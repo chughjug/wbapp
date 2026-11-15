@@ -11,6 +11,7 @@ const App = () => {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const ctl = useBackdropPanel(api);
   useEffect(() => {
+    console.log("HARNESS effect, api=", !!api);
     if (!api) return;
     (window as any).api = api;
     (window as any).ops = { applyBackdrop, removeBackdrop, getBackdropState, restoreElements };
@@ -20,7 +21,7 @@ const App = () => {
   return (
     <div className="wrap">
       <div className="canvas">
-        <Excalidraw excalidrawAPI={(a) => setApi(a)}>
+        <Excalidraw excalidrawAPI={(a) => { console.log("HARNESS got api"); setApi(a); }}>
           <div style={{ position: "absolute", top: 8, right: 8, zIndex: 10 }}>
             <BackdropPanel {...ctl.panelProps} />
           </div>
