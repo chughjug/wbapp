@@ -37,12 +37,12 @@ import type {
 
 import { renderPaper } from "../paper";
 
-import type { Page } from "../types";
-
 import { getPageChildren } from "./pageModel";
 import { usePages } from "./usePages";
 
 import "./PageSidebar.scss";
+
+import type { Page } from "../types";
 
 /** Width of a rendered thumbnail, in CSS px. */
 const THUMBNAIL_WIDTH = 132;
@@ -145,11 +145,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
       aria-label="Pages"
       data-testid="goodnotes-page-sidebar"
     >
-      <ul
-        className="goodnotes-pages__list"
-        ref={listRef}
-        onKeyDown={onKeyDown}
-      >
+      <ul className="goodnotes-pages__list" ref={listRef} onKeyDown={onKeyDown}>
         {pages.map((page, index) => {
           const isActive = index === activePageIndex;
           const label = `Page ${index + 1} of ${pages.length}`;

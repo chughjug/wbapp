@@ -7,6 +7,8 @@ import {
   useEditorInterface,
   ExcalidrawAPIProvider,
   useExcalidrawAPI,
+  Sidebar,
+  Footer,
 } from "@excalidraw/excalidraw";
 import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
@@ -79,6 +81,22 @@ import type {
 import type { ResolutionType } from "@excalidraw/common/utility-types";
 import type { ResolvablePromise } from "@excalidraw/common/utils";
 
+import { ExportDialog, getOrderedPageFrames } from "./goodnotes/export";
+import { PenTray } from "./goodnotes/pens";
+import {
+  PageSidebar,
+  usePages,
+  isPageFrame,
+  getPageTemplate,
+} from "./goodnotes/pages";
+import { PaperBackgroundLayer } from "./goodnotes/paper";
+import {
+  Shelf,
+  getScene,
+  saveSceneDebounced,
+  flushSceneSaves,
+} from "./goodnotes/library";
+
 import CustomStats from "./CustomStats";
 import {
   Provider,
@@ -148,6 +166,8 @@ import "./index.scss";
 
 import { ExcalidrawPlusPromoBanner } from "./components/ExcalidrawPlusPromoBanner";
 import { AppSidebar } from "./components/AppSidebar";
+
+import type { DocMeta } from "./goodnotes/types";
 
 import type { CollabAPI } from "./collab/Collab";
 
@@ -372,11 +392,77 @@ const initializeScene = async (opts: {
   return { scene: null, isExternalScene: false };
 };
 
-const ExcalidrawWrapper = () => {
+const ExcalidrawWrapper = ({
+  docId,
+  onCloseDocument,
+}: {
+  docId: string;
+  onCloseDocument: () => void;
+}) => {
   const excalidrawAPI = useExcalidrawAPI();
 
   const [errorMessage, setErrorMessage] = useState("");
   const isCollabDisabled = isRunningInIframe();
+
+  const [isPdfExportOpen, setIsPdfExportOpen] = useState(false);
+  // view transform mirrored out of AppState so the paper layer, which lives
+  // outside the editor, can follow the canvas
+  const [paperView, setPaperView] = useState({
+    elements: [] as readonly OrderedExcalidrawElement[],
+    scrollX: 0,
+    scrollY: 0,
+    zoom: 1,
+    theme: "light" as "light" | "dark",
+    offsetLeft: 0,
+    offsetTop: 0,
+  });
+
+  const { seedFirstPage } = usePages(excalidrawAPI);
+
+  // 1-based page under the viewport centre, for the export dialog's
+  // "current page" option. Keyed off `paperView` so it tracks scrolling.
+  const currentPageNumber = useMemo(() => {
+    if (!excalidrawAPI) {
+      return null;
+    }
+    const { scrollY, height } = excalidrawAPI.getAppState();
+    const centreY = -scrollY + height / 2;
+    const frames = getOrderedPageFrames(paperView.elements);
+    const index = frames.findIndex(
+      (frame) => centreY >= frame.y && centreY <= frame.y + frame.height,
+    );
+    return index === -1 ? null : index + 1;
+  }, [excalidrawAPI, paperView]);
+
+  // every new document starts with one page, so the canvas is never an
+  // unbounded void; idempotent, so reopening a document does not add pages
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    initialStatePromiseRef.current.promise.then(() => {
+      seedFirstPage({ size: "LETTER", template: "lined" });
+    });
+  }, [excalidrawAPI, seedFirstPage]);
+
+  // show the page strip by default; a notebook's page list is not something
+  // the user should have to go looking for
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    excalidrawAPI.toggleSidebar({ name: "goodnotes-pages", force: true });
+  }, [excalidrawAPI]);
+
+  // flush any debounced scene write before the tab goes away
+  useEffect(() => {
+    const flush = () => void flushSceneSaves();
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, []);
 
   const { editorTheme, appTheme, setAppTheme } = useHandleAppTheme();
 
@@ -564,7 +650,31 @@ const ExcalidrawWrapper = () => {
 
     initializeScene({ collabAPI, excalidrawAPI }).then(async (data) => {
       loadImages(data, /* isInitialLoad */ true);
-      initialStatePromiseRef.current.promise.resolve(data.scene);
+      // Prefer this document's own scene from the library. Falling back to
+      // `data.scene` keeps the usual defaults and the `#json=` import path
+      // working for a document that has never been saved.
+      const docScene = await getScene(docId);
+      initialStatePromiseRef.current.promise.resolve(
+        docScene
+          ? {
+              elements: docScene.elements,
+              appState: {
+                ...docScene.appState,
+                // the paper layer sits behind Excalidraw's canvas, which
+                // paints over it unless the background is literally
+                // "transparent"
+                viewBackgroundColor: "transparent",
+              },
+              files: docScene.files,
+            }
+          : {
+              ...data.scene,
+              appState: {
+                ...data.scene?.appState,
+                viewBackgroundColor: "transparent",
+              },
+            },
+      );
     });
 
     const onHashChange = async (event: HashChangeEvent) => {
@@ -685,7 +795,14 @@ const ExcalidrawWrapper = () => {
         false,
       );
     };
-  }, [isCollabDisabled, collabAPI, excalidrawAPI, setLangCode, loadImages]);
+  }, [
+    isCollabDisabled,
+    collabAPI,
+    excalidrawAPI,
+    setLangCode,
+    loadImages,
+    docId,
+  ]);
 
   useEffect(() => {
     const unloadHandler = (event: BeforeUnloadEvent) => {
@@ -720,6 +837,32 @@ const ExcalidrawWrapper = () => {
     if (collabAPI?.isCollaborating()) {
       collabAPI.syncElements(elements);
     }
+
+    // persist into this document's own record; coalesced per document
+    saveSceneDebounced(docId, { elements, appState, files });
+
+    // keep the paper layer in step with the canvas; bail out to the previous
+    // object when nothing it cares about moved, so this hot path does not
+    // re-render the layer on every pointer event
+    setPaperView((prev) =>
+      prev.elements === elements &&
+      prev.scrollX === appState.scrollX &&
+      prev.scrollY === appState.scrollY &&
+      prev.zoom === appState.zoom.value &&
+      prev.theme === appState.theme &&
+      prev.offsetLeft === appState.offsetLeft &&
+      prev.offsetTop === appState.offsetTop
+        ? prev
+        : {
+            elements,
+            scrollX: appState.scrollX,
+            scrollY: appState.scrollY,
+            zoom: appState.zoom.value,
+            theme: appState.theme,
+            offsetLeft: appState.offsetLeft,
+            offsetTop: appState.offsetTop,
+          },
+    );
 
     // this check is redundant, but since this is a hot path, it's best
     // not to evaludate the nested expression every time
@@ -948,11 +1091,30 @@ const ExcalidrawWrapper = () => {
 
   return (
     <div
-      style={{ height: "100%" }}
+      style={{ height: "100%", position: "relative" }}
       className={clsx("excalidraw-app", {
         "is-collaborating": isCollaborating,
       })}
     >
+      <PaperBackgroundLayer
+        elements={paperView.elements}
+        scrollX={paperView.scrollX}
+        scrollY={paperView.scrollY}
+        zoom={paperView.zoom}
+        theme={paperView.theme}
+        offsetLeft={paperView.offsetLeft}
+        offsetTop={paperView.offsetTop}
+        // Resolve by frame id, not by `page.index`: the paper module derives
+        // that index from the frame NAME (so "page:1" gives 1), while the
+        // pages module's index accessors are 0-based array positions. Going
+        // through the id sidesteps the mismatch entirely.
+        templateForPage={(page) => {
+          const frame = paperView.elements.find((el) => el.id === page.id);
+          return frame && isPageFrame(frame)
+            ? getPageTemplate(frame)
+            : undefined;
+        }}
+      />
       <Excalidraw
         viewportStatusFrame={viewportStatusFrame}
         userToFollow={userToFollow}
@@ -1041,6 +1203,8 @@ const ExcalidrawWrapper = () => {
           isCollabEnabled={isCollabAvailable}
           theme={appTheme}
           refresh={() => forceRefresh((prev) => !prev)}
+          onExportPdf={() => setIsPdfExportOpen(true)}
+          onCloseDocument={onCloseDocument}
         />
         <AppWelcomeScreen
           onCollabDialogOpen={onCollabDialogOpen}
@@ -1068,6 +1232,21 @@ const ExcalidrawWrapper = () => {
         </OverwriteConfirmDialog>
         <AppFooter onChange={() => excalidrawAPI?.refresh()} />
         {excalidrawAPI && <AIComponents excalidrawAPI={excalidrawAPI} />}
+
+        {/* GoodNotes layer. The tray goes in <Footer>, a real Excalidraw
+            slot: as a bare child it joined the container's layout flow and
+            pushed the static canvas sideways by its own width. Footer also
+            keeps it inside `.excalidraw`, where the CSS custom properties
+            it uses are scoped. */}
+        <Footer>
+          <PenTray excalidrawAPI={excalidrawAPI} />
+        </Footer>
+        {excalidrawAPI && (
+          <Sidebar name="goodnotes-pages" docked onDock={() => {}}>
+            <Sidebar.Header />
+            <PageSidebar excalidrawAPI={excalidrawAPI} />
+          </Sidebar>
+        )}
 
         <TTDDialogTrigger />
         {isCollaborating && isOffline && (
@@ -1306,7 +1485,65 @@ const ExcalidrawWrapper = () => {
           />
         )}
       </Excalidraw>
+      {isPdfExportOpen && excalidrawAPI && (
+        <ExportDialog
+          elements={excalidrawAPI.getSceneElements()}
+          files={excalidrawAPI.getFiles()}
+          appState={excalidrawAPI.getAppState()}
+          currentPageNumber={currentPageNumber}
+          theme={editorTheme}
+          onClose={() => setIsPdfExportOpen(false)}
+        />
+      )}
     </div>
+  );
+};
+
+/**
+ * Routes between the document shelf and a single open document.
+ *
+ * A document is addressed by `/d/<docId>`, so a specific assignment can be
+ * linked to and the back button behaves. `ExcalidrawWrapper` is keyed on the
+ * id, which remounts the editor on document switch rather than trying to
+ * swap a live scene underneath it.
+ */
+const GoodNotesRoot = () => {
+  const [docId, setDocId] = useState<string | null>(() => {
+    const match = window.location.pathname.match(/^\/d\/([^/]+)$/);
+    return match ? decodeURIComponent(match[1]) : null;
+  });
+  const { editorTheme } = useHandleAppTheme();
+
+  const openDocument = useCallback((doc: DocMeta) => {
+    window.history.pushState({}, "", `/d/${encodeURIComponent(doc.id)}`);
+    setDocId(doc.id);
+  }, []);
+
+  const closeDocument = useCallback(() => {
+    void flushSceneSaves();
+    window.history.pushState({}, "", "/");
+    setDocId(null);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const match = window.location.pathname.match(/^\/d\/([^/]+)$/);
+      setDocId(match ? decodeURIComponent(match[1]) : null);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  if (!docId) {
+    return <Shelf theme={editorTheme} onOpenDocument={openDocument} />;
+  }
+
+  return (
+    <ExcalidrawWrapper
+      key={docId}
+      docId={docId}
+      onCloseDocument={closeDocument}
+    />
   );
 };
 
@@ -1321,7 +1558,7 @@ const ExcalidrawApp = () => {
     <TopErrorBoundary>
       <Provider store={appJotaiStore}>
         <ExcalidrawAPIProvider>
-          <ExcalidrawWrapper />
+          <GoodNotesRoot />
         </ExcalidrawAPIProvider>
       </Provider>
     </TopErrorBoundary>

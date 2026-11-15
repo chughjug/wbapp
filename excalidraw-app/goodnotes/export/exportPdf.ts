@@ -116,7 +116,10 @@ export const matchPageSizeName = (
     PageSizeName,
     { width: number; height: number },
   ][]) {
-    if (Math.abs(size.width - width) <= 1 && Math.abs(size.height - height) <= 1) {
+    if (
+      Math.abs(size.width - width) <= 1 &&
+      Math.abs(size.height - height) <= 1
+    ) {
       return name;
     }
   }
@@ -311,9 +314,9 @@ export const exportDocumentToPdf = async ({
     }
   }
   for (const frame of allPageFrames) {
-    const stored = (
-      frame.customData as Record<string, unknown> | undefined
-    )?.[PAGE_CUSTOM_DATA_KEY] as { template?: PaperTemplateId } | undefined;
+    const stored = (frame.customData as Record<string, unknown> | undefined)?.[
+      PAGE_CUSTOM_DATA_KEY
+    ] as { template?: PaperTemplateId } | undefined;
     if (stored?.template) {
       templateByFrameId.set(frame.id, stored.template);
     }

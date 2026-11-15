@@ -8,8 +8,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ExcalidrawElement } from "@excalidraw/element/types";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
-import type { Page, PageSizeName, PaperTemplateId } from "../types";
-
 import {
   addPage as addPageToElements,
   deletePage as deletePageInElements,
@@ -20,6 +18,8 @@ import {
   setPageTemplate as setPageTemplateInElements,
 } from "./pageModel";
 import { scrollToPage as scrollViewportToPage } from "./scrollToPage";
+
+import type { Page, PageSizeName, PaperTemplateId } from "../types";
 
 export interface UsePagesResult {
   /** Every page in the document, in document order. */
@@ -153,7 +153,8 @@ export const usePages = (
   );
 
   const deletePage = useCallback(
-    (index: number) => apply((elements) => deletePageInElements(elements, index)),
+    (index: number) =>
+      apply((elements) => deletePageInElements(elements, index)),
     [apply],
   );
 
@@ -175,9 +176,7 @@ export const usePages = (
 
   const setPageTemplate = useCallback(
     (index: number, template: PaperTemplateId) =>
-      apply((elements) =>
-        setPageTemplateInElements(elements, index, template),
-      ),
+      apply((elements) => setPageTemplateInElements(elements, index, template)),
     [apply],
   );
 

@@ -15,12 +15,8 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 
-import type {
-  ExcalidrawElement,
-} from "@excalidraw/element/types";
+import type { ExcalidrawElement } from "@excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
-
-import type { PaperTemplateId } from "../types";
 
 import {
   downloadPdfBlob,
@@ -33,6 +29,8 @@ import {
 } from "./exportPdf";
 
 import "./ExportDialog.scss";
+
+import type { PaperTemplateId } from "../types";
 
 export type PageRangeMode = "all" | "current" | "custom";
 
@@ -180,7 +178,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       if (!root) {
         return;
       }
-      const focusable = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+      const focusable = [
+        ...root.querySelectorAll<HTMLElement>(FOCUSABLE),
+      ].filter(
         (el) => el.offsetParent !== null || el === document.activeElement,
       );
       if (focusable.length === 0) {
@@ -508,7 +508,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         )}
 
         {/* single polite live region for progress + completion */}
-        <div className="gn-export-visually-hidden" aria-live="polite" role="status">
+        <div
+          className="gn-export-visually-hidden"
+          aria-live="polite"
+          role="status"
+        >
           {status}
         </div>
 

@@ -31,7 +31,11 @@ export type { ExportDocumentToPdfOptions } from "./exportPdf";
 export { PdfExportError } from "./exportPdf";
 
 /** Finds/orders the `page:N` frames of a scene (local to this module). */
-export { getOrderedPageFrames, isPageFrame, matchPageSizeName } from "./exportPdf";
+export {
+  getOrderedPageFrames,
+  isPageFrame,
+  matchPageSizeName,
+} from "./exportPdf";
 
 /** Parses user input like `"1-3,5"` into 1-based page numbers. */
 export { parsePageRange } from "./exportPdf";

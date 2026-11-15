@@ -22,10 +22,25 @@ export const AppMainMenu: React.FC<{
   isCollabEnabled: boolean;
   theme: Theme | "system";
   refresh: () => void;
+  onExportPdf: () => void;
+  onCloseDocument: () => void;
 }> = React.memo((props) => {
   const { t } = useI18n();
   return (
     <MainMenu>
+      <MainMenu.Item
+        onSelect={props.onCloseDocument}
+        data-testid="goodnotes-all-documents"
+      >
+        All documents
+      </MainMenu.Item>
+      <MainMenu.Item
+        onSelect={props.onExportPdf}
+        data-testid="goodnotes-export-pdf"
+      >
+        Export to PDF…
+      </MainMenu.Item>
+      <MainMenu.Separator />
       <MainMenu.DefaultItems.LoadScene />
       <MainMenu.DefaultItems.SaveToActiveFile />
       <MainMenu.DefaultItems.Export />

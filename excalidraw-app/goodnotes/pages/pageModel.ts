@@ -134,13 +134,14 @@ export const getPages = (elements: Elements): Page[] => {
 
 /** Number of pages in the scene. */
 export const getPageCount = (elements: Elements): number =>
-  elements.reduce((count, element) => count + (isPageFrame(element) ? 1 : 0), 0);
+  elements.reduce(
+    (count, element) => count + (isPageFrame(element) ? 1 : 0),
+    0,
+  );
 
 /** The page frame at `index`, or `null`. */
-export const getPageAt = (
-  elements: Elements,
-  index: number,
-): Page | null => getPages(elements)[index] ?? null;
+export const getPageAt = (elements: Elements, index: number): Page | null =>
+  getPages(elements)[index] ?? null;
 
 /** `y` the page at `index` should sit at, given the sizes of the pages above. */
 export const getPageTop = (pages: readonly Page[], index: number): number => {
@@ -221,13 +222,23 @@ export const createPageFrame = (
     backgroundColor: "transparent",
     name: pageFrameName(index),
     customData: {
-      [PAGE_CUSTOM_DATA_KEY]: {
+      [PAGE_CUSTOM_DATA_KEY]: identityPageCustomData({
         template: opts?.template ?? "blank",
         size,
-      } satisfies PageCustomData,
+      }),
     },
   });
 };
+
+/**
+ * Identity function that pins its argument to `PageCustomData`.
+ *
+ * This is what `satisfies PageCustomData` would express, written as a call
+ * because the repo's eslint runs an older @typescript-eslint parser that
+ * cannot parse the `satisfies` operator (it fails with "',' expected"),
+ * even though tsc accepts it.
+ */
+const identityPageCustomData = (data: PageCustomData): PageCustomData => data;
 
 // ---------------------------------------------------------------------------
 // restacking — the core of the module
@@ -365,8 +376,7 @@ export const addPage = (
   const reference = pages[at - 1] ?? pages[at] ?? null;
   const size =
     opts.size ?? (reference ? getPageSizeName(reference.frame) : "A4");
-  const template =
-    opts.template ?? (reference ? reference.template : "blank");
+  const template = opts.template ?? (reference ? reference.template : "blank");
 
   // y is provisional; restackPages assigns the real slot. We place it just
   // above the page currently at `at` so the sort puts it in the right place.
@@ -449,11 +459,11 @@ export const setPageTemplate = (
       ? newElementWith(element, {
           customData: {
             ...(element.customData ?? {}),
-            [PAGE_CUSTOM_DATA_KEY]: {
+            [PAGE_CUSTOM_DATA_KEY]: identityPageCustomData({
               ...readCustomData(page.frame),
               size: getPageSizeName(page.frame),
               template,
-            } satisfies PageCustomData,
+            }),
           },
         })
       : element,
