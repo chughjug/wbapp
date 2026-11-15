@@ -1,18 +1,12 @@
-import React from "react";
 import { nanoid } from "nanoid";
 
-import { trackEvent } from "@excalidraw/excalidraw/analytics";
-import { Card } from "@excalidraw/excalidraw/components/Card";
-import { ExcalidrawLogo } from "@excalidraw/excalidraw/components/ExcalidrawLogo";
-import { IconButton } from "@excalidraw/excalidraw/components/IconButton";
-import { MIME_TYPES, getFrame } from "@excalidraw/common";
+import { MIME_TYPES } from "@excalidraw/common";
 import {
   encryptData,
   generateEncryptionKey,
 } from "@excalidraw/excalidraw/data/encryption";
 import { serializeAsJSON } from "@excalidraw/excalidraw/data/json";
 import { isInitializedImageElement } from "@excalidraw/element";
-import { useI18n } from "@excalidraw/excalidraw/i18n";
 
 import type {
   FileId,
@@ -27,6 +21,8 @@ import type {
 import { FILE_UPLOAD_MAX_BYTES } from "../app_constants";
 import { encodeFilesForUpload } from "../data/FileManager";
 import { saveFilesToFirebase, uploadBytesToFirebase } from "../data/firebase";
+
+import type React from "react";
 
 export const exportToExcalidrawPlus = async (
   elements: readonly NonDeletedExcalidrawElement[],
@@ -83,6 +79,15 @@ export const exportToExcalidrawPlus = async (
   );
 };
 
+/**
+ * Branding removed: the "Export to Excalidraw+" upsell card no longer renders
+ * in the export dialog.
+ *
+ * This no-op stub only exists until `excalidraw-app/App.tsx` drops its usage
+ * (see `excalidraw-app/goodnotes/BRANDING_APP_TSX.md`). Once that edit lands,
+ * delete this component (and this whole file, if `exportToExcalidrawPlus` is
+ * dropped from App.tsx too).
+ */
 export const ExportToExcalidrawPlus: React.FC<{
   elements: readonly NonDeletedExcalidrawElement[];
   appState: Partial<AppState>;
@@ -90,42 +95,4 @@ export const ExportToExcalidrawPlus: React.FC<{
   name: string;
   onError: (error: Error) => void;
   onSuccess: () => void;
-}> = ({ elements, appState, files, name, onError, onSuccess }) => {
-  const { t } = useI18n();
-  return (
-    <Card color="primary">
-      <div className="Card-icon">
-        <ExcalidrawLogo
-          style={{
-            [`--color-logo-icon` as any]: "#fff",
-            width: "2.8rem",
-            height: "2.8rem",
-          }}
-        />
-      </div>
-      <h2>Excalidraw+</h2>
-      <div className="Card-details">
-        {t("exportDialog.excalidrawplus_description")}
-      </div>
-      <IconButton
-        className="Card-button"
-        type="button"
-        title={t("exportDialog.excalidrawplus_button")}
-        aria-label={t("exportDialog.excalidrawplus_button")}
-        showAriaLabel={true}
-        onClick={async () => {
-          try {
-            trackEvent("export", "eplus", `ui (${getFrame()})`);
-            await exportToExcalidrawPlus(elements, appState, files, name);
-            onSuccess();
-          } catch (error: any) {
-            console.error(error);
-            if (error.name !== "AbortError") {
-              onError(new Error(t("exportDialog.excalidrawplus_exportError")));
-            }
-          }
-        }}
-      />
-    </Card>
-  );
-};
+}> = () => null;
