@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Excalidraw, restoreElements } from "@excalidraw/excalidraw";
-import "@excalidraw/excalidraw/index.css";
+import "../../index.scss";
 
-import { BackdropPanel, useBackdropPanel, applyBackdrop, removeBackdrop, getBackdropState } from "../index";
+import { BackdropPanel, useBackdropPanel, applyBackdrop, removeBackdrop, getBackdropState } from "./index";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 

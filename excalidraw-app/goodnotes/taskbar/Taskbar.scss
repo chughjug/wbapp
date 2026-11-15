@@ -7,10 +7,10 @@
  * `.excalidraw`. Every value has a literal fallback so the bar is still legible
  * if it is ever mounted outside the editor.
  *
- * Deliberately NOT used: `--color-muted`, which is a background grey and has
- * no contrast guarantee as a text colour. Secondary text uses
- * `--keybinding-color`, which is the token Excalidraw itself uses for de-
- * emphasised label text in both themes.
+ * Deliberately NOT used: `--color-muted` (a *background* grey, no contrast
+ * guarantee as text) and `--keybinding-color` (#b8b8b8 on light, ~1.9:1 on the
+ * island). De-emphasised text uses `--input-label-color`, a real text token
+ * that measures >8:1 in both themes.
  */
 
 // The root both scopes the theme tokens and positions the bar. It carries
@@ -164,9 +164,11 @@
     padding: 0 0.5rem;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
-    // `--color-muted` is a *background* grey; this is the token Excalidraw
-    // uses for de-emphasised text, and it is defined for both themes.
-    color: var(--keybinding-color, #868e96);
+    // `--color-muted` is a *background* grey, and `--keybinding-color` is
+    // deliberately low-contrast (1.9:1 on white) — neither is safe for text.
+    // `--input-label-color` is the de-emphasised *text* token: #495057 on
+    // light, #e9ecef on dark, i.e. >8:1 against the island in both themes.
+    color: var(--input-label-color, #495057);
   }
 
   // visually hidden, still announced
@@ -222,7 +224,7 @@
     font-weight: 600;
     letter-spacing: 0.02em;
     text-transform: uppercase;
-    color: var(--keybinding-color, #868e96);
+    color: var(--input-label-color, #495057);
   }
 
   &__menu-item {
@@ -257,7 +259,8 @@
     }
 
     &:disabled {
-      color: var(--keybinding-color, #868e96);
+      color: var(--input-label-color, #495057);
+      opacity: 0.8;
       cursor: default;
     }
   }

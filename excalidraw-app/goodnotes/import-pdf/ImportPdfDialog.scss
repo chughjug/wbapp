@@ -99,9 +99,17 @@
   margin: 0;
   padding: 0.625rem 0.75rem;
   border-radius: var(--border-radius-md, 0.375rem);
-  border: 1px solid var(--color-warning-dark, #f5c33b);
-  background-color: var(--color-warning-background, rgba(245, 195, 59, 0.16));
-  color: var(--text-primary-color, var(--color-on-surface));
+  border: 1px solid var(--color-warning-dark, #f5c354);
+  // `--color-warning-background` is the same pale yellow in BOTH themes, so
+  // the text on it must be dark in both — `--text-primary-color` would be
+  // near-white (and unreadable) in dark theme.
+  background-color: var(--color-warning-background, #fceeca);
+  color: #1b1b1f;
+
+  code {
+    background-color: rgba(0, 0, 0, 0.08);
+    color: inherit;
+  }
 
   .gn-import-pdf-dialog__code {
     display: block;
