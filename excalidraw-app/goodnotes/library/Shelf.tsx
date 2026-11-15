@@ -532,7 +532,8 @@ export const Shelf = ({
   // id of a card that should take DOM focus once it renders
   const pendingFocusRef = useRef<string | null>(null);
 
-  // a single clock read per render keeps every badge mutually consistent
+  // one clock read per documents-change keeps every badge mutually consistent
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const now = useMemo(() => Date.now(), [documents]);
 
   const visible = useMemo(() => {
