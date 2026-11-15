@@ -20,6 +20,8 @@ import type {
 } from "@excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 
+import type { PaperTemplateId } from "../types";
+
 import {
   downloadPdfBlob,
   exportDocumentToPdf,
@@ -46,6 +48,11 @@ export interface ExportDialogProps {
   currentPageNumber?: number | null;
   /** Pre-filled filename (with or without the `.pdf` suffix). */
   defaultFileName?: string;
+  /**
+   * Paper template used for pages whose frame name doesn't encode one.
+   * Pass the document's default (e.g. `DocMeta.defaultTemplate`).
+   */
+  defaultPaperTemplate?: PaperTemplateId;
   /** Called on Escape, backdrop click, Cancel, or after a successful export. */
   onClose: () => void;
   /** Optional hook for telemetry / toasts. */
@@ -68,6 +75,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   appState,
   currentPageNumber = null,
   defaultFileName = "document",
+  defaultPaperTemplate = "blank",
   onClose,
   onExported,
 }) => {
@@ -233,6 +241,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         pageRange: pages,
         scale,
         includeBackground,
+        defaultPaperTemplate,
         fileName,
         signal: controller.signal,
         onProgress: (completed, total) => {
@@ -281,6 +290,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     appState,
     scale,
     includeBackground,
+    defaultPaperTemplate,
     fileName,
     onExported,
     onClose,
@@ -433,7 +443,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 disabled={isExporting}
                 onChange={(event) => setIncludeBackground(event.target.checked)}
               />
-              <span>Include background</span>
+              <span>Include page background (paper &amp; colour)</span>
             </label>
           </div>
 

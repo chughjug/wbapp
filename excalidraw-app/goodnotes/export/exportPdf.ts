@@ -22,9 +22,10 @@ import type {
 } from "@excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 
+import { getPaperPageRects, renderPaper } from "../paper";
 import { PAGE_FRAME_PREFIX, PAGE_SIZES } from "../types";
 
-import type { PageSizeName } from "../types";
+import type { PageSizeName, PaperTemplateId } from "../types";
 
 // ---------------------------------------------------------------------------
 // Units
@@ -61,12 +62,18 @@ export const isPageFrame = (
  * Returns `null` when the suffix isn't a plain positive integer.
  */
 const parsePageFrameIndex = (frame: ExcalidrawFrameElement): number | null => {
-  const suffix = (frame.name ?? "").slice(PAGE_FRAME_PREFIX.length).trim();
-  if (!/^\d+$/.test(suffix)) {
-    return null;
+  // name shapes: "page:", "page:3", "page:3:lined", "page:lined"
+  const parts = (frame.name ?? "")
+    .slice(PAGE_FRAME_PREFIX.length)
+    .split(":")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  for (const part of parts) {
+    if (/^\d+$/.test(part)) {
+      return Number(part);
+    }
   }
-  const parsed = Number(suffix);
-  return Number.isFinite(parsed) ? parsed : null;
+  return null;
 };
 
 /**
@@ -237,8 +244,19 @@ export interface ExportDocumentToPdfOptions {
   pageRange?: readonly number[] | null;
   /** Raster multiplier for print quality. @default 2 */
   scale?: number;
-  /** Paint the scene background behind each page. @default true */
+  /**
+   * Paint the page background — the paper template (lined/grid/Cornell/…)
+   * plus the sheet fill — behind each page's ink. The paper layer lives in
+   * the DOM, not in the Excalidraw scene, so the PDF has to redraw it.
+   * When `false` the page raster is transparent.
+   * @default true
+   */
   includeBackground?: boolean;
+  /**
+   * Paper template for pages whose frame name doesn't encode one
+   * (e.g. plain `"page:2"`). @default "blank"
+   */
+  defaultPaperTemplate?: PaperTemplateId;
   /** Stored as the PDF's document title. */
   fileName?: string;
   /** Called after each page is placed. */
@@ -272,12 +290,21 @@ export const exportDocumentToPdf = async ({
   pageRange,
   scale = DEFAULT_SCALE,
   includeBackground = true,
+  defaultPaperTemplate = "blank",
   fileName,
   onProgress,
   signal,
 }: ExportDocumentToPdfOptions): Promise<Blob> => {
   const sceneElements = getNonDeletedElements(elements);
   const allPageFrames = getOrderedPageFrames(sceneElements);
+
+  // per-frame paper template, parsed by the paper module from the frame name
+  const templateByFrameId = new Map<string, PaperTemplateId>();
+  for (const rect of getPaperPageRects(sceneElements)) {
+    if (rect.template) {
+      templateByFrameId.set(rect.id, rect.template);
+    }
+  }
 
   if (allPageFrames.length === 0) {
     throw new PdfExportError(
@@ -331,7 +358,10 @@ export const exportDocumentToPdf = async ({
     const format: [number, number] = [widthPt, heightPt];
 
     try {
-      const canvas = await exportScene({
+      // Ink layer: always transparent, so the paper drawn underneath shows
+      // through. Excalidraw clips this to exactly the frame's bounds, with
+      // zero padding, and hides the frame's own name/outline.
+      const inkCanvas = await exportScene({
         type: "canvas",
         data: {
           elements: sceneElements,
@@ -339,17 +369,44 @@ export const exportDocumentToPdf = async ({
           files: files ?? undefined,
         },
         config: {
-          // clips output to exactly this frame's bounds, with zero padding,
-          // and hides the frame's own name/outline
           exportingFrame: frame,
           // print output is always light theme
           theme: THEME.LIGHT,
-          canvasBackgroundColor: includeBackground ? undefined : false,
+          canvasBackgroundColor: false,
           scale: effectiveScale,
         },
       });
 
-      const dataUrl = canvas.toDataURL("image/png");
+      let pageCanvas: HTMLCanvasElement = inkCanvas;
+
+      if (includeBackground) {
+        // Paper (sheet fill + rulings + border) is a DOM overlay in the app,
+        // not part of the scene, so it has to be redrawn here as the bottom
+        // layer of the page.
+        const composite = document.createElement("canvas");
+        composite.width = inkCanvas.width;
+        composite.height = inkCanvas.height;
+        const ctx = composite.getContext("2d");
+        if (!ctx) {
+          throw new Error("could not get a 2d canvas context");
+        }
+        const sx = inkCanvas.width / frame.width;
+        const sy = inkCanvas.height / frame.height;
+        ctx.save();
+        ctx.scale(sx, sy);
+        renderPaper(
+          ctx,
+          templateByFrameId.get(frame.id) ?? defaultPaperTemplate,
+          frame.width,
+          frame.height,
+          { theme: "light", sheet: true },
+        );
+        ctx.restore();
+        ctx.drawImage(inkCanvas, 0, 0);
+        pageCanvas = composite;
+      }
+
+      const dataUrl = pageCanvas.toDataURL("image/png");
 
       if (doc === null) {
         doc = new jsPDF({

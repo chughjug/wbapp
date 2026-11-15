@@ -22,10 +22,16 @@ import React, {
 } from "react";
 
 import type {
+  ExcalidrawElement,
   ExcalidrawFrameElement,
   NonDeleted,
 } from "@excalidraw/element/types";
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import type {
+  BinaryFiles,
+  ExcalidrawImperativeAPI,
+} from "@excalidraw/excalidraw/types";
+
+import { renderPaper } from "../paper";
 
 import type { Page } from "../types";
 
@@ -34,8 +40,10 @@ import { usePages } from "./usePages";
 
 import "./PageSidebar.scss";
 
-/** Width of a rendered thumbnail bitmap, in CSS px. */
+/** Width of a rendered thumbnail, in CSS px. */
 const THUMBNAIL_WIDTH = 132;
+/** Bitmaps are rendered at this multiple of the CSS size, for crispness. */
+const THUMBNAIL_PIXEL_RATIO = 2;
 /** How long to wait after the last scene change before re-rendering thumbs. */
 const THUMBNAIL_DEBOUNCE_MS = 400;
 /**
@@ -233,6 +241,72 @@ const prefersReducedMotionCSS = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
+ * Renders one page thumbnail: the page's paper template painted first, then
+ * the page's ink composited on top.
+ *
+ * The ink raster MUST be transparent or it would hide the paper, hence
+ * `canvasBackgroundColor: false` (without it the export fills the canvas with
+ * `appState.viewBackgroundColor` and the paper would never be visible). The
+ * frame is passed as `exportingFrame`, so the export is clipped to the page
+ * and its canvas is exactly the page box — no frame name or outline drawn.
+ *
+ * Exported for testing; not part of the module's public API (`index.ts`).
+ */
+export const renderPageThumbnail = async ({
+  page,
+  children,
+  files,
+  theme,
+}: {
+  page: Page;
+  children: ExcalidrawElement[];
+  files: BinaryFiles;
+  theme: "light" | "dark";
+}): Promise<string> => {
+  const { width: pageWidth, height: pageHeight } = page.frame;
+  const scale = (THUMBNAIL_WIDTH / pageWidth) * THUMBNAIL_PIXEL_RATIO;
+  const canvasWidth = Math.max(1, Math.round(pageWidth * scale));
+  const canvasHeight = Math.max(1, Math.round(pageHeight * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("no 2d context");
+  }
+
+  // 1. the paper (sheet fill + rulings + border), in page-local coordinates
+  ctx.save();
+  ctx.scale(canvasWidth / pageWidth, canvasHeight / pageHeight);
+  renderPaper(ctx, page.template, pageWidth, pageHeight, {
+    theme,
+    sheet: true,
+  });
+  ctx.restore();
+
+  // 2. the ink, on a transparent raster, composited over the paper
+  const ink = await exportScene({
+    type: "canvas",
+    data: {
+      elements: getNonDeletedElements([...children, page.frame]),
+      files,
+    },
+    config: {
+      exportingFrame: page.frame as NonDeleted<ExcalidrawFrameElement>,
+      padding: 0,
+      theme,
+      // transparent — otherwise this raster would paint over the paper
+      canvasBackgroundColor: false,
+      scale,
+    },
+  });
+  ctx.drawImage(ink, 0, 0, canvasWidth, canvasHeight);
+
+  return canvas.toDataURL("image/png");
+};
+
+/**
  * Debounced, cached page thumbnails.
  *
  * Each page is rendered with `exportScene({ type: "canvas", … })` using the
@@ -259,16 +333,17 @@ const usePageThumbnails = (
       return "";
     }
     const elements = excalidrawAPI.getSceneElements();
-    return pages
+    const theme = excalidrawAPI.getAppState().theme;
+    return `${theme}#${pages
       .map((page) => {
         const children = getPageChildren(elements, page.frame.id);
         let sum = page.frame.version;
         for (const child of children) {
           sum += child.version;
         }
-        return `${page.frame.id}:${children.length}:${sum}`;
+        return `${page.frame.id}:${page.template}:${children.length}:${sum}`;
       })
-      .join("|");
+      .join("|")}`;
     // `pages` identity changes whenever a page frame changes; we additionally
     // re-read children on every render of this hook's owner (cheap filter).
   }, [excalidrawAPI, pages, enabled]);
@@ -284,6 +359,7 @@ const usePageThumbnails = (
       const elements = excalidrawAPI.getSceneElements();
       const appState = excalidrawAPI.getAppState();
       const files = excalidrawAPI.getFiles();
+      const theme = appState.theme === "dark" ? "dark" : "light";
       const next = new Map<string, string>();
 
       for (const page of pages) {
@@ -295,30 +371,19 @@ const usePageThumbnails = (
         for (const child of children) {
           sum += child.version;
         }
-        const key = `${children.length}:${sum}:${page.frame.width}x${page.frame.height}`;
+        const key = `${children.length}:${sum}:${page.frame.width}x${page.frame.height}:${page.template}:${theme}`;
         const cached = cacheRef.current.get(page.frame.id);
         if (cached?.key === key) {
           next.set(page.frame.id, cached.url);
           continue;
         }
         try {
-          const canvas = await exportScene({
-            type: "canvas",
-            data: {
-              elements: getNonDeletedElements([...children, page.frame]),
-              appState: {
-                viewBackgroundColor: appState.viewBackgroundColor,
-              },
-              files,
-            },
-            config: {
-              exportingFrame: page.frame as NonDeleted<ExcalidrawFrameElement>,
-              padding: 0,
-              theme: appState.theme === "dark" ? "dark" : "light",
-              scale: THUMBNAIL_WIDTH / page.frame.width,
-            },
+          const url = await renderPageThumbnail({
+            page,
+            children,
+            files,
+            theme,
           });
-          const url = canvas.toDataURL("image/png");
           cacheRef.current.set(page.frame.id, { key, url });
           next.set(page.frame.id, url);
         } catch {
