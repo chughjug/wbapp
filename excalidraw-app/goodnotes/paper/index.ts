@@ -1,0 +1,59 @@
+/**
+ * GoodNotes paper templates — public API.
+ *
+ * Draws ruled / grid / dotted / Cornell / staff page backgrounds behind the
+ * Excalidraw canvas. Nothing here mutates the Excalidraw scene; the layer is
+ * presentational only and never intercepts pointer input.
+ *
+ * Quick start (see ./INTEGRATION.md for the exact App.tsx diff):
+ *
+ *   <PaperBackgroundLayer
+ *     elements={elements}
+ *     scrollX={appState.scrollX}
+ *     scrollY={appState.scrollY}
+ *     zoom={appState.zoom.value}
+ *     theme={appState.theme}
+ *     defaultTemplate={template}
+ *   />
+ */
+
+export {
+  /** React layer that paints every page's paper behind Excalidraw. */
+  PaperBackgroundLayer,
+  /** Derive page rects from frames whose name starts with PAGE_FRAME_PREFIX. */
+  getPaperPageRects,
+} from "./PaperBackgroundLayer";
+export type {
+  PaperBackgroundLayerProps,
+  PaperPageRect,
+} from "./PaperBackgroundLayer";
+
+export {
+  /** Accessible radiogroup for choosing a template, with live previews. */
+  PaperPicker,
+  /** A single mini-preview swatch, drawn from the real template functions. */
+  PaperPreview,
+} from "./PaperPicker";
+export type { PaperPickerProps, PaperPreviewProps } from "./PaperPicker";
+
+export {
+  /** All templates keyed by id. */
+  PAPER_TEMPLATES,
+  /** Templates in display order. */
+  PAPER_TEMPLATE_LIST,
+  /** Template ids in display order. */
+  PAPER_TEMPLATE_ORDER,
+  /** Lookup by id, falling back to `blank`. */
+  getPaperTemplate,
+  /** Theme-aware palette (paper, rule, accent, border). */
+  getPaperPalette,
+  /** Draw sheet + rulings + border for one page into an already-placed ctx. */
+  renderPaper,
+  /** Geometry constants, exported for callers that need to align to them. */
+  LINE_SPACING,
+  GRID_SPACING,
+  DOT_SPACING,
+  DOT_RADIUS,
+  PAGE_PADDING,
+} from "./templates";
+export type { PaperTheme } from "./templates";

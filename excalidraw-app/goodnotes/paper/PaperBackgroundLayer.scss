@@ -1,0 +1,19 @@
+/**
+ * The paper layer sits behind every Excalidraw canvas and must never take
+ * pointer input. Excalidraw's own canvases use `--zIndex-canvas: 1`
+ * (interactive canvas: 2), so z-index 0 keeps us underneath both while still
+ * being above the editor's background.
+ */
+.goodnotes-paper-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  // never intercept pointer input — the editor owns all pointer handling
+  pointer-events: none !important;
+  touch-action: none;
+  // the Excalidraw stylesheet sets `image-rendering: pixelated` on every
+  // `canvas` inside `.excalidraw`; our lines are drawn at DPR already and
+  // look better without it
+  image-rendering: auto;
+  user-select: none;
+}
