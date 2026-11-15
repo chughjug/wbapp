@@ -8337,6 +8337,7 @@ class App extends React.Component<AppProps, AppState> {
       roughness: this.state.currentItemRoughness,
       opacity: this.state.currentItemOpacity,
       roundness: null,
+      customData: this.state.currentItemCustomData ?? undefined,
       simulatePressure,
       strokeOptions: {
         variability: strokeVariability,

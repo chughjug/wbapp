@@ -1022,6 +1022,17 @@ export const renderSelectionElement = (
   context.restore();
 };
 
+/**
+ * GoodNotes-style highlighter marker.
+ *
+ * An element opts into highlighter compositing by carrying
+ * `customData.goodnotes.highlighter === true`. `customData` is an existing,
+ * freely-shaped, serialized field on every element, so this needs no change
+ * to the element type union and old scenes keep loading unchanged.
+ */
+export const isHighlighterElement = (element: ExcalidrawElement): boolean =>
+  element.customData?.goodnotes?.highlighter === true;
+
 export const renderElement = (
   element: NonDeletedExcalidrawElement,
   elementsMap: RenderableElementsMap,
@@ -1046,6 +1057,14 @@ export const renderElement = (
   context.globalAlpha =
     renderState.opacity *
     (reduceAlphaForSelection ? DEFAULT_REDUCED_GLOBAL_ALPHA : 1);
+  // Highlighter: composite the whole element with `multiply` so a stroke laid
+  // over ink/other strokes darkens like real marker ink instead of washing
+  // them out. Freedraw is blitted from a per-element cached bitmap, so the
+  // stroke composites as one unit and self-intersections never darken.
+  // Restored by the `context.restore()` in the `finally` below.
+  if (isHighlighterElement(element)) {
+    context.globalCompositeOperation = "multiply";
+  }
   // Cached bitmaps apply the offset before pixel snapping. Moving it into
   // the canvas transform first loses precision at half-device-pixel ties.
   if (

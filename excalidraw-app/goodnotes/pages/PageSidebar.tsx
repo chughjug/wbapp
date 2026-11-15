@@ -1,0 +1,394 @@
+/**
+ * Vertical strip of page thumbnails — the GoodNotes page navigator.
+ *
+ * Accessibility notes:
+ *  - the strip is a `listbox`-flavoured list of real `<button>`s; the active
+ *    page carries `aria-current="page"`,
+ *  - ArrowUp/ArrowDown move roving focus between pages (Home/End jump),
+ *    Enter/Space activate — the native button behaviour,
+ *  - every icon-only control has a text accessible name,
+ *  - focus rings are visible (`:focus-visible`) and never removed,
+ *  - `prefers-reduced-motion: reduce` disables the CSS transitions here and
+ *    the canvas easing in `scrollToPage`.
+ */
+
+import { exportScene, getNonDeletedElements } from "@excalidraw/excalidraw";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import type {
+  ExcalidrawFrameElement,
+  NonDeleted,
+} from "@excalidraw/element/types";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+
+import type { Page } from "../types";
+
+import { getPageChildren } from "./pageModel";
+import { usePages } from "./usePages";
+
+import "./PageSidebar.scss";
+
+/** Width of a rendered thumbnail bitmap, in CSS px. */
+const THUMBNAIL_WIDTH = 132;
+/** How long to wait after the last scene change before re-rendering thumbs. */
+const THUMBNAIL_DEBOUNCE_MS = 400;
+/**
+ * Above this many pages we stop rendering bitmaps and fall back to numbered
+ * placeholders. Each thumbnail is a full off-screen canvas render of a page,
+ * which is too expensive to do for a large document on every change.
+ */
+const THUMBNAIL_PAGE_LIMIT = 60;
+
+export interface PageSidebarProps {
+  excalidrawAPI: ExcalidrawImperativeAPI | null;
+  /** Render page bitmaps. Defaults to true. */
+  thumbnails?: boolean;
+  className?: string;
+}
+
+export const PageSidebar: React.FC<PageSidebarProps> = ({
+  excalidrawAPI,
+  thumbnails = true,
+  className,
+}) => {
+  const {
+    pages,
+    activePageIndex,
+    goToPage,
+    addPage,
+    deletePage,
+    movePageUp,
+    movePageDown,
+  } = usePages(excalidrawAPI);
+
+  const thumbs = usePageThumbnails(
+    excalidrawAPI,
+    pages,
+    thumbnails && pages.length <= THUMBNAIL_PAGE_LIMIT,
+  );
+
+  const listRef = useRef<HTMLUListElement>(null);
+  // roving tabindex: only one page button is tabbable at a time
+  const [focusIndex, setFocusIndex] = useState(0);
+
+  useEffect(() => {
+    if (activePageIndex >= 0) {
+      setFocusIndex(activePageIndex);
+    }
+  }, [activePageIndex]);
+
+  const focusPageButton = useCallback((index: number) => {
+    const button = listRef.current?.querySelector<HTMLButtonElement>(
+      `[data-page-index="${index}"] .goodnotes-page__open`,
+    );
+    button?.focus();
+  }, []);
+
+  const onKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLUListElement>) => {
+      let next: number | null = null;
+      if (event.key === "ArrowDown") {
+        next = Math.min(focusIndex + 1, pages.length - 1);
+      } else if (event.key === "ArrowUp") {
+        next = Math.max(focusIndex - 1, 0);
+      } else if (event.key === "Home") {
+        next = 0;
+      } else if (event.key === "End") {
+        next = pages.length - 1;
+      }
+      if (next !== null && next !== focusIndex) {
+        event.preventDefault();
+        setFocusIndex(next);
+        focusPageButton(next);
+      } else if (next !== null) {
+        event.preventDefault();
+      }
+    },
+    [focusIndex, pages.length, focusPageButton],
+  );
+
+  // keep the active thumbnail in view in the strip
+  useEffect(() => {
+    if (activePageIndex < 0) {
+      return;
+    }
+    const item = listRef.current?.querySelector(
+      `[data-page-index="${activePageIndex}"]`,
+    );
+    item?.scrollIntoView({
+      block: "nearest",
+      behavior: prefersReducedMotionCSS() ? "auto" : "smooth",
+    });
+  }, [activePageIndex]);
+
+  return (
+    <nav
+      className={`goodnotes-pages ${className ?? ""}`}
+      aria-label="Pages"
+      data-testid="goodnotes-page-sidebar"
+    >
+      <ul
+        className="goodnotes-pages__list"
+        ref={listRef}
+        onKeyDown={onKeyDown}
+      >
+        {pages.map((page, index) => {
+          const isActive = index === activePageIndex;
+          const label = `Page ${index + 1} of ${pages.length}`;
+          return (
+            <li
+              className="goodnotes-page"
+              key={page.frame.id}
+              data-page-index={index}
+              data-active={isActive || undefined}
+            >
+              <button
+                type="button"
+                className="goodnotes-page__open"
+                aria-current={isActive ? "page" : undefined}
+                aria-label={label}
+                tabIndex={index === focusIndex ? 0 : -1}
+                onFocus={() => setFocusIndex(index)}
+                onClick={() => goToPage(index)}
+              >
+                <span className="goodnotes-page__thumb" aria-hidden="true">
+                  {thumbs.get(page.frame.id) ? (
+                    <img
+                      src={thumbs.get(page.frame.id)}
+                      alt=""
+                      draggable={false}
+                    />
+                  ) : (
+                    <span className="goodnotes-page__placeholder">
+                      {index + 1}
+                    </span>
+                  )}
+                </span>
+                <span className="goodnotes-page__number" aria-hidden="true">
+                  {index + 1}
+                </span>
+              </button>
+
+              <div className="goodnotes-page__actions">
+                <button
+                  type="button"
+                  className="goodnotes-page__action"
+                  aria-label={`Move page ${index + 1} up`}
+                  disabled={index === 0}
+                  onClick={() => movePageUp(index)}
+                >
+                  <ChevronUpIcon />
+                </button>
+                <button
+                  type="button"
+                  className="goodnotes-page__action"
+                  aria-label={`Move page ${index + 1} down`}
+                  disabled={index === pages.length - 1}
+                  onClick={() => movePageDown(index)}
+                >
+                  <ChevronDownIcon />
+                </button>
+                <button
+                  type="button"
+                  className="goodnotes-page__action goodnotes-page__action--danger"
+                  aria-label={`Delete page ${index + 1}`}
+                  disabled={pages.length <= 1}
+                  onClick={() => deletePage(index)}
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="goodnotes-pages__footer">
+        <button
+          type="button"
+          className="goodnotes-pages__add"
+          onClick={() => addPage()}
+        >
+          <PlusIcon />
+          <span>Add page</span>
+        </button>
+      </div>
+    </nav>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// thumbnails
+// ---------------------------------------------------------------------------
+
+const prefersReducedMotionCSS = () =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Debounced, cached page thumbnails.
+ *
+ * Each page is rendered with `exportScene({ type: "canvas", … })` using the
+ * frame as `exportingFrame`, which clips the export to the page exactly as
+ * the editor would. Renders are keyed on the page's content version, so only
+ * pages that actually changed are re-rendered.
+ *
+ * FALLBACK (documented): when `enabled` is false — e.g. the document has more
+ * pages than {@link THUMBNAIL_PAGE_LIMIT} — the strip shows numbered
+ * placeholders instead. Rendering dozens of full-page canvases on every edit
+ * is not worth the main-thread cost.
+ */
+const usePageThumbnails = (
+  excalidrawAPI: ExcalidrawImperativeAPI | null,
+  pages: Page[],
+  enabled: boolean,
+) => {
+  const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
+  const cacheRef = useRef(new Map<string, { key: string; url: string }>());
+
+  // content signature per page: frame version + versions of its children
+  const signature = useMemo(() => {
+    if (!excalidrawAPI || !enabled) {
+      return "";
+    }
+    const elements = excalidrawAPI.getSceneElements();
+    return pages
+      .map((page) => {
+        const children = getPageChildren(elements, page.frame.id);
+        let sum = page.frame.version;
+        for (const child of children) {
+          sum += child.version;
+        }
+        return `${page.frame.id}:${children.length}:${sum}`;
+      })
+      .join("|");
+    // `pages` identity changes whenever a page frame changes; we additionally
+    // re-read children on every render of this hook's owner (cheap filter).
+  }, [excalidrawAPI, pages, enabled]);
+
+  useEffect(() => {
+    if (!excalidrawAPI || !enabled) {
+      setThumbs(new Map());
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const elements = excalidrawAPI.getSceneElements();
+      const appState = excalidrawAPI.getAppState();
+      const files = excalidrawAPI.getFiles();
+      const next = new Map<string, string>();
+
+      for (const page of pages) {
+        if (cancelled) {
+          return;
+        }
+        const children = getPageChildren(elements, page.frame.id);
+        let sum = page.frame.version;
+        for (const child of children) {
+          sum += child.version;
+        }
+        const key = `${children.length}:${sum}:${page.frame.width}x${page.frame.height}`;
+        const cached = cacheRef.current.get(page.frame.id);
+        if (cached?.key === key) {
+          next.set(page.frame.id, cached.url);
+          continue;
+        }
+        try {
+          const canvas = await exportScene({
+            type: "canvas",
+            data: {
+              elements: getNonDeletedElements([...children, page.frame]),
+              appState: {
+                viewBackgroundColor: appState.viewBackgroundColor,
+              },
+              files,
+            },
+            config: {
+              exportingFrame: page.frame as NonDeleted<ExcalidrawFrameElement>,
+              padding: 0,
+              theme: appState.theme === "dark" ? "dark" : "light",
+              scale: THUMBNAIL_WIDTH / page.frame.width,
+            },
+          });
+          const url = canvas.toDataURL("image/png");
+          cacheRef.current.set(page.frame.id, { key, url });
+          next.set(page.frame.id, url);
+        } catch {
+          // a failed render just leaves the numbered placeholder in place
+        }
+      }
+
+      if (!cancelled) {
+        // drop cache entries for pages that no longer exist
+        const live = new Set(pages.map((page) => page.frame.id));
+        for (const id of [...cacheRef.current.keys()]) {
+          if (!live.has(id)) {
+            cacheRef.current.delete(id);
+          }
+        }
+        setThumbs(next);
+      }
+    }, THUMBNAIL_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [excalidrawAPI, enabled, signature]);
+
+  return thumbs;
+};
+
+// ---------------------------------------------------------------------------
+// icons (decorative — every control has a text accessible name)
+// ---------------------------------------------------------------------------
+
+const iconProps = {
+  width: 16,
+  height: 16,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+  focusable: false,
+};
+
+const ChevronUpIcon = () => (
+  <svg {...iconProps}>
+    <polyline points="18 15 12 9 6 15" />
+  </svg>
+);
+
+const ChevronDownIcon = () => (
+  <svg {...iconProps}>
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg {...iconProps}>
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg {...iconProps}>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+
+export default PageSidebar;

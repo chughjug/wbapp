@@ -456,6 +456,11 @@ export interface AppState {
   currentItemStrokeWidthKey: StrokeWidthKey;
   currentItemStrokeStyle: ExcalidrawElement["strokeStyle"];
   currentItemRoughness: number;
+  /**
+   * `customData` stamped onto newly created freedraw elements. Used by the
+   * GoodNotes highlighter preset to mark a stroke as a highlighter.
+   */
+  currentItemCustomData: ExcalidrawElement["customData"] | null;
   currentItemStrokeVariability: StrokeVariability;
   currentItemOpacity: number;
   currentItemFontFamily: FontFamilyValues;
