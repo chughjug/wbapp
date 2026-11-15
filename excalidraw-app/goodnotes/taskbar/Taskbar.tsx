@@ -28,12 +28,6 @@ import {
   useState,
 } from "react";
 
-import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
-
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-
-import type { PenPreset } from "../types";
-
 import {
   AddPageIcon,
   ArrowIcon,
@@ -59,6 +53,12 @@ import { LAYOUT, planOverflow } from "./model";
 import { activateTool, toolFromAppState } from "./tools";
 
 import "./Taskbar.scss";
+
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
+
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+
+import type { PenPreset } from "../types";
 
 import type { TaskbarMenuSection } from "./Menu";
 import type {
@@ -252,13 +252,7 @@ export const Taskbar = ({
       setInternalTool(tool);
       onToolChangeRef.current?.(tool, tool === "shape" ? shape : undefined);
     },
-    [
-      excalidrawAPI,
-      penPreset,
-      highlighterPreset,
-      activeShape,
-      onToolChangeRef,
-    ],
+    [excalidrawAPI, penPreset, highlighterPreset, activeShape, onToolChangeRef],
   );
 
   // ---- control model ------------------------------------------------------
@@ -434,17 +428,15 @@ export const Taskbar = ({
       return;
     }
     const next = new Map<string, number>();
-    ghost
-      .querySelectorAll<HTMLElement>("[data-gn-measure]")
-      .forEach((node) => {
-        const id = node.dataset.gnMeasure!;
-        const width = node.getBoundingClientRect().width;
-        if (id === "__more__") {
-          setMoreWidth(width);
-        } else {
-          next.set(id, width);
-        }
-      });
+    ghost.querySelectorAll<HTMLElement>("[data-gn-measure]").forEach((node) => {
+      const id = node.dataset.gnMeasure!;
+      const width = node.getBoundingClientRect().width;
+      if (id === "__more__") {
+        setMoreWidth(width);
+      } else {
+        next.set(id, width);
+      }
+    });
     setWidths(next);
   }, [controls, showLabels]);
 
@@ -549,8 +541,7 @@ export const Taskbar = ({
       return;
     }
     document.body.classList.add(SUPPRESS_DEFAULT_TOOLBAR_CLASS);
-    return () =>
-      document.body.classList.remove(SUPPRESS_DEFAULT_TOOLBAR_CLASS);
+    return () => document.body.classList.remove(SUPPRESS_DEFAULT_TOOLBAR_CLASS);
   }, [suppressDefaultToolbar]);
 
   // ---- rendering ----------------------------------------------------------
@@ -600,9 +591,7 @@ export const Taskbar = ({
           data-control={control.id}
           data-kind={control.kind}
           disabled={control.disabled}
-          tabIndex={
-            measuring ? -1 : activeFocusId === control.id ? 0 : -1
-          }
+          tabIndex={measuring ? -1 : activeFocusId === control.id ? 0 : -1}
           aria-pressed={
             control.kind === "toggle" || isMenu ? !!control.pressed : undefined
           }

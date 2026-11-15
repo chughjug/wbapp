@@ -84,7 +84,9 @@ const applyInk = (api: ExcalidrawImperativeAPI, preset: PenPreset) => {
     appState: {
       currentItemStrokeColor: preset.color,
       currentItemStrokeWidthKey: snapStrokeWidth(preset.width),
-      currentItemOpacity: Math.round(Math.min(100, Math.max(0, preset.opacity))),
+      currentItemOpacity: Math.round(
+        Math.min(100, Math.max(0, preset.opacity)),
+      ),
       // a fresh object per activation so elements never share a reference
       currentItemCustomData:
         preset.tool === "highlighter"
@@ -143,10 +145,7 @@ export const activateTool = (
         type: SHAPE_TOOL[shape] as "rectangle",
       });
       editor.updateScene({ appState: { currentItemCustomData: null } });
-      return;
     }
-    default:
-      return;
   }
 };
 

@@ -25,7 +25,11 @@
  * onto the page does not paint a white box over the paper underneath.
  */
 
-import { exportScene, getNonDeletedElements, THEME } from "@excalidraw/excalidraw";
+import {
+  exportScene,
+  getNonDeletedElements,
+  THEME,
+} from "@excalidraw/excalidraw";
 
 import type { ExcalidrawElement, Theme } from "@excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
@@ -110,10 +114,7 @@ export class FuzzySelectRasterError extends Error {
  * Clamps `scale` so neither canvas dimension exceeds the browser's limit.
  * Exported for tests.
  */
-export const clampRasterScale = (
-  region: SceneRect,
-  scale: number,
-): number => {
+export const clampRasterScale = (region: SceneRect, scale: number): number => {
   const longest = Math.max(region.width, region.height);
   if (longest <= 0) {
     return scale;

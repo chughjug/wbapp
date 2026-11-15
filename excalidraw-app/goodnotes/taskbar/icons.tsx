@@ -83,7 +83,8 @@ export const ShapesIcon = () =>
 export const RectangleIcon = () =>
   svg(<rect x="3.5" y="5.5" width="17" height="13" rx="2" />);
 
-export const EllipseIcon = () => svg(<ellipse cx="12" cy="12" rx="8.5" ry="6.5" />);
+export const EllipseIcon = () =>
+  svg(<ellipse cx="12" cy="12" rx="8.5" ry="6.5" />);
 
 export const DiamondIcon = () =>
   svg(<path d="M12 3.5 20.5 12 12 20.5 3.5 12 12 3.5Z" />);
@@ -162,5 +163,4 @@ export const MoreIcon = () =>
     { fill: true },
   );
 
-export const ChevronIcon = () =>
-  svg(<path d="m7 10 5 5 5-5" />);
+export const ChevronIcon = () => svg(<path d="m7 10 5 5 5-5" />);

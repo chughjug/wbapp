@@ -179,7 +179,10 @@ export { duplicateRasterIntoScene } from "./duplicate";
 /** Builds just the `BinaryFileData` (content-hashed id) for a PNG blob. */
 export { createBinaryFileDataFromPng } from "./duplicate";
 
-export { DEFAULT_DUPLICATE_OFFSET, FuzzySelectDuplicateError } from "./duplicate";
+export {
+  DEFAULT_DUPLICATE_OFFSET,
+  FuzzySelectDuplicateError,
+} from "./duplicate";
 
 export type {
   DuplicateSelectionOptions,

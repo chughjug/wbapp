@@ -202,10 +202,7 @@
     border: 1px solid var(--dialog-border-color, #e9ecef);
     border-radius: 0.625rem;
     background-color: var(--popup-bg-color, #fff);
-    box-shadow: var(
-      --shadow-island-stronger,
-      0 6px 20px rgba(0, 0, 0, 0.18)
-    );
+    box-shadow: var(--shadow-island-stronger, 0 6px 20px rgba(0, 0, 0, 0.18));
 
     &[data-align="start"] {
       left: 0;

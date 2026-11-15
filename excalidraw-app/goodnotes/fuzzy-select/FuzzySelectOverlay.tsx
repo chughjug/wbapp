@@ -597,7 +597,10 @@ export const FuzzySelectOverlay = ({
       ACTION_BAR_GAP,
       Math.min(
         centreX - ACTION_BAR_ESTIMATED_WIDTH / 2,
-        Math.max(ACTION_BAR_GAP, host.width - ACTION_BAR_ESTIMATED_WIDTH - ACTION_BAR_GAP),
+        Math.max(
+          ACTION_BAR_GAP,
+          host.width - ACTION_BAR_ESTIMATED_WIDTH - ACTION_BAR_GAP,
+        ),
       ),
     );
 
@@ -716,9 +719,7 @@ export const FuzzySelectOverlay = ({
         className={
           status
             ? `gn-fuzzy-select__status${
-                status.tone === "error"
-                  ? " gn-fuzzy-select__status--error"
-                  : ""
+                status.tone === "error" ? " gn-fuzzy-select__status--error" : ""
               }`
             : "gn-fuzzy-select__sr-only"
         }

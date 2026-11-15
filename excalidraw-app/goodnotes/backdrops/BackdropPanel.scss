@@ -21,6 +21,9 @@
   --gn-bd-danger: var(--color-danger, #db6965);
 
   box-sizing: border-box;
+  // Excalidraw turns UI pointer events off while a tool is active; islands
+  // opt back in through this variable (see packages/excalidraw/css/styles.scss).
+  pointer-events: var(--ui-pointerEvents, all);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
