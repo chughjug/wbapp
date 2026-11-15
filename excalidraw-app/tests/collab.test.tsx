@@ -49,6 +49,28 @@ vi.mock("../../excalidraw-app/data/firebase.ts", () => {
   };
 });
 
+// jsdom implements neither of these, and the editor chrome mounted by the app
+// (the paper background layer observes canvas size; the page strip scrolls the
+// active page into view) uses both. Other suites in this repo polyfill them the
+// same way, e.g. `tests/colorInput.test.tsx` and `tests/search.test.tsx`.
+(global as any).ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+window.HTMLElement.prototype.scrollIntoView = vi.fn();
+
+// The app opens the editor for a shared-scene link (see `beforeEach` below),
+// which would otherwise hit the network to fetch the scene.
+vi.mock("../data", async (importOriginal) => {
+  const module = await importOriginal<typeof import("../data")>();
+
+  return {
+    ...module,
+    importFromBackend: async () => ({ elements: [], appState: {} }),
+  };
+});
+
 vi.mock("socket.io-client", () => {
   return {
     default: () => {
@@ -69,6 +91,16 @@ vi.mock("socket.io-client", () => {
  * i.e. multiplayer history tests could be a good first candidate, as we could test both history stacks simultaneously.
  */
 describe("collaboration", () => {
+  // `/` is the document shelf now, so rendering the app there mounts no
+  // editor at all. A shared-scene link (`#json=…` / `#room=…`) is the app's
+  // way of addressing a scene that has no library document behind it, which
+  // is exactly the pristine, document-less canvas these tests need — and the
+  // `#json=` form gets there without auto-joining a room, which would
+  // invalidate the explicit `startCollaboration` call below.
+  beforeEach(() => {
+    window.history.replaceState({}, "", "/#json=sharedSceneId,sharedSceneKey");
+  });
+
   it("should emit two ephemeral increments even though updates get batched", async () => {
     const durableIncrements: DurableIncrement[] = [];
     const ephemeralIncrements: EphemeralIncrement[] = [];

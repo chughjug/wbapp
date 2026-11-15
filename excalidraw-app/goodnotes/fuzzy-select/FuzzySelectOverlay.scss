@@ -1,0 +1,244 @@
+// Styles for the GoodNotes fuzzy-select overlay.
+//
+// Everything is themed from Excalidraw's own CSS custom properties, which are
+// scoped to `.excalidraw` (and `.excalidraw.theme--dark`) — hence the root
+// element carries those classes. The rules below undo the layout `.excalidraw`
+// itself sets (`position: relative; height: 100%`).
+//
+// NOTE: `--color-muted` and friends are BACKGROUND greys in Excalidraw's
+// palette, so no text colour here is derived from them. Text uses
+// `--text-primary-color` (which resolves to `--color-on-surface`), with the
+// secondary line dimmed by opacity rather than by a different hue, so
+// contrast holds in both themes.
+
+.excalidraw.gn-fuzzy-select {
+  position: absolute;
+  inset: 0;
+  height: auto;
+  // above Excalidraw's canvases, below its UI islands/dialogs
+  z-index: 4;
+  // INACTIVE: the overlay must be completely transparent to the pointer so
+  // drawing, panning and selection all still reach the canvas underneath.
+  pointer-events: none;
+  // the overlay never scrolls or shows UI chrome of its own
+  overflow: visible;
+  background: none;
+
+  &.gn-fuzzy-select--active {
+    // ACTIVE: only the capture surface takes pointer events (see below), so
+    // the root stays `none` and children opt in.
+    cursor: crosshair;
+  }
+}
+
+// -----------------------------------------------------------------------
+// Pointer capture surface
+// -----------------------------------------------------------------------
+
+.gn-fuzzy-select__surface {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  touch-action: none;
+
+  .gn-fuzzy-select--active & {
+    pointer-events: auto;
+  }
+}
+
+// -----------------------------------------------------------------------
+// The lasso path
+// -----------------------------------------------------------------------
+
+.gn-fuzzy-select__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.gn-fuzzy-select__fill {
+  fill: var(--color-primary);
+  fill-opacity: 0.08;
+  stroke: none;
+}
+
+// Two stacked strokes make the "marching ants" readable on any background:
+// an opaque light understroke, then the dashed primary-coloured ants on top.
+.gn-fuzzy-select__ants-under {
+  fill: none;
+  stroke: var(--island-bg-color);
+  stroke-width: 3;
+  stroke-opacity: 0.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.gn-fuzzy-select__ants {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 6 4;
+  animation: gn-fuzzy-select-ants 600ms linear infinite;
+}
+
+@keyframes gn-fuzzy-select-ants {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+// -----------------------------------------------------------------------
+// Floating action bar
+// -----------------------------------------------------------------------
+
+.gn-fuzzy-select__actions {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  pointer-events: auto;
+  box-sizing: border-box;
+  border-radius: var(--border-radius-lg, 0.5rem);
+  border: 1px solid var(--dialog-border-color, var(--default-border-color));
+  background-color: var(--island-bg-color, #fff);
+  color: var(--text-primary-color, var(--color-on-surface));
+  box-shadow: var(--shadow-island, 0 4px 12px rgba(0, 0, 0, 0.18));
+  font-family: inherit;
+  font-size: 0.8125rem;
+  animation: gn-fuzzy-select-pop 120ms ease-out;
+}
+
+.gn-fuzzy-select__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2rem;
+  padding: 0 0.625rem;
+  cursor: pointer;
+  white-space: nowrap;
+  font: inherit;
+  color: var(--text-primary-color, var(--color-on-surface));
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-md, 0.375rem);
+
+  &:hover:not(:disabled) {
+    background-color: var(--button-hover-bg, var(--color-surface-high));
+  }
+
+  &:active:not(:disabled) {
+    background-color: var(--color-surface-mid, var(--color-primary-light));
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+
+  // Visible keyboard focus ring. `:focus-visible` only, so a mouse click
+  // doesn't leave a ring behind.
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #6965db);
+    outline-offset: 1px;
+  }
+
+  svg {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+  }
+}
+
+.gn-fuzzy-select__button--primary {
+  color: var(--color-primary, #6965db);
+  font-weight: 600;
+}
+
+.gn-fuzzy-select__separator {
+  width: 1px;
+  align-self: stretch;
+  margin: 0.125rem 0.125rem;
+  background-color: var(--dialog-border-color, var(--default-border-color));
+}
+
+.gn-fuzzy-select__count {
+  padding: 0 0.5rem 0 0.375rem;
+  // dimmed by opacity, NOT by a muted background grey, so it stays legible
+  // in both themes
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+// -----------------------------------------------------------------------
+// Status / live region
+// -----------------------------------------------------------------------
+
+.gn-fuzzy-select__status {
+  position: absolute;
+  left: 50%;
+  bottom: 5.5rem;
+  transform: translateX(-50%);
+  max-width: min(28rem, calc(100% - 2rem));
+  box-sizing: border-box;
+  padding: 0.5rem 0.75rem;
+  pointer-events: none;
+  border-radius: var(--border-radius-lg, 0.5rem);
+  border: 1px solid var(--dialog-border-color, var(--default-border-color));
+  background-color: var(--island-bg-color, #fff);
+  color: var(--text-primary-color, var(--color-on-surface));
+  box-shadow: var(--shadow-island, 0 4px 12px rgba(0, 0, 0, 0.18));
+  font-family: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.gn-fuzzy-select__status--error {
+  border-color: var(--color-danger, #db6965);
+}
+
+// Screen-reader-only, but still focusable/announced.
+.gn-fuzzy-select__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes gn-fuzzy-select-pop {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// -----------------------------------------------------------------------
+// Reduced motion: no marching ants, no pop-in. The dashed outline stays —
+// only the movement goes away.
+// -----------------------------------------------------------------------
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-fuzzy-select__ants {
+    animation: none;
+  }
+
+  .gn-fuzzy-select__actions {
+    animation: none;
+  }
+}

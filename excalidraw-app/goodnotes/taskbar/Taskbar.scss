@@ -1,0 +1,317 @@
+/**
+ * Taskbar styling.
+ *
+ * Colour comes exclusively from Excalidraw's own custom properties (defined in
+ * `packages/excalidraw/css/theme.scss`), which is why the root carries the
+ * `excalidraw` / `theme--dark` classes — those properties are scoped to
+ * `.excalidraw`. Every value has a literal fallback so the bar is still legible
+ * if it is ever mounted outside the editor.
+ *
+ * Deliberately NOT used: `--color-muted`, which is a background grey and has
+ * no contrast guarantee as a text colour. Secondary text uses
+ * `--keybinding-color`, which is the token Excalidraw itself uses for de-
+ * emphasised label text in both themes.
+ */
+
+// The root both scopes the theme tokens and positions the bar. It carries
+// `.excalidraw`, whose base rule is a full-size flex container — undone here.
+.gn-taskbar-scope.gn-taskbar-scope {
+  position: fixed;
+  top: 0.75rem;
+  left: 0;
+  right: 0;
+  bottom: auto;
+  z-index: 5;
+
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+
+  width: auto;
+  height: auto;
+  padding: 0 0.75rem;
+  overflow: visible;
+
+  // the strip either side of the bar must not eat canvas clicks
+  pointer-events: none;
+
+  font-family: var(--ui-font, system-ui, sans-serif);
+  color: var(--text-primary-color, #1b1b1f);
+}
+
+.gn-taskbar {
+  pointer-events: auto;
+
+  display: flex;
+  align-items: center;
+  gap: 4px; // keep in sync with LAYOUT.gap in model.ts
+
+  max-width: 100%;
+  min-width: 0;
+  padding: 5px 6px; // 2 * 6 === LAYOUT.paddingX
+
+  border-radius: 0.75rem;
+  background-color: var(--island-bg-color, #fff);
+  box-shadow: var(
+    --shadow-island,
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.12)
+  );
+
+  font-size: 0.75rem;
+  line-height: 1.2;
+
+  &--ghost {
+    // real layout, no paint, no hit-testing, no tab stops
+    position: absolute;
+    top: 0;
+    left: 0;
+    visibility: hidden;
+    pointer-events: none;
+    max-width: none;
+    white-space: nowrap;
+  }
+
+  &__slot {
+    position: relative;
+    display: flex;
+    flex: 0 0 auto;
+  }
+
+  &__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+
+    box-sizing: border-box;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    margin: 0;
+    padding: 0 0.4375rem;
+
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    background-color: transparent;
+    color: var(--text-primary-color, #1b1b1f);
+    font: inherit;
+    cursor: pointer;
+
+    transition: background-color 120ms ease, border-color 120ms ease,
+      color 120ms ease;
+
+    &:hover:not(:disabled) {
+      background-color: var(--button-hover-bg, rgba(0, 0, 0, 0.06));
+    }
+
+    &:active:not(:disabled) {
+      background-color: var(--button-active-bg, rgba(0, 0, 0, 0.1));
+    }
+
+    // a ring that survives both themes and the pressed background
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4dabf7);
+      outline-offset: 1px;
+    }
+
+    &[aria-pressed="true"] {
+      background-color: var(--color-surface-primary-container, #e0dfff);
+      color: var(--color-on-primary-container, #030064);
+    }
+
+    &:disabled {
+      color: var(--color-disabled, #adb5bd);
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+  }
+
+  &__icon {
+    flex: 0 0 auto;
+  }
+
+  &__text {
+    white-space: nowrap;
+    padding-inline-end: 0.125rem;
+  }
+
+  &__caret {
+    width: 0;
+    height: 0;
+    margin-inline-start: 0.0625rem;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    border-top: 3px solid currentColor;
+    opacity: 0.65;
+  }
+
+  &__separator {
+    flex: 0 0 auto;
+    width: 1px; // keep in sync with LAYOUT.separator
+    align-self: stretch;
+    margin: 0.3125rem 0;
+    background-color: var(--default-border-color, #e9ecef);
+    border: 0;
+  }
+
+  &__status {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    height: 2.25rem;
+    padding: 0 0.5rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    // `--color-muted` is a *background* grey; this is the token Excalidraw
+    // uses for de-emphasised text, and it is defined for both themes.
+    color: var(--keybinding-color, #868e96);
+  }
+
+  // visually hidden, still announced
+  &__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  // ---- popovers ---------------------------------------------------------
+
+  &__menu {
+    position: absolute;
+    top: calc(100% + 0.375rem);
+    z-index: 10;
+
+    min-width: 11rem;
+    padding: 0.25rem;
+
+    border: 1px solid var(--dialog-border-color, #e9ecef);
+    border-radius: 0.625rem;
+    background-color: var(--popup-bg-color, #fff);
+    box-shadow: var(
+      --shadow-island-stronger,
+      0 6px 20px rgba(0, 0, 0, 0.18)
+    );
+
+    &[data-align="start"] {
+      left: 0;
+    }
+
+    &[data-align="end"] {
+      right: 0;
+    }
+  }
+
+  &__menu-group + &__menu-group {
+    margin-top: 0.125rem;
+    padding-top: 0.25rem;
+    border-top: 1px solid var(--default-border-color, #e9ecef);
+  }
+
+  &__menu-heading {
+    padding: 0.25rem 0.5rem 0.125rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--keybinding-color, #868e96);
+  }
+
+  &__menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 2rem;
+    padding: 0.25rem 0.5rem;
+
+    border: 0;
+    border-radius: 0.4375rem;
+    background-color: transparent;
+    color: var(--popup-text-color, #1b1b1f);
+    font: inherit;
+    font-size: 0.8125rem;
+    text-align: start;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background-color: var(--button-hover-bg, rgba(0, 0, 0, 0.06));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4dabf7);
+      outline-offset: -2px;
+    }
+
+    &[aria-checked="true"] {
+      background-color: var(--color-surface-primary-container, #e0dfff);
+      color: var(--color-on-primary-container, #030064);
+    }
+
+    &:disabled {
+      color: var(--keybinding-color, #868e96);
+      cursor: default;
+    }
+  }
+
+  &__menu-icon {
+    display: inline-flex;
+    width: 1.25rem;
+    flex: 0 0 auto;
+  }
+
+  &__menu-label {
+    flex: 1 1 auto;
+  }
+
+  &__menu-tick {
+    flex: 0 0 auto;
+    opacity: 0.8;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-taskbar__button {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .gn-taskbar {
+    border: 1px solid CanvasText;
+  }
+
+  .gn-taskbar__button[aria-pressed="true"] {
+    border-color: Highlight;
+  }
+}
+
+/**
+ * Opt-in suppression of Excalidraw's own top chrome, toggled by the
+ * `suppressDefaultToolbar` prop (which adds this class to <body>).
+ *
+ * There is no `UIOptions` switch for the shapes toolbar — `LayerUI` renders it
+ * whenever `defaultUIEnabled` is true, and the only props that remove it
+ * (`viewModeEnabled`, `zenModeEnabled`) change editor behaviour too. CSS is
+ * therefore the correct lever; see INTEGRATION.md.
+ */
+body.gn-taskbar-suppress-default-ui {
+  .excalidraw .App-menu_top .shapes-section {
+    display: none;
+  }
+
+  // the canvas no longer needs to leave room for the (absent) toolbar
+  .excalidraw .App-menu_top {
+    pointer-events: none;
+
+    > * {
+      pointer-events: auto;
+    }
+  }
+}

@@ -396,7 +396,8 @@ const ExcalidrawWrapper = ({
   docId,
   onCloseDocument,
 }: {
-  docId: string;
+  /** null for a transient scene (shared `#room=` / `#json=` link). */
+  docId: string | null;
   onCloseDocument: () => void;
 }) => {
   const excalidrawAPI = useExcalidrawAPI();
@@ -435,15 +436,21 @@ const ExcalidrawWrapper = ({
   }, [excalidrawAPI, paperView]);
 
   // every new document starts with one page, so the canvas is never an
-  // unbounded void; idempotent, so reopening a document does not add pages
+  // unbounded void; idempotent, so reopening a document does not add pages.
+  //
+  // A transient scene (`docId === null`) is deliberately excluded: it is
+  // somebody else's `#room=` session or an imported `#json=` drawing, not a
+  // notebook in this user's library. Seeding there would inject a `page:1`
+  // frame into a scene we do not own — and in a live room that frame would
+  // be synced straight into every other participant's canvas.
   useEffect(() => {
-    if (!excalidrawAPI) {
+    if (!excalidrawAPI || !docId) {
       return;
     }
     initialStatePromiseRef.current.promise.then(() => {
       seedFirstPage({ size: "LETTER", template: "lined" });
     });
-  }, [excalidrawAPI, seedFirstPage]);
+  }, [excalidrawAPI, docId, seedFirstPage]);
 
   // show the page strip by default; a notebook's page list is not something
   // the user should have to go looking for
@@ -653,7 +660,7 @@ const ExcalidrawWrapper = ({
       // Prefer this document's own scene from the library. Falling back to
       // `data.scene` keeps the usual defaults and the `#json=` import path
       // working for a document that has never been saved.
-      const docScene = await getScene(docId);
+      const docScene = docId ? await getScene(docId) : null;
       initialStatePromiseRef.current.promise.resolve(
         docScene
           ? {
@@ -838,8 +845,11 @@ const ExcalidrawWrapper = ({
       collabAPI.syncElements(elements);
     }
 
-    // persist into this document's own record; coalesced per document
-    saveSceneDebounced(docId, { elements, appState, files });
+    // persist into this document's own record; coalesced per document.
+    // A transient scene has none, and stays on upstream's LocalData.
+    if (docId) {
+      saveSceneDebounced(docId, { elements, appState, files });
+    }
 
     // keep the paper layer in step with the canvas; bail out to the previous
     // object when nothing it cares about moved, so this hot path does not
@@ -1500,6 +1510,16 @@ const ExcalidrawWrapper = ({
 };
 
 /**
+ * A shared-scene URL (`#room=…` for live collaboration, `#json=…` for an
+ * imported scene) addresses a scene directly, so it must open the editor
+ * rather than dropping the visitor on their own shelf. Such a scene has no
+ * library document behind it, so it runs transiently on upstream's
+ * `LocalData` persistence.
+ */
+const hasTransientSceneInUrl = () =>
+  /[#&](room|json)=/.test(window.location.hash);
+
+/**
  * Routes between the document shelf and a single open document.
  *
  * A document is addressed by `/d/<docId>`, so a specific assignment can be
@@ -1512,6 +1532,8 @@ const GoodNotesRoot = () => {
     const match = window.location.pathname.match(/^\/d\/([^/]+)$/);
     return match ? decodeURIComponent(match[1]) : null;
   });
+  // the editor, not the shelf, is what a shared link resolves to
+  const [isTransientScene] = useState(hasTransientSceneInUrl);
   const { editorTheme } = useHandleAppTheme();
 
   const openDocument = useCallback((doc: DocMeta) => {
@@ -1534,13 +1556,13 @@ const GoodNotesRoot = () => {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  if (!docId) {
+  if (!docId && !isTransientScene) {
     return <Shelf theme={editorTheme} onOpenDocument={openDocument} />;
   }
 
   return (
     <ExcalidrawWrapper
-      key={docId}
+      key={docId ?? "transient"}
       docId={docId}
       onCloseDocument={closeDocument}
     />
