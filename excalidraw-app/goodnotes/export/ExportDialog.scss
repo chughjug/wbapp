@@ -78,7 +78,7 @@
 
 .gn-export-dialog__description {
   margin: 0;
-  color: var(--color-muted, var(--color-gray-60));
+  color: var(--color-muted-darker, var(--color-gray-60));
 }
 
 .gn-export-dialog__body {
@@ -159,7 +159,7 @@
 }
 
 .gn-export-filename__suffix {
-  color: var(--color-muted, var(--color-gray-60));
+  color: var(--color-muted-darker, var(--color-gray-60));
 }
 
 .gn-export-error {
@@ -191,7 +191,7 @@
 }
 
 .gn-export-progress__text {
-  color: var(--color-muted, var(--color-gray-60));
+  color: var(--color-muted-darker, var(--color-gray-60));
   font-variant-numeric: tabular-nums;
 }
 

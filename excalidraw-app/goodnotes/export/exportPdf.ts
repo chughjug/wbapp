@@ -23,6 +23,7 @@ import type {
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 
 import { getPaperPageRects, renderPaper } from "../paper";
+import { PAGE_CUSTOM_DATA_KEY } from "../pages";
 import { PAGE_FRAME_PREFIX, PAGE_SIZES } from "../types";
 
 import type { PageSizeName, PaperTemplateId } from "../types";
@@ -298,11 +299,23 @@ export const exportDocumentToPdf = async ({
   const sceneElements = getNonDeletedElements(elements);
   const allPageFrames = getOrderedPageFrames(sceneElements);
 
-  // per-frame paper template, parsed by the paper module from the frame name
+  // Per-frame paper template, in precedence order:
+  //   1. the pages module's `customData` (canonical; frame names stay plain)
+  //   2. a template encoded in the frame name ("page:3:lined"), which the
+  //      paper module also understands
+  //   3. the caller's document default
   const templateByFrameId = new Map<string, PaperTemplateId>();
   for (const rect of getPaperPageRects(sceneElements)) {
     if (rect.template) {
       templateByFrameId.set(rect.id, rect.template);
+    }
+  }
+  for (const frame of allPageFrames) {
+    const stored = (
+      frame.customData as Record<string, unknown> | undefined
+    )?.[PAGE_CUSTOM_DATA_KEY] as { template?: PaperTemplateId } | undefined;
+    if (stored?.template) {
+      templateByFrameId.set(frame.id, stored.template);
     }
   }
 

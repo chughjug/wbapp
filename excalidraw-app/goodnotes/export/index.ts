@@ -18,7 +18,12 @@
 export { ExportDialog } from "./ExportDialog";
 export type { ExportDialogProps, PageRangeMode } from "./ExportDialog";
 
-/** Renders page frames to a multi-page PDF Blob. Always light theme. */
+/**
+ * Renders page frames to a multi-page PDF Blob. Always light theme.
+ * Each page is composited as paper (sheet + rulings + border, redrawn from
+ * `goodnotes/paper`) with a transparent ink raster on top, then placed on a
+ * jsPDF page sized from the frame's real geometry (px * 72/96 = pt).
+ */
 export { exportDocumentToPdf } from "./exportPdf";
 export type { ExportDocumentToPdfOptions } from "./exportPdf";
 
