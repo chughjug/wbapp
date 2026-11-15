@@ -151,8 +151,12 @@
     flex: 0 0 auto;
     width: 1px; // keep in sync with LAYOUT.separator
     align-self: stretch;
-    margin: 0.3125rem 0;
-    background-color: var(--default-border-color, #e9ecef);
+    margin: 0.375rem 0;
+    // `--default-border-color` resolves to `--color-surface-high`, which is
+    // all but invisible on the island; the outline-variant token is the one
+    // that reads as a hairline in both themes.
+    background-color: var(--color-border-outline-variant, #c5c5d0);
+    opacity: 0.7;
     border: 0;
   }
 
@@ -307,7 +311,15 @@
  * therefore the correct lever; see INTEGRATION.md.
  */
 body.gn-taskbar-suppress-default-ui {
+  // desktop: the top shapes island
   .excalidraw .App-menu_top .shapes-section {
+    display: none;
+  }
+
+  // mobile form factor: the same tools, rendered as a bottom bar by
+  // `MobileMenu`. Hidden too, otherwise every tool appears twice.
+  .excalidraw--mobile .App-toolbar-content,
+  .excalidraw--mobile .App-bottom-bar .App-toolbar {
     display: none;
   }
 
