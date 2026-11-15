@@ -133,7 +133,9 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
     const item = listRef.current?.querySelector(
       `[data-page-index="${activePageIndex}"]`,
     );
-    item?.scrollIntoView({
+    // `?.` on the method too: jsdom has no scrollIntoView, and the repo
+    // guards it the same way elsewhere
+    item?.scrollIntoView?.({
       block: "nearest",
       behavior: prefersReducedMotionCSS() ? "auto" : "smooth",
     });

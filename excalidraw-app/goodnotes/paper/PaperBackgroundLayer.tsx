@@ -8,6 +8,8 @@
  * See INTEGRATION.md in this folder for how to mount it.
  */
 
+import { supportsResizeObserver } from "@excalidraw/common";
+
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 import type { ExcalidrawElement } from "@excalidraw/element/types";
@@ -257,12 +259,16 @@ export const PaperBackgroundLayer = (props: PaperBackgroundLayerProps) => {
 
     measure();
 
-    const observer = new ResizeObserver(measure);
-    observer.observe(parent ?? canvas);
+    // ResizeObserver is feature-detected throughout this repo (and absent in
+    // jsdom); the window resize listener below is the fallback.
+    const observer = supportsResizeObserver
+      ? new ResizeObserver(measure)
+      : null;
+    observer?.observe(parent ?? canvas);
     window.addEventListener("resize", measure);
 
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       window.removeEventListener("resize", measure);
     };
   }, [schedule]);
