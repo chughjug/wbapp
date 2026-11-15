@@ -2,7 +2,10 @@
 // Colours come from Excalidraw's theme custom properties, so the dialog is
 // correct in both light and dark theme without any hardcoded values.
 
-.gn-export-backdrop {
+// The portal root carries the `excalidraw` class so the theme custom
+// properties resolve; these rules override the editor container's own
+// layout (`position: relative; height: 100%`).
+.excalidraw.gn-export-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -263,7 +266,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gn-export-backdrop,
+  // must match the specificity of `.excalidraw.gn-export-backdrop` above
+  .excalidraw.gn-export-backdrop,
   .gn-export-dialog {
     animation: none;
   }

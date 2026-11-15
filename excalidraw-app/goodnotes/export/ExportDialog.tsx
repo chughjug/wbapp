@@ -57,6 +57,11 @@ export interface ExportDialogProps {
   onClose: () => void;
   /** Optional hook for telemetry / toasts. */
   onExported?: (blob: Blob, fileName: string) => void;
+  /**
+   * UI theme for the dialog itself (the PDF is always light).
+   * Defaults to `appState.theme`.
+   */
+  theme?: "light" | "dark";
 }
 
 const SCALE_OPTIONS = [
@@ -78,6 +83,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   defaultPaperTemplate = "blank",
   onClose,
   onExported,
+  theme,
 }) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
@@ -309,7 +315,13 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
   return createPortal(
     <div
-      className="gn-export-backdrop"
+      // mirrors Excalidraw's own portal containers (see
+      // `useCreatePortalContainer`): the theme custom properties are scoped
+      // to `.excalidraw`, so a portal outside the editor needs these classes
+      // for light/dark to work at all.
+      className={`excalidraw gn-export-backdrop${
+        (theme ?? appState?.theme) === "dark" ? " theme--dark" : ""
+      }`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           requestClose();
