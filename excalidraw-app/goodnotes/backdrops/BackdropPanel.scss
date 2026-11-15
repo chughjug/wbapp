@@ -211,6 +211,21 @@
     border-radius: var(--border-radius-md, 0.375rem);
     background: var(--gn-bd-surface-alt);
     cursor: pointer;
+
+    // show the whole well as the colour, not a tiny inset chip
+    &::-webkit-color-swatch-wrapper {
+      padding: 2px;
+    }
+
+    &::-webkit-color-swatch {
+      border: 1px solid var(--gn-bd-border);
+      border-radius: 0.1875rem;
+    }
+
+    &::-moz-color-swatch {
+      border: 1px solid var(--gn-bd-border);
+      border-radius: 0.1875rem;
+    }
   }
 
   &__field--color {
