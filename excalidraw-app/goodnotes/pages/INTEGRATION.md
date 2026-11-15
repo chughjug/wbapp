@@ -138,7 +138,60 @@ const { pages, activePageIndex, addPage, goToPage } = usePages(excalidrawAPI);
 - jump to the page of a clicked element:
   `scrollToPageOfElement(excalidrawAPI, elementId)`
 
-## 6. Things worth knowing
+## 6. Contract with the paper-templates module
+
+**Decision: option 2 — the template is stored in the frame's `customData`, not
+in the frame name.** Page frame names stay exactly `page:1`, `page:2`, … .
+
+Why: Excalidraw renders `frame.name` as a visible label above the frame and
+lets the user rename it inline (`getFrameLikeTitle`, and the frame-name editor
+in the interactive scene). A name like `page:3:cornell` would be shown on the
+canvas, and any user rename would silently change the paper. `customData` is
+the sanctioned per-element host-data slot, survives save/load, export and
+collaboration, and cannot be edited away by accident.
+
+Wire the paper module's `templateForPage` callback to this accessor:
+
+```tsx
+import { getTemplateForPage } from "./goodnotes/pages";
+
+<PaperLayer
+  // …
+  templateForPage={(pageIndex: number) =>
+    getTemplateForPage(excalidrawAPI.getSceneElements(), pageIndex)
+  }
+/>
+```
+
+Other accessors available for the same data:
+
+| Accessor | Signature |
+| --- | --- |
+| `getTemplateForPage` | `(elements: readonly ExcalidrawElement[], index: number) => PaperTemplateId` |
+| `getPageTemplate` | `(frame: ExcalidrawFrameElement) => PaperTemplateId` |
+| `getPages(elements)[i].template` | already a `PaperTemplateId` on every `Page` |
+| `setPageTemplate` | `(elements, index, template) => ExcalidrawElement[]` (writer) |
+| `usePages(api).setPageTemplate` | `(index, template) => void` (writer, applies via `updateScene`) |
+
+The storage key is exported as `PAGE_CUSTOM_DATA_KEY` (`"goodnotesPage"`), with
+the shape `{ template: PaperTemplateId; size: PageSizeName }`, if you ever need
+to read it directly.
+
+Note the paper module's existing `page:<index>:<templateId>` parser stays
+backward-compatible with what we emit — it just always sees the two-segment
+form `page:<index>` and should fall back to its default (which should then be
+overridden by `templateForPage`).
+
+### Page backgrounds are transparent
+
+Checked: Excalidraw draws a frame as an **outline only** — `renderElement.ts`
+(`case "frame"`) strokes with `FRAME_STYLE` and never fills from
+`element.backgroundColor`; `FRAME_STYLE.backgroundColor` is `"transparent"`
+too. On top of that, `createPageFrame` sets `backgroundColor: "transparent"`
+explicitly. A page frame therefore cannot occlude the paper layer painted
+behind the canvas.
+
+## 7. Things worth knowing
 
 - **This fork has no `excalidrawAPI.scrollToContent`.** The replacement is
   `excalidrawAPI.setViewport(opts)`; `scrollToPage` wraps it.
