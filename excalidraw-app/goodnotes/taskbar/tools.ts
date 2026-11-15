@@ -1,5 +1,5 @@
 /**
- * The only place the taskbar talks to the editor.
+ * The only place the nav bar talks to the editor.
  *
  * Everything goes through the documented `ExcalidrawImperativeAPI` surface —
  * `setActiveTool` for the tool itself and `updateScene({ appState })` for the
@@ -14,6 +14,33 @@ import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import type { PenPreset } from "../types";
 
 import type { TaskbarShapeId, TaskbarToolId } from "./model";
+
+/**
+ * Tools that STAY ACTIVE after one use, because the user's next action is
+ * almost always "do it again": ink and erasing.
+ *
+ * Everything else (shape, text, image, sticky note) is one-shot — after a
+ * single placement the editor falls back to the selection tool, because the
+ * next action is almost always "move / resize what I just placed".
+ *
+ * Mechanically this is Excalidraw's own tool lock: `setActiveTool({ locked })`
+ * sets `appState.activeTool.locked`, and the editor reverts to
+ * `preferredSelectionTool` on pointer-up for every unlocked tool
+ * (`App#isToolLocked`). We therefore do not re-implement reversion, we just
+ * declare which slots are sticky and let the editor do it.
+ *
+ * NOTE on the word "sticky": `"sticky"` the tool id means a sticky NOTE.
+ * Whether a tool persists is `isPersistentTool`, never "sticky".
+ */
+export const PERSISTENT_TOOLS: readonly TaskbarToolId[] = [
+  "pen",
+  "highlighter",
+  "eraser",
+];
+
+/** @see PERSISTENT_TOOLS */
+export const isPersistentTool = (tool: TaskbarToolId): boolean =>
+  PERSISTENT_TOOLS.includes(tool);
 
 /**
  * `customData` marker that makes the renderer composite a freedraw stroke with
@@ -79,7 +106,8 @@ const isUsable = (api: ExcalidrawImperativeAPI | null) =>
   !!api && !api.isDestroyed;
 
 const applyInk = (api: ExcalidrawImperativeAPI, preset: PenPreset) => {
-  api.setActiveTool({ type: "freedraw" });
+  // locked: ink is a persistent tool — see PERSISTENT_TOOLS
+  api.setActiveTool({ type: "freedraw", locked: true });
   api.updateScene({
     appState: {
       currentItemStrokeColor: preset.color,
@@ -120,7 +148,10 @@ export const activateTool = (
 
   switch (tool) {
     case "select":
-      editor.setActiveTool({ type: "selection" });
+      editor.setActiveTool({ type: "selection", locked: false });
+      return;
+    case "lasso":
+      editor.setActiveTool({ type: "lasso", locked: false });
       return;
     case "pen":
       applyInk(editor, options.pen ?? DEFAULT_PEN);
@@ -129,20 +160,27 @@ export const activateTool = (
       applyInk(editor, options.highlighter ?? DEFAULT_HIGHLIGHTER);
       return;
     case "eraser":
-      editor.setActiveTool({ type: "eraser" });
+      editor.setActiveTool({ type: "eraser", locked: true });
       editor.updateScene({ appState: { currentItemCustomData: null } });
       return;
     case "text":
-      editor.setActiveTool({ type: "text" });
+      editor.setActiveTool({ type: "text", locked: false });
       editor.updateScene({ appState: { currentItemCustomData: null } });
       return;
     case "image":
-      editor.setActiveTool({ type: "image" });
+      editor.setActiveTool({ type: "image", locked: false });
+      return;
+    case "sticky":
+      // Excalidraw has a first-class `stickynote` tool in this fork; one
+      // placement then back to select.
+      editor.setActiveTool({ type: "stickynote", locked: false });
+      editor.updateScene({ appState: { currentItemCustomData: null } });
       return;
     case "shape": {
       const shape = options.shape ?? "rectangle";
       editor.setActiveTool({
         type: SHAPE_TOOL[shape] as "rectangle",
+        locked: false,
       });
       editor.updateScene({ appState: { currentItemCustomData: null } });
     }
@@ -154,7 +192,7 @@ export const activateTool = (
  * correct when the tool changes behind its back (keyboard shortcut, Escape
  * after a drag, another goodnotes surface such as the pen tray).
  *
- * Returns `null` for tools the bar does not own (hand, laser, frame, lasso…) —
+ * Returns `null` for tools the bar does not own (hand, laser, frame…) —
  * callers should then show nothing as pressed rather than lie.
  */
 export const toolFromAppState = (appState: {
@@ -167,6 +205,8 @@ export const toolFromAppState = (appState: {
   switch (type) {
     case "selection":
       return { tool: "select", shape: null };
+    case "lasso":
+      return { tool: "lasso", shape: null };
     case "freedraw":
       return { tool: highlighting ? "highlighter" : "pen", shape: null };
     case "eraser":
@@ -175,6 +215,8 @@ export const toolFromAppState = (appState: {
       return { tool: "text", shape: null };
     case "image":
       return { tool: "image", shape: null };
+    case "stickynote":
+      return { tool: "sticky", shape: null };
     case "rectangle":
     case "ellipse":
     case "diamond":

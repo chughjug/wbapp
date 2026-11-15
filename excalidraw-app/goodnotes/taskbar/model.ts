@@ -1,24 +1,27 @@
 /**
- * The taskbar's data model: what a control is, which groups exist, and how the
- * bar decides what to drop into the overflow ("More") menu.
+ * The nav bar's data model: what a control is, which groups exist, and how a
+ * cluster decides what to drop into its overflow ("More") menu.
  *
- * Nothing here renders or touches the editor; `Taskbar.tsx` builds this model
- * from props and `tools.ts` applies the editor side effects. Keeping the model
+ * Nothing here renders or touches the editor; `shell/NavBar.tsx` builds this
+ * model from props and `tools.ts` applies the editor side effects. Keeping the model
  * declarative is what makes the overflow maths, the roving tabindex and the
  * More menu share one source of truth.
  */
 
 import type { ReactNode } from "react";
 
-/** Tool slots the taskbar can own. Not 1:1 with Excalidraw tool types. */
+/** Tool slots the nav bar can own. Not 1:1 with Excalidraw tool types. */
 export type TaskbarToolId =
   | "select"
+  | "lasso"
   | "pen"
   | "highlighter"
   | "eraser"
   | "shape"
   | "text"
-  | "image";
+  | "image"
+  /** Sticky NOTE. Unrelated to `isPersistentTool`. */
+  | "sticky";
 
 /** Shapes offered behind the single "Shapes" control. */
 export type TaskbarShapeId =
@@ -28,12 +31,19 @@ export type TaskbarShapeId =
   | "arrow"
   | "line";
 
-/** Logical clusters, rendered left to right with a separator between them. */
-export type TaskbarGroupId = "tools" | "image" | "document" | "pages";
+/**
+ * Logical clusters inside one zone, rendered left to right with a hairline
+ * separator between them.
+ *
+ * `draw` / `insert` split the centre tool cluster the way the GoodNotes study
+ * does (ink and erasing, then things you place). `document` and `pages` are
+ * the right zone's action runs.
+ */
+export type TaskbarGroupId = "draw" | "insert" | "document" | "pages";
 
 export const GROUP_ORDER: readonly TaskbarGroupId[] = [
-  "tools",
-  "image",
+  "draw",
+  "insert",
   "document",
   "pages",
 ];
@@ -83,7 +93,7 @@ export interface TaskbarMenuItem {
 }
 
 /**
- * Geometry constants mirroring `Taskbar.scss`. They only feed the overflow
+ * Geometry constants mirroring `shell/NavBar.scss`. They only feed the overflow
  * estimate, so being a pixel out just makes the bar marginally conservative.
  */
 export const LAYOUT = {

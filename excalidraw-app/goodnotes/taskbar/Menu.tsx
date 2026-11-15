@@ -1,6 +1,7 @@
 /**
- * The popover used by both the "Shapes" control and the overflow ("More")
- * control. One implementation so the two behave identically.
+ * The popover used by the "Shapes" control, the centre cluster's overflow
+ * control and the nav bar's right-zone "more" (…) control. One implementation
+ * so all three behave identically.
  *
  * Accessibility contract:
  * - `role="menu"` with `role="menuitem"` / `role="menuitemradio"` children.
@@ -11,6 +12,8 @@
  */
 
 import { useCallback, useEffect, useRef } from "react";
+
+import "./Menu.scss";
 
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 
@@ -115,7 +118,7 @@ export const TaskbarMenu = ({
     <div
       ref={rootRef}
       id={id}
-      className="gn-taskbar__menu"
+      className="gn-menu"
       data-align={align}
       role="menu"
       aria-labelledby={labelledBy}
@@ -124,12 +127,12 @@ export const TaskbarMenu = ({
       {sections.map((section) => (
         <div
           key={section.id}
-          className="gn-taskbar__menu-group"
+          className="gn-menu__group"
           role={section.label ? "group" : "none"}
           aria-label={section.label}
         >
           {section.label && (
-            <div className="gn-taskbar__menu-heading" aria-hidden="true">
+            <div className="gn-menu__heading" aria-hidden="true">
               {section.label}
             </div>
           )}
@@ -138,7 +141,7 @@ export const TaskbarMenu = ({
               key={item.id}
               type="button"
               data-gn-menuitem=""
-              className="gn-taskbar__menu-item"
+              className="gn-menu__item"
               role={radio ? "menuitemradio" : "menuitem"}
               aria-checked={radio ? !!item.checked : undefined}
               disabled={item.disabled}
@@ -148,12 +151,12 @@ export const TaskbarMenu = ({
                 onClose({ restoreFocus: true });
               }}
             >
-              <span className="gn-taskbar__menu-icon" aria-hidden="true">
+              <span className="gn-menu__icon" aria-hidden="true">
                 {item.icon}
               </span>
-              <span className="gn-taskbar__menu-label">{item.label}</span>
+              <span className="gn-menu__label">{item.label}</span>
               {!radio && item.checked && (
-                <span className="gn-taskbar__menu-tick" aria-hidden="true">
+                <span className="gn-menu__tick" aria-hidden="true">
                   ✓
                 </span>
               )}

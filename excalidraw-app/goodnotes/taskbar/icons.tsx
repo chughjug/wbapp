@@ -1,7 +1,7 @@
 /**
- * Inline 20x20 icons for the taskbar.
+ * Inline 20x20 icons for the nav bar.
  *
- * Self-contained on purpose: the taskbar must not import from
+ * Self-contained on purpose: the bar must not import from
  * `packages/excalidraw` internals (not part of the public entrypoint) nor from
  * sibling `goodnotes/*` modules owned by other agents. Every icon is a bare
  * `<svg>` that inherits `currentColor`, so theming is automatic, and every one
@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 
 const svg = (children: ReactNode, opts?: { fill?: boolean }): ReactNode => (
   <svg
-    className="gn-taskbar__icon"
+    className="gn-icon"
     viewBox="0 0 24 24"
     width="20"
     height="20"
@@ -164,3 +164,87 @@ export const MoreIcon = () =>
   );
 
 export const ChevronIcon = () => svg(<path d="m7 10 5 5 5-5" />);
+
+// ---------------------------------------------------------------------------
+// nav-bar zones (added with the three-zone shell)
+// ---------------------------------------------------------------------------
+
+export const LassoIcon = () =>
+  svg(
+    <>
+      <path d="M4.2 11.2c0-3.6 3.5-6.4 7.8-6.4s7.8 2.8 7.8 6.4-3.5 6.4-7.8 6.4c-1.3 0-2.6-.2-3.7-.7" />
+      <path d="M8.3 16.9c-1 .7-1.6 1.6-1.6 2.3 0 .7.6 1.3 1.4 1.3" />
+    </>,
+  );
+
+export const StickyIcon = () =>
+  svg(
+    <>
+      <path d="M4.5 5.5a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v8.2l-5.8 5.8H5.5a1 1 0 0 1-1-1v-13Z" />
+      <path d="M19.5 13.7h-4.8a1 1 0 0 0-1 1v4.8" />
+    </>,
+  );
+
+export const PagesPanelIcon = () =>
+  svg(
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M9.5 4.5v15" />
+    </>,
+  );
+
+export const SearchIcon = () =>
+  svg(
+    <>
+      <circle cx="11" cy="11" r="6.3" />
+      <path d="m15.6 15.6 4.4 4.4" />
+    </>,
+  );
+
+export const UndoIcon = () =>
+  svg(
+    <>
+      <path d="M8.5 7.5 4.5 11l4 3.5" />
+      <path d="M4.5 11h9a5 5 0 0 1 0 10h-3" />
+    </>,
+  );
+
+export const RedoIcon = () =>
+  svg(
+    <>
+      <path d="M15.5 7.5 19.5 11l-4 3.5" />
+      <path d="M19.5 11h-9a5 5 0 0 0 0 10h3" />
+    </>,
+  );
+
+export const ShareIcon = () =>
+  svg(
+    <>
+      <path d="M12 15.5V4" />
+      <path d="m8 7.8 4-3.8 4 3.8" />
+      <path d="M5 13.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-5.5" />
+    </>,
+  );
+
+export const WriteIcon = () =>
+  svg(
+    <>
+      <path d="M15.8 4.6a1.8 1.8 0 0 1 2.6 2.6L9 16.6l-3.5 1 1-3.5 9.3-9.5Z" />
+      <path d="M4 20.5h16" />
+    </>,
+  );
+
+export const ReadIcon = () =>
+  svg(
+    <>
+      <path d="M12 6.8C10.4 5.4 8.3 4.8 4.5 4.8v12.4c3.8 0 5.9.6 7.5 2 1.6-1.4 3.7-2 7.5-2V4.8c-3.8 0-5.9.6-7.5 2Z" />
+      <path d="M12 6.8v12.4" />
+    </>,
+  );
+
+export const CloseIcon = () =>
+  svg(
+    <>
+      <path d="m6 6 12 12M18 6 6 18" />
+    </>,
+  );

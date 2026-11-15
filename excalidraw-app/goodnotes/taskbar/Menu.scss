@@ -1,0 +1,117 @@
+/**
+ * Styling for the shared popover (`Menu.tsx`).
+ *
+ * Colour comes exclusively from Excalidraw's own custom properties (defined in
+ * `packages/excalidraw/css/theme.scss`), so the menu is correct in light and
+ * dark; every value keeps a literal fallback for the case where the popover is
+ * mounted outside an `.excalidraw` scope.
+ *
+ * Deliberately NOT used: `--color-muted` (a *background* grey with no contrast
+ * guarantee as text) and `--keybinding-color` (~1.9:1 on white). De-emphasised
+ * text uses `--input-label-color`, a real text token (#495057 light /
+ * #e9ecef dark, >8:1 against the popup background in both themes).
+ */
+
+.gn-menu {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  z-index: 10;
+
+  min-width: 12rem;
+  max-height: min(60vh, 28rem);
+  overflow-y: auto;
+  padding: 0.25rem;
+
+  border: 1px solid var(--dialog-border-color, #e9ecef);
+  border-radius: 0.625rem;
+  background-color: var(--popup-bg-color, #fff);
+  box-shadow: var(--shadow-island-stronger, 0 6px 20px rgba(0, 0, 0, 0.18));
+
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-size: 0.8125rem;
+
+  &[data-align="start"] {
+    left: 0;
+  }
+
+  &[data-align="end"] {
+    right: 0;
+  }
+
+  &__group + &__group {
+    margin-top: 0.125rem;
+    padding-top: 0.25rem;
+    border-top: 1px solid var(--default-border-color, #e9ecef);
+  }
+
+  &__heading {
+    padding: 0.25rem 0.5rem 0.125rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--input-label-color, #495057);
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 2rem;
+    padding: 0.25rem 0.5rem;
+
+    border: 0;
+    border-radius: 0.4375rem;
+    background-color: transparent;
+    color: var(--popup-text-color, #1b1b1f);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background-color: var(--button-hover-bg, rgba(0, 0, 0, 0.06));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4dabf7);
+      outline-offset: -2px;
+    }
+
+    &[aria-checked="true"] {
+      background-color: var(--color-surface-primary-container, #e0dfff);
+      color: var(--color-on-primary-container, #030064);
+    }
+
+    &:disabled {
+      color: var(--input-label-color, #495057);
+      opacity: 0.8;
+      cursor: default;
+    }
+  }
+
+  &__icon {
+    display: inline-flex;
+    width: 1.25rem;
+    flex: 0 0 auto;
+  }
+
+  &__label {
+    flex: 1 1 auto;
+  }
+
+  &__tick {
+    flex: 0 0 auto;
+    opacity: 0.8;
+  }
+}
+
+@media (forced-colors: active) {
+  .gn-menu {
+    border: 1px solid CanvasText;
+  }
+
+  .gn-menu__item[aria-checked="true"] {
+    border: 1px solid Highlight;
+  }
+}
