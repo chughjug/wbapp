@@ -1,6 +1,10 @@
 /**
  * Vertical strip of page thumbnails — the GoodNotes page navigator.
  *
+ * Thumbnails are composited: the page's paper template (`renderPaper` from
+ * `../paper`) is painted first, then the page's ink is exported on a
+ * transparent raster and drawn over it.
+ *
  * Accessibility notes:
  *  - the strip is a `listbox`-flavoured list of real `<button>`s; the active
  *    page carries `aria-current="page"`,
@@ -314,10 +318,14 @@ export const renderPageThumbnail = async ({
  * the editor would. Renders are keyed on the page's content version, so only
  * pages that actually changed are re-rendered.
  *
+ * Each thumbnail is the page's paper template (from `../paper`'s
+ * `renderPaper`) with the ink composited on top — see
+ * {@link renderPageThumbnail} — so a lined page looks lined in the strip.
+ *
  * FALLBACK (documented): when `enabled` is false — e.g. the document has more
  * pages than {@link THUMBNAIL_PAGE_LIMIT} — the strip shows numbered
- * placeholders instead. Rendering dozens of full-page canvases on every edit
- * is not worth the main-thread cost.
+ * placeholders instead (no paper either). Rendering dozens of full-page
+ * canvases on every edit is not worth the main-thread cost.
  */
 const usePageThumbnails = (
   excalidrawAPI: ExcalidrawImperativeAPI | null,

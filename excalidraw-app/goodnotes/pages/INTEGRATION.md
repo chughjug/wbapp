@@ -191,6 +191,31 @@ too. On top of that, `createPageFrame` sets `backgroundColor: "transparent"`
 explicitly. A page frame therefore cannot occlude the paper layer painted
 behind the canvas.
 
+### Thumbnails show the paper
+
+The page-thumbnail strip composites the two layers: `renderPaper(ctx,
+templateId, w, h, { theme, sheet: true })` from `../paper` is painted first,
+then the page's ink is exported on a **transparent** raster
+(`canvasBackgroundColor: false`) and drawn on top. So a lined page looks lined
+in the strip, a grid page looks gridded, and the thumbnail matches what the
+canvas shows.
+
+Verified headlessly against the running dev server (Playwright + Chromium,
+importing the real modules):
+
+| thumbnail | non-white paper px | ink px |
+| --- | --- | --- |
+| `lined` page with a red rectangle on it | 14 522 | 597 |
+| `grid` page, empty | 37 180 | 0 |
+| `blank` page, empty (control — border only) | 1 270 | 0 |
+
+Negative control, same export at the same size: **without**
+`canvasBackgroundColor: false` the ink raster is 35 775/35 775 opaque pixels
+(it would have covered the paper completely); **with** it, 0 opaque pixels on
+an empty page. Keep that flag if you ever touch this code.
+
+`PageSidebar` imports `../paper` directly — no extra wiring in App.tsx.
+
 ## 7. Things worth knowing
 
 - **This fork has no `excalidrawAPI.scrollToContent`.** The replacement is
