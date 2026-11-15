@@ -81,6 +81,25 @@ export const useSelectedImageElement = (
   return element;
 };
 
+/** The editor's current theme, kept in sync as the user toggles it. */
+export const useEditorTheme = (
+  excalidrawAPI: ExcalidrawImperativeAPI | null,
+): BackdropTheme => {
+  const [theme, setTheme] = useState<BackdropTheme>("light");
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    const read = () =>
+      setTheme(
+        (excalidrawAPI.getAppState()?.theme ?? "light") as BackdropTheme,
+      );
+    read();
+    return excalidrawAPI.onChange(read);
+  }, [excalidrawAPI]);
+  return theme;
+};
+
 /* -------------------------------------------------------------------------- */
 /* preview                                                                     */
 /* -------------------------------------------------------------------------- */
@@ -269,8 +288,7 @@ export const BackdropPanel = ({
   const element = useSelectedImageElement(excalidrawAPI);
   const elementId = element?.id ?? null;
 
-  const editorTheme = (excalidrawAPI?.getAppState()?.theme ??
-    "light") as BackdropTheme;
+  const editorTheme = useEditorTheme(excalidrawAPI);
   const theme = themeProp ?? editorTheme;
 
   const existing = getBackdropState(element);
@@ -335,6 +353,21 @@ export const BackdropPanel = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [excalidrawAPI, elementId, element?.fileId]);
+
+  // follow the editor's theme while the user has not tweaked anything
+  const prevThemeRef = useRef(theme);
+  useEffect(() => {
+    const prevTheme = prevThemeRef.current;
+    prevThemeRef.current = theme;
+    if (prevTheme === theme) {
+      return;
+    }
+    setParams((prev) =>
+      JSON.stringify(prev) === JSON.stringify(getPresetParams(presetId, prevTheme))
+        ? getPresetParams(presetId, theme)
+        : prev,
+    );
+  }, [theme, presetId]);
 
   const selectPreset = useCallback(
     (id: BackdropPresetId, moveFocus: boolean) => {
@@ -441,8 +474,11 @@ export const BackdropPanel = ({
       aria-labelledby={titleId}
       aria-modal="false"
       onKeyDown={(event) => {
+        // Excalidraw listens for keys on the document: arrow keys nudge the
+        // selected element, Delete removes it, digits switch tools. While
+        // focus is inside the panel those must not reach the editor.
+        event.stopPropagation();
         if (event.key === "Escape") {
-          event.stopPropagation();
           onClose();
         }
       }}

@@ -28,6 +28,8 @@ import {
   useState,
 } from "react";
 
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+
 import {
   AddPageIcon,
   ArrowIcon,
@@ -55,8 +57,6 @@ import { activateTool, toolFromAppState } from "./tools";
 import "./Taskbar.scss";
 
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
-
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import type { PenPreset } from "../types";
 

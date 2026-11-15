@@ -59,6 +59,7 @@ export {
   BackdropPreview,
   useBackdropPanel,
   useSelectedImageElement,
+  useEditorTheme,
 } from "./BackdropPanel";
 export type {
   BackdropPanelProps,
