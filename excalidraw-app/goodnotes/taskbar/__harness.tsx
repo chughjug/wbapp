@@ -17,7 +17,7 @@ const Harness = () => {
   return (
     <div style={{ height: "100%" }}>
       <Excalidraw
-        excalidrawAPI={(a) => { (window as any).__gnApi = a; setApi(a); }}
+        onExcalidrawAPI={(a) => { (window as any).__gnApi = a; setApi(a); }}
         theme={theme}
         initialData={{ appState: { theme } }}
       />

@@ -21,7 +21,7 @@ const App = () => {
   return (
     <div className="wrap">
       <div className="canvas">
-        <Excalidraw excalidrawAPI={(a) => { console.log("HARNESS got api"); setApi(a); }}>
+        <Excalidraw onExcalidrawAPI={(a) => { console.log("HARNESS got api"); setApi(a); }}>
           <div style={{ position: "absolute", top: 8, right: 8, zIndex: 10 }}>
             <BackdropPanel {...ctl.panelProps} />
           </div>

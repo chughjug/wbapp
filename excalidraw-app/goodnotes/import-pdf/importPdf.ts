@@ -31,7 +31,10 @@
 
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import { newElementWith, newImageElement } from "@excalidraw/element";
-import { generateIdFromFile, getDataURL } from "@excalidraw/excalidraw/data/blob";
+import {
+  generateIdFromFile,
+  getDataURL,
+} from "@excalidraw/excalidraw/data/blob";
 
 import type {
   ExcalidrawElement,
@@ -160,10 +163,7 @@ export interface PdfjsLike {
   getDocument: (src: Record<string, unknown>) => {
     promise: Promise<PdfDocumentLike>;
     destroy: () => Promise<void> | void;
-    onPassword?: (
-      callback: (password: string) => void,
-      reason: number,
-    ) => void;
+    onPassword?: (callback: (password: string) => void, reason: number) => void;
   };
   GlobalWorkerOptions?: { workerSrc?: string; workerPort?: unknown };
   version?: string;
@@ -349,9 +349,7 @@ export const matchClosestPageSize = (
   pdfHeightPx: number,
 ): { size: PageSizeName; landscape: boolean } => {
   const landscape = pdfWidthPx > pdfHeightPx;
-  const ratio = landscape
-    ? pdfHeightPx / pdfWidthPx
-    : pdfWidthPx / pdfHeightPx;
+  const ratio = landscape ? pdfHeightPx / pdfWidthPx : pdfWidthPx / pdfHeightPx;
   let best: PageSizeName = "A4";
   let bestDelta = Infinity;
   for (const name of Object.keys(PAGE_SIZES) as PageSizeName[]) {

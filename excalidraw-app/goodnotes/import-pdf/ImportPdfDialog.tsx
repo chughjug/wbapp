@@ -111,7 +111,9 @@ export const ImportPdfDialog: React.FC<ImportPdfDialogProps> = ({
   const [dependencyMissing, setDependencyMissing] = useState(false);
 
   const editorTheme =
-    theme ?? (excalidrawAPI.getAppState?.().theme as "light" | "dark") ?? "light";
+    theme ??
+    (excalidrawAPI.getAppState?.().theme as "light" | "dark") ??
+    "light";
 
   // ---- dependency probe ---------------------------------------------------
   useEffect(() => {
@@ -172,7 +174,9 @@ export const ImportPdfDialog: React.FC<ImportPdfDialogProps> = ({
       }
       const focusable = [
         ...root.querySelectorAll<HTMLElement>(FOCUSABLE),
-      ].filter((el) => el.offsetParent !== null || el === document.activeElement);
+      ].filter(
+        (el) => el.offsetParent !== null || el === document.activeElement,
+      );
       if (focusable.length === 0) {
         return;
       }
@@ -190,49 +194,46 @@ export const ImportPdfDialog: React.FC<ImportPdfDialogProps> = ({
   );
 
   // ---- file selection -----------------------------------------------------
-  const acceptFile = useCallback(
-    async (candidate: File) => {
-      setError(null);
-      setNeedsPassword(false);
-      setPassword("");
-      setPageCount(null);
-      if (!isPdfFile(candidate)) {
-        setFile(null);
-        setError(`"${candidate.name}" is not a PDF.`);
+  const acceptFile = useCallback(async (candidate: File) => {
+    setError(null);
+    setNeedsPassword(false);
+    setPassword("");
+    setPageCount(null);
+    if (!isPdfFile(candidate)) {
+      setFile(null);
+      setError(`"${candidate.name}" is not a PDF.`);
+      return;
+    }
+    setFile(candidate);
+    try {
+      const count = await readPdfPageCount(candidate);
+      if (!unmountedRef.current) {
+        // reading the PDF proves pdf.js is reachable after all (e.g. the
+        // host called configurePdfjs() after this dialog mounted)
+        setDependencyMissing(false);
+        setPageCount(count);
+        setCustomRange(`1-${count}`);
+      }
+    } catch (err) {
+      if (unmountedRef.current) {
         return;
       }
-      setFile(candidate);
-      try {
-        const count = await readPdfPageCount(candidate);
-        if (!unmountedRef.current) {
-          // reading the PDF proves pdf.js is reachable after all (e.g. the
-          // host called configurePdfjs() after this dialog mounted)
-          setDependencyMissing(false);
-          setPageCount(count);
-          setCustomRange(`1-${count}`);
-        }
-      } catch (err) {
-        if (unmountedRef.current) {
+      if (err instanceof PdfImportError) {
+        if (err.code === "password-required") {
+          setNeedsPassword(true);
+          setError(
+            "This PDF is password-protected. Enter its password to continue.",
+          );
           return;
         }
-        if (err instanceof PdfImportError) {
-          if (err.code === "password-required") {
-            setNeedsPassword(true);
-            setError(
-              "This PDF is password-protected. Enter its password to continue.",
-            );
-            return;
-          }
-          if (err.code === "missing-dependency") {
-            setDependencyMissing(true);
-            return;
-          }
+        if (err.code === "missing-dependency") {
+          setDependencyMissing(true);
+          return;
         }
-        setError(describePdfImportError(err));
       }
-    },
-    [],
-  );
+      setError(describePdfImportError(err));
+    }
+  }, []);
 
   const onFileInputChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -398,8 +399,8 @@ export const ImportPdfDialog: React.FC<ImportPdfDialogProps> = ({
 
         {dependencyMissing && (
           <div className="gn-import-pdf-dialog__banner" role="alert">
-            <strong>PDF rendering is unavailable.</strong> This build is
-            missing the <code>{PDFJS_PACKAGE}</code> package (
+            <strong>PDF rendering is unavailable.</strong> This build is missing
+            the <code>{PDFJS_PACKAGE}</code> package (
             <code>{PDFJS_VERSION_RANGE}</code>). Install it and reload:
             <code className="gn-import-pdf-dialog__code">
               yarn workspace excalidraw-app add {PDFJS_PACKAGE}
@@ -497,7 +498,10 @@ export const ImportPdfDialog: React.FC<ImportPdfDialogProps> = ({
             <label htmlFor={`${rangeInputId}-custom`}>Page range</label>
           </div>
           <div className="gn-import-pdf-field">
-            <label htmlFor={rangeInputId} className="gn-import-pdf-visually-hidden">
+            <label
+              htmlFor={rangeInputId}
+              className="gn-import-pdf-visually-hidden"
+            >
               Page range
             </label>
             <input
@@ -554,9 +558,7 @@ export const ImportPdfDialog: React.FC<ImportPdfDialogProps> = ({
           <select
             id={sizingId}
             value={sizing}
-            onChange={(event) =>
-              setSizing(event.target.value as PdfPageSizing)
-            }
+            onChange={(event) => setSizing(event.target.value as PdfPageSizing)}
             disabled={busy}
           >
             <option value="preset">
@@ -603,8 +605,9 @@ export const ImportPdfDialog: React.FC<ImportPdfDialogProps> = ({
                 />
               </div>
               <p className="gn-import-pdf-progress__label">
-                Importing page {Math.min(progress.completed + 1, progress.total)}{" "}
-                of {progress.total}…
+                Importing page{" "}
+                {Math.min(progress.completed + 1, progress.total)} of{" "}
+                {progress.total}…
               </p>
             </>
           ) : null}
