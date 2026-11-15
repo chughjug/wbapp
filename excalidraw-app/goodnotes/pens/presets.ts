@@ -86,7 +86,9 @@ const isPenPreset = (value: unknown): value is PenPreset => {
   return (
     typeof p.id === "string" &&
     typeof p.label === "string" &&
-    (p.tool === "freedraw" || p.tool === "highlighter" || p.tool === "eraser") &&
+    (p.tool === "freedraw" ||
+      p.tool === "highlighter" ||
+      p.tool === "eraser") &&
     typeof p.color === "string" &&
     typeof p.width === "number" &&
     Number.isFinite(p.width) &&

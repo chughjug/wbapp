@@ -38,6 +38,7 @@ import { getContainingFrame, isFrameClippable } from "@excalidraw/element";
 import { getCornerRadius, isPathALoop } from "@excalidraw/element";
 
 import { ShapeCache } from "@excalidraw/element";
+import { isHighlighterElement } from "@excalidraw/element";
 import {
   getStickyNoteFooter,
   getStickyNotePathCommands,
@@ -569,6 +570,12 @@ const renderElementToSvg = (
         }) rotate(${degree} ${cx} ${cy})`,
       );
       wrapper.setAttribute("stroke", "none");
+      // GoodNotes highlighter: mirror the canvas renderer's `multiply`
+      // compositing (see `isHighlighterElement` in
+      // `packages/element/src/renderElement.ts`) in SVG exports.
+      if (isHighlighterElement(element)) {
+        wrapper.setAttribute("style", "mix-blend-mode: multiply");
+      }
 
       const g = maybeWrapNodesInFrameClipPath(
         element,

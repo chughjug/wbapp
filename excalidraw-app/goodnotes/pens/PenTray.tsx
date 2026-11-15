@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
-import type { PenPreset } from "../types";
-
 import {
   PEN_WIDTHS,
   loadPenPresets,
@@ -13,6 +11,8 @@ import {
 } from "./presets";
 
 import "./PenTray.scss";
+
+import type { PenPreset } from "../types";
 
 /**
  * Marker written into `element.customData` so the renderer composites the
@@ -206,9 +206,7 @@ export const PenTray = ({
                 aria-pressed={isActive}
                 data-tool={preset.tool}
                 title={
-                  shortcut
-                    ? `${preset.label} (${shortcut})`
-                    : preset.label
+                  shortcut ? `${preset.label} (${shortcut})` : preset.label
                 }
                 onClick={() => activate(preset)}
               >

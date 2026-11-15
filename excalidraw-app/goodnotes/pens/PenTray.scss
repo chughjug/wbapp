@@ -64,6 +64,9 @@
     border-radius: 999px;
     background-color: var(--pen-color, currentColor);
     opacity: var(--pen-opacity, 1);
+    // keeps a near-background-coloured ink (black on dark, white on light)
+    // visible as a swatch
+    box-shadow: 0 0 0 1px var(--default-border-color, #e9ecef);
 
     &[data-tool="eraser"] {
       height: 0.75rem;
