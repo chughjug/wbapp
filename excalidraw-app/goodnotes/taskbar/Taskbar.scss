@@ -21,7 +21,9 @@
   left: 0;
   right: 0;
   bottom: auto;
-  z-index: 5;
+  // above Excalidraw's own UI layers (library 120 / main menu 110 / top 100)
+  // but below its modal layer (1000) so dialogs still cover the bar
+  z-index: 125;
 
   display: flex;
   justify-content: center;

@@ -205,6 +205,9 @@ export const ImportPdfDialog: React.FC<ImportPdfDialogProps> = ({
       try {
         const count = await readPdfPageCount(candidate);
         if (!unmountedRef.current) {
+          // reading the PDF proves pdf.js is reachable after all (e.g. the
+          // host called configurePdfjs() after this dialog mounted)
+          setDependencyMissing(false);
           setPageCount(count);
           setCustomRange(`1-${count}`);
         }
@@ -502,9 +505,14 @@ export const ImportPdfDialog: React.FC<ImportPdfDialogProps> = ({
               type="text"
               inputMode="numeric"
               value={customRange}
-              onChange={(event) => setCustomRange(event.target.value)}
+              // typing in the field IS the "page range" choice — a disabled
+              // input would be unreachable from the keyboard and invisible to
+              // screen readers' form navigation
+              onChange={(event) => {
+                setCustomRange(event.target.value);
+                setRangeMode("custom");
+              }}
               onFocus={() => setRangeMode("custom")}
-              disabled={rangeMode !== "custom"}
               aria-describedby={rangeError ? rangeErrorId : rangeHintId}
               aria-invalid={!!rangeError}
             />

@@ -330,13 +330,22 @@
   }
 }
 
+// Text on the primary fill follows Excalidraw's own convention
+// (`FilledButton`): `--color-surface-lowest`, which is near-white in light
+// theme and near-black in dark theme. `#fff` on the light-purple dark-theme
+// primary would only reach ~2:1 contrast.
 .gn-import-pdf-button--primary {
-  color: var(--color-primary-contrast, #fff);
+  color: var(--color-surface-lowest, #fff);
   background-color: var(--color-primary, #6965db);
   border-color: var(--color-primary, #6965db);
 
   &:hover:not(:disabled) {
-    background-color: var(--color-primary-darker, #5b57d1);
+    background-color: var(--color-brand-hover, #5b57d1);
+    border-color: var(--color-brand-hover, #5b57d1);
+  }
+
+  &:active:not(:disabled) {
+    background-color: var(--color-brand-active, #5b57d1);
   }
 }
 
