@@ -290,12 +290,15 @@
 }
 
 .goodnotes-backdrop-preview {
-
   display: block;
   border-radius: 0.1875rem;
   // a checkerboard, so transparent bleed around the panel is visible
   background-color: var(--gn-bd-surface);
-  background-image: linear-gradient(45deg, var(--gn-bd-border) 25%, transparent 25%),
+  background-image: linear-gradient(
+      45deg,
+      var(--gn-bd-border) 25%,
+      transparent 25%
+    ),
     linear-gradient(-45deg, var(--gn-bd-border) 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, var(--gn-bd-border) 75%),
     linear-gradient(-45deg, transparent 75%, var(--gn-bd-border) 75%);

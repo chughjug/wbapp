@@ -39,11 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
 import { t } from "@excalidraw/excalidraw/i18n";
 
-import {
-  ExcalLogo,
-  usersIcon,
-  share,
-} from "@excalidraw/excalidraw/components/icons";
+import { usersIcon, share } from "@excalidraw/excalidraw/components/icons";
 import { isElementLink } from "@excalidraw/element";
 import {
   bumpElementVersions,
@@ -77,6 +73,15 @@ import type { ResolutionType } from "@excalidraw/common/utility-types";
 import type { ResolvablePromise } from "@excalidraw/common/utils";
 
 import { ExportDialog, getOrderedPageFrames } from "./goodnotes/export";
+import { Taskbar } from "./goodnotes/taskbar";
+import { ImportPdfDialog } from "./goodnotes/import-pdf";
+import {
+  FuzzySelectOverlay,
+  toggleFuzzySelect,
+  deactivateFuzzySelect,
+  useFuzzySelectActive,
+} from "./goodnotes/fuzzy-select";
+import { BackdropPanel, useBackdropPanel } from "./goodnotes/backdrops";
 import { PenTray } from "./goodnotes/pens";
 import {
   PageSidebar,
@@ -395,6 +400,9 @@ const ExcalidrawWrapper = ({
   const isCollabDisabled = isRunningInIframe();
 
   const [isPdfExportOpen, setIsPdfExportOpen] = useState(false);
+  const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
+  const isFuzzySelectActive = useFuzzySelectActive();
+  const backdrops = useBackdropPanel(excalidrawAPI);
   // view transform mirrored out of AppState so the paper layer, which lives
   // outside the editor, can follow the canvas
   const [paperView, setPaperView] = useState({
@@ -407,7 +415,7 @@ const ExcalidrawWrapper = ({
     offsetTop: 0,
   });
 
-  const { seedFirstPage } = usePages(excalidrawAPI);
+  const { seedFirstPage, pages, addPage } = usePages(excalidrawAPI);
 
   // 1-based page under the viewport centre, for the export dialog's
   // "current page" option. Keyed off `paperView` so it tracks scrolling.
@@ -1049,7 +1057,6 @@ const ExcalidrawWrapper = ({
     );
   }
 
-
   return (
     <div
       style={{ height: "100%", position: "relative" }}
@@ -1106,7 +1113,6 @@ const ExcalidrawWrapper = ({
 
           return (
             <div className="excalidraw-ui-top-right">
-
               {collabError.message && <CollabError collabError={collabError} />}
               <LiveCollaborationTrigger
                 isCollaborating={isCollaborating}
@@ -1300,6 +1306,42 @@ const ExcalidrawWrapper = ({
           />
         )}
       </Excalidraw>
+      <Taskbar
+        excalidrawAPI={excalidrawAPI}
+        suppressDefaultToolbar
+        onFuzzySelect={() => {
+          backdrops.close();
+          toggleFuzzySelect();
+        }}
+        fuzzySelectActive={isFuzzySelectActive}
+        onImportPdf={() => {
+          deactivateFuzzySelect();
+          setIsPdfImportOpen(true);
+        }}
+        onExportPdf={() => {
+          deactivateFuzzySelect();
+          setIsPdfExportOpen(true);
+        }}
+        onOpenBackdrops={() => {
+          // the lasso overlay is modal and covers the window
+          deactivateFuzzySelect();
+          backdrops.open();
+        }}
+        backdropsActive={backdrops.isOpen}
+        backdropsDisabled={!backdrops.hasImageSelection}
+        onAddPage={() => addPage()}
+        pageCount={pages.length}
+        currentPage={currentPageNumber ?? undefined}
+      />
+      <FuzzySelectOverlay excalidrawAPI={excalidrawAPI} />
+      <BackdropPanel {...backdrops.panelProps} />
+      {isPdfImportOpen && excalidrawAPI && (
+        <ImportPdfDialog
+          excalidrawAPI={excalidrawAPI}
+          theme={editorTheme}
+          onClose={() => setIsPdfImportOpen(false)}
+        />
+      )}
       {isPdfExportOpen && excalidrawAPI && (
         <ExportDialog
           elements={excalidrawAPI.getSceneElements()}

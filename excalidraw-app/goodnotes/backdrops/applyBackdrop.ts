@@ -38,6 +38,17 @@
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import { newElementWith } from "@excalidraw/element";
 
+import type {
+  ExcalidrawElement,
+  ExcalidrawImageElement,
+  FileId,
+} from "@excalidraw/element/types";
+
+import type {
+  BinaryFileData,
+  ExcalidrawImperativeAPI,
+} from "@excalidraw/excalidraw/types";
+
 import {
   computeBackdropGeometry,
   getPresetParams,
@@ -51,15 +62,6 @@ import type {
   BackdropPresetId,
   BackdropTheme,
 } from "./backdrops";
-import type {
-  ExcalidrawElement,
-  ExcalidrawImageElement,
-  FileId,
-} from "@excalidraw/element/types";
-import type {
-  BinaryFileData,
-  ExcalidrawImperativeAPI,
-} from "@excalidraw/excalidraw/types";
 
 /** Namespace shared by every GoodNotes feature on `element.customData`. */
 export const GOODNOTES_CUSTOM_DATA_NAMESPACE = "goodnotes";
@@ -101,9 +103,7 @@ export const getBackdropState = (
     GOODNOTES_CUSTOM_DATA_NAMESPACE
   ] as CustomDataRecord | undefined;
   const state = ns?.[BACKDROP_CUSTOM_DATA_KEY] as BackdropState | undefined;
-  return state && typeof state === "object" && state.original
-    ? state
-    : null;
+  return state && typeof state === "object" && state.original ? state : null;
 };
 
 export const hasBackdrop = (
@@ -121,8 +121,9 @@ const mergeCustomData = (
 ): CustomDataRecord | undefined => {
   const existing = (element.customData as CustomDataRecord | undefined) ?? {};
   const existingNs =
-    (existing[GOODNOTES_CUSTOM_DATA_NAMESPACE] as CustomDataRecord | undefined) ??
-    {};
+    (existing[GOODNOTES_CUSTOM_DATA_NAMESPACE] as
+      | CustomDataRecord
+      | undefined) ?? {};
   const nextNs: CustomDataRecord = { ...existingNs };
   if (state) {
     nextNs[BACKDROP_CUSTOM_DATA_KEY] = state;
@@ -185,9 +186,9 @@ export const fileIdFromDataURL = async (dataURL: string): Promise<FileId> => {
     const digest = await window.crypto.subtle.digest("SHA-1", buffer);
     return bytesToHex(new Uint8Array(digest)) as FileId;
   } catch {
-    return `${Date.now().toString(16)}${Math.random()
-      .toString(16)
-      .slice(2)}`.padEnd(40, "0").slice(0, 40) as FileId;
+    return `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`
+      .padEnd(40, "0")
+      .slice(0, 40) as FileId;
   }
 };
 
@@ -374,11 +375,13 @@ const commit = (
   elementId: string,
   mutate: (element: ExcalidrawImageElement) => Partial<ExcalidrawImageElement>,
 ) => {
-  const next = api.getSceneElements().map((el) =>
-    el.id === elementId && isBackdropTarget(el)
-      ? newElementWith(el, mutate(el as ExcalidrawImageElement) as never)
-      : el,
-  );
+  const next = api
+    .getSceneElements()
+    .map((el) =>
+      el.id === elementId && isBackdropTarget(el)
+        ? newElementWith(el, mutate(el as ExcalidrawImageElement) as never)
+        : el,
+    );
   api.updateScene({
     elements: next,
     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
@@ -436,7 +439,8 @@ export const applyBackdrop = async ({
   const geometry = computeBackdropGeometry(naturalWidth, naturalHeight, params);
   const scale = Math.min(
     1,
-    MAX_BAKED_RASTER_SIZE / Math.max(geometry.canvasWidth, geometry.canvasHeight),
+    MAX_BAKED_RASTER_SIZE /
+      Math.max(geometry.canvasWidth, geometry.canvasHeight),
   );
 
   const { canvas, ctx } = createCanvas(

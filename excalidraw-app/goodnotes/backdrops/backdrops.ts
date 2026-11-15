@@ -208,10 +208,16 @@ export const normalizeBackdropParams = (
   params: BackdropParams,
 ): BackdropParams => {
   const next = { ...params };
-  for (const key of Object.keys(BACKDROP_PARAM_RANGES) as BackdropNumericParam[]) {
+  for (const key of Object.keys(
+    BACKDROP_PARAM_RANGES,
+  ) as BackdropNumericParam[]) {
     const range = BACKDROP_PARAM_RANGES[key];
     const raw = Number(next[key]);
-    next[key] = clamp(Number.isFinite(raw) ? raw : range.min, range.min, range.max);
+    next[key] = clamp(
+      Number.isFinite(raw) ? raw : range.min,
+      range.min,
+      range.max,
+    );
   }
   if (next.fillStyle !== "gradient") {
     next.fillStyle = "solid";
@@ -356,7 +362,8 @@ export const renderBackdrop = (
   const geometry =
     options.geometry ??
     computeBackdropGeometry(options.imageWidth, options.imageHeight, params);
-  const unit = Math.max(1, Math.min(options.imageWidth, options.imageHeight)) / 100;
+  const unit =
+    Math.max(1, Math.min(options.imageWidth, options.imageHeight)) / 100;
 
   const panelRadius = params.cornerRadius * unit;
   const imageRadius = params.imageRadius * unit;
@@ -381,7 +388,12 @@ export const renderBackdrop = (
     const cy = geometry.panelY + halfH;
     const dx = Math.sin(rad) * halfW;
     const dy = -Math.cos(rad) * halfH;
-    const gradient = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy);
+    const gradient = ctx.createLinearGradient(
+      cx - dx,
+      cy - dy,
+      cx + dx,
+      cy + dy,
+    );
     gradient.addColorStop(0, params.fillColor);
     gradient.addColorStop(1, params.fillColorEnd);
     ctx.fillStyle = gradient;

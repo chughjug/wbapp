@@ -12,7 +12,17 @@
  *  - animations are disabled under `prefers-reduced-motion: reduce`.
  */
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import type { ExcalidrawImageElement } from "@excalidraw/element/types";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import {
   BACKDROP_PARAM_RANGES,
@@ -38,8 +48,6 @@ import type {
   BackdropPresetId,
   BackdropTheme,
 } from "./backdrops";
-import type { ExcalidrawImageElement } from "@excalidraw/element/types";
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 /* -------------------------------------------------------------------------- */
 /* selection                                                                   */
@@ -174,7 +182,9 @@ export const BackdropPreview = ({
     <canvas
       ref={canvasRef}
       aria-hidden="true"
-      className={`goodnotes-backdrop-preview${className ? ` ${className}` : ""}`}
+      className={`goodnotes-backdrop-preview${
+        className ? ` ${className}` : ""
+      }`}
     />
   );
 };
@@ -363,7 +373,8 @@ export const BackdropPanel = ({
       return;
     }
     setParams((prev) =>
-      JSON.stringify(prev) === JSON.stringify(getPresetParams(presetId, prevTheme))
+      JSON.stringify(prev) ===
+      JSON.stringify(getPresetParams(presetId, prevTheme))
         ? getPresetParams(presetId, theme)
         : prev,
     );
@@ -426,7 +437,9 @@ export const BackdropPanel = ({
       });
       onApplied?.(elementId, presetId === "none" ? null : presetId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not apply backdrop.");
+      setError(
+        err instanceof Error ? err.message : "Could not apply backdrop.",
+      );
     } finally {
       setBusy(false);
     }
@@ -536,7 +549,9 @@ export const BackdropPanel = ({
                       }
                     }}
                     className={`goodnotes-backdrop-panel__option${
-                      selected ? " goodnotes-backdrop-panel__option--selected" : ""
+                      selected
+                        ? " goodnotes-backdrop-panel__option--selected"
+                        : ""
                     }`}
                     data-preset={preset.id}
                     onClick={() => selectPreset(preset.id, false)}
@@ -590,7 +605,11 @@ export const BackdropPanel = ({
             </div>
             <ColorField
               id={`${uid}-fill`}
-              label={params.fillStyle === "gradient" ? "Gradient start" : "Fill colour"}
+              label={
+                params.fillStyle === "gradient"
+                  ? "Gradient start"
+                  : "Fill colour"
+              }
               value={params.fillColor}
               onChange={(value) => setParam("fillColor", value)}
             />

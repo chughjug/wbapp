@@ -391,7 +391,10 @@ export default defineConfig(({ mode }) => {
               },
             },
           ],
-          maximumFileSizeToCacheInBytes: 2.3 * 1024 ** 2, // 2.3MB
+          // 6MB: the GoodNotes layer (pdf.js, jsPDF) pushes the entry chunk
+          // past the old 2.3MB ceiling, and exceeding it fails the build
+          // rather than just skipping precache for that file.
+          maximumFileSizeToCacheInBytes: 6 * 1024 ** 2,
         },
         manifest: {
           short_name: "Notebook",
