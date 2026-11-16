@@ -56,7 +56,11 @@ export type { TabBarProps } from "./TabBar";
  * current `docId` so navigation opens/activates the matching tab.
  */
 export { useOpenDocs, useActiveDocMeta } from "./useOpenDocs";
-export type { OpenTab, OpenDocsActions, UseOpenDocsResult } from "./useOpenDocs";
+export type {
+  OpenTab,
+  OpenDocsActions,
+  UseOpenDocsResult,
+} from "./useOpenDocs";
 
 // ---------------------------------------------------------------------------
 // Model (use directly from outside React — e.g. a command palette)

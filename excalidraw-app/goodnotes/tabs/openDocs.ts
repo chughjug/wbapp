@@ -66,10 +66,7 @@ export const normalizeOpenDocs = (raw: unknown): OpenDocsState => {
  * "new tab opens next to the one it came from" behaviour browsers use — and,
  * at the cap, the oldest non-active tab is evicted to make room.
  */
-export const openDocIn = (
-  state: OpenDocsState,
-  id: string,
-): OpenDocsState => {
+export const openDocIn = (state: OpenDocsState, id: string): OpenDocsState => {
   if (!id) {
     return state;
   }
@@ -127,7 +124,10 @@ export const reorderDocIn = (
   if (from === -1) {
     return state;
   }
-  const to = Math.max(0, Math.min(state.openIds.length - 1, Math.trunc(toIndex)));
+  const to = Math.max(
+    0,
+    Math.min(state.openIds.length - 1, Math.trunc(toIndex)),
+  );
   if (to === from) {
     return state;
   }

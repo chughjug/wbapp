@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./TabBar.scss";
 
 import type { OpenTab } from "./useOpenDocs";
-import type React from "react";
+import type { DragEvent, KeyboardEvent, MouseEvent } from "react";
 
 export interface TabBarProps {
   /** Tabs in display order (from `useOpenDocs`). */
@@ -90,7 +90,7 @@ export const docDotColor = (
   const hue = hash % 360;
   // avoid the muddy 50–70° band, where mid-saturation yellows read as grey
   const adjustedHue = hue >= 48 && hue <= 70 ? hue + 26 : hue;
-  const saturation = 58 + (hash >> 9) % 18;
+  const saturation = 58 + ((hash >> 9) % 18);
   const lightness = theme === "dark" ? 62 : 46;
   return `hsl(${adjustedHue} ${saturation}% ${lightness}%)`;
 };
@@ -201,12 +201,13 @@ export const TabBar = ({
   );
 
   const onTabKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLButtonElement>, id: string) => {
+    (event: KeyboardEvent<HTMLButtonElement>, id: string) => {
       const index = ids.indexOf(id);
       if (index === -1) {
         return;
       }
-      const reorderModifier = event.shiftKey && (event.ctrlKey || event.metaKey);
+      const reorderModifier =
+        event.shiftKey && (event.ctrlKey || event.metaKey);
 
       switch (event.key) {
         case "ArrowLeft":
@@ -252,16 +253,17 @@ export const TabBar = ({
           if (neighbour) {
             requestAnimationFrame(() => focusTab(neighbour));
           }
-          return;
+          break;
         }
         default:
+          break;
       }
     },
     [ids, focusTab, move, onActivate, onClose],
   );
 
   const onTabPointerDown = useCallback(
-    (event: React.MouseEvent<HTMLElement>, id: string) => {
+    (event: MouseEvent<HTMLElement>, id: string) => {
       // middle click closes, as in a browser
       if (event.button === 1) {
         event.preventDefault();
@@ -273,7 +275,7 @@ export const TabBar = ({
 
   // --- drag and drop ------------------------------------------------------
   const onDragStart = useCallback(
-    (event: React.DragEvent<HTMLDivElement>, id: string) => {
+    (event: DragEvent<HTMLDivElement>, id: string) => {
       if (!onReorder) {
         return;
       }
@@ -286,7 +288,7 @@ export const TabBar = ({
   );
 
   const onDragOverTab = useCallback(
-    (event: React.DragEvent<HTMLDivElement>, index: number) => {
+    (event: DragEvent<HTMLDivElement>, index: number) => {
       if (!onReorder || !dragId) {
         return;
       }
