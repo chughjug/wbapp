@@ -29,6 +29,9 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 
+import type { ExcalidrawImageElement } from "@excalidraw/element/types";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+
 import {
   DEFAULT_GRAPH_HEIGHT,
   DEFAULT_GRAPH_WIDTH,
@@ -51,8 +54,6 @@ import "./GraphDialog.scss";
 
 import type { GraphKind, GraphSpec, SpecProblem } from "./spec";
 import type { InsertGraphResult } from "./insertGraph";
-import type { ExcalidrawImageElement } from "@excalidraw/element/types";
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 export interface GraphDialogProps {
   excalidrawAPI: ExcalidrawImperativeAPI;
@@ -298,7 +299,9 @@ export const GraphDialog: React.FC<GraphDialogProps> = ({
       }
       const focusable = [
         ...root.querySelectorAll<HTMLElement>(FOCUSABLE),
-      ].filter((el) => el.offsetParent !== null || el === document.activeElement);
+      ].filter(
+        (el) => el.offsetParent !== null || el === document.activeElement,
+      );
       if (focusable.length === 0) {
         return;
       }
@@ -400,7 +403,11 @@ export const GraphDialog: React.FC<GraphDialogProps> = ({
           <div className="gn-graph-dialog__form">
             <fieldset className="gn-graph-fieldset" id={kindGroupId}>
               <legend>What to draw</legend>
-              <div className="gn-graph-segmented" role="radiogroup" aria-label="Graph type">
+              <div
+                className="gn-graph-segmented"
+                role="radiogroup"
+                aria-label="Graph type"
+              >
                 {(
                   [
                     ["function", "Equation"],
@@ -541,7 +548,11 @@ export const GraphDialog: React.FC<GraphDialogProps> = ({
                     </div>
                   </div>
                   {problemFor("xRange") && (
-                    <p className="gn-graph-error" id={xRangeErrorId} role="alert">
+                    <p
+                      className="gn-graph-error"
+                      id={xRangeErrorId}
+                      role="alert"
+                    >
                       {problemFor("xRange")?.message}
                     </p>
                   )}
@@ -793,11 +804,7 @@ export const GraphDialog: React.FC<GraphDialogProps> = ({
             onClick={() => void submit()}
             disabled={!isValid || busy}
           >
-            {busy
-              ? "Working…"
-              : editElement
-              ? "Update graph"
-              : "Insert graph"}
+            {busy ? "Working…" : editElement ? "Update graph" : "Insert graph"}
           </button>
         </div>
       </div>

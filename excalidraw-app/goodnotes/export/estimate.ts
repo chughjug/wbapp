@@ -137,8 +137,10 @@ export const formatFileSize = (bytes: number): string => {
 
 /** How long the export is likely to take, in seconds, for honest copy. */
 export const estimateSeconds = (pageCount: number, scale: number): number =>
-  // measured: ~0.25s per page at 1x on a laptop, quadratic in scale
-  Math.max(1, Math.round(pageCount * 0.25 * scale * scale));
+  // Measured in Chromium on a Letter page: 0.14 s per page per scale^2
+  // (5 pages took 2.8s at 2x and 10.6s at 4x). Rounded up a little, since
+  // a slow tablet is the case where the number matters.
+  Math.max(1, Math.round(pageCount * 0.16 * scale * scale));
 
 /** `"about 20 seconds"` / `"about 2 minutes"`. */
 export const formatDuration = (seconds: number): string => {

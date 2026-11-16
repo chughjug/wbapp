@@ -22,8 +22,8 @@ export const createScale = (
 ): LinearScale => {
   const span = domainMax - domainMin || 1;
   const fn = ((value: number) =>
-    rangeMin + ((value - domainMin) / span) * (rangeMax - rangeMin)) as
-    LinearScale;
+    rangeMin +
+    ((value - domainMin) / span) * (rangeMax - rangeMin)) as LinearScale;
   fn.domainMin = domainMin;
   fn.domainMax = domainMax;
   fn.rangeMin = rangeMin;
@@ -42,7 +42,15 @@ export const niceStep = (rawStep: number): number => {
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
   const normalized = rawStep / magnitude;
   const nice =
-    normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 2.5 ? 2.5 : normalized <= 5 ? 5 : 10;
+    normalized <= 1
+      ? 1
+      : normalized <= 2
+      ? 2
+      : normalized <= 2.5
+      ? 2.5
+      : normalized <= 5
+      ? 5
+      : 10;
   return nice * magnitude;
 };
 
@@ -57,11 +65,7 @@ export interface TickSet {
  * Ticks at nice round numbers covering `[min, max]`, aiming for roughly
  * `target` of them (never the raw `range / 10`).
  */
-export const niceTicks = (
-  min: number,
-  max: number,
-  target = 6,
-): TickSet => {
+export const niceTicks = (min: number, max: number, target = 6): TickSet => {
   if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
     return { values: [min], step: 1, decimals: 0 };
   }

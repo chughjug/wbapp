@@ -28,6 +28,19 @@ import {
   getDataURL,
 } from "@excalidraw/excalidraw/data/blob";
 
+import type {
+  ExcalidrawElement,
+  ExcalidrawImageElement,
+  FileId,
+  NonDeleted,
+} from "@excalidraw/element/types";
+
+import type {
+  BinaryFileData,
+  DataURL,
+  ExcalidrawImperativeAPI,
+} from "@excalidraw/excalidraw/types";
+
 import {
   DEFAULT_GRAPH_HEIGHT,
   DEFAULT_GRAPH_WIDTH,
@@ -43,17 +56,6 @@ import {
 
 import type { RenderGraphResult } from "./renderGraph";
 import type { GraphSpec } from "./spec";
-import type {
-  ExcalidrawElement,
-  ExcalidrawImageElement,
-  FileId,
-  NonDeleted,
-} from "@excalidraw/element/types";
-import type {
-  BinaryFileData,
-  DataURL,
-  ExcalidrawImperativeAPI,
-} from "@excalidraw/excalidraw/types";
 
 type CustomDataRecord = Record<string, unknown>;
 
@@ -87,7 +89,9 @@ const canvasToBlob = (
       if (blob) {
         resolve(blob);
       } else {
-        reject(new Error("The browser could not turn the graph into an image."));
+        reject(
+          new Error("The browser could not turn the graph into an image."),
+        );
       }
     }, mimeType);
   });

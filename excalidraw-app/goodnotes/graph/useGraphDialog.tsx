@@ -15,13 +15,15 @@
 
 import React, { useCallback, useMemo, useState } from "react";
 
+import type { ExcalidrawImageElement } from "@excalidraw/element/types";
+
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+
 import { GraphDialog } from "./GraphDialog";
 import { getGraphSpec, getSelectedGraphElement } from "./insertGraph";
 
 import type { GraphSpec } from "./spec";
 import type { InsertGraphResult } from "./insertGraph";
-import type { ExcalidrawImageElement } from "@excalidraw/element/types";
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 export interface UseGraphDialogOptions {
   onInserted?: (result: InsertGraphResult) => void;

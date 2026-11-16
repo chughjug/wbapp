@@ -203,11 +203,7 @@ export {
   sampleValues,
 } from "./sample";
 
-export type {
-  CurvePoint,
-  PolylineOptions,
-  PolylineResult,
-} from "./sample";
+export type { CurvePoint, PolylineOptions, PolylineResult } from "./sample";
 
 export {
   /** Ticks at nice round numbers (never raw range/10). */

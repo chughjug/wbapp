@@ -178,7 +178,13 @@ const splitNameRun = (
   let index = 0;
   while (index < run.length) {
     // longest-first, so `exp` wins over `e` and `sinh` over `sin`
-    const match = known.find((candidate) => run.startsWith(candidate, index));
+    let match: string | undefined;
+    for (const candidate of known) {
+      if (run.startsWith(candidate, index)) {
+        match = candidate;
+        break;
+      }
+    }
     if (!match) {
       // report the whole remaining word — that is what the user sees as wrong
       const rest = /^[a-zA-Z]+/.exec(run.slice(index))?.[0] ?? run.slice(index);
@@ -195,10 +201,7 @@ const splitNameRun = (
   return pieces;
 };
 
-const tokenize = (
-  source: string,
-  variables: readonly string[],
-): Token[] => {
+const tokenize = (source: string, variables: readonly string[]): Token[] => {
   const tokens: Token[] = [];
   let index = 0;
   while (index < source.length) {
@@ -220,10 +223,11 @@ const tokenize = (
       }
       const text = source.slice(start, index);
       if (source[index] === ".") {
-        throw new ExpressionError(
-          `"${text}." has two decimal points.`,
-          { position: start, token: `${text}.`, source },
-        );
+        throw new ExpressionError(`"${text}." has two decimal points.`, {
+          position: start,
+          token: `${text}.`,
+          source,
+        });
       }
       tokens.push({
         kind: "number",
@@ -467,11 +471,7 @@ export const parseExpression = (
         reduce(top);
       }
       if (!found) {
-        fail(
-          'This ")" has no matching "(".',
-          token.position,
-          token.text,
-        );
+        fail('This ")" has no matching "(".', token.position, token.text);
       }
       // a function application closes with its argument's bracket
       const top = stack[stack.length - 1];

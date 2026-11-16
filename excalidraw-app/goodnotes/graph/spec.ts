@@ -259,7 +259,9 @@ export const normalizeGraphSpec = (value: unknown): GraphSpec | null => {
           .slice(0, MAX_SERIES)
           .map((item, index) => ({
             id:
-              typeof item.id === "string" && item.id ? item.id : `s${index + 1}`,
+              typeof item.id === "string" && item.id
+                ? item.id
+                : `s${index + 1}`,
             expression: (item.expression as string).slice(
               0,
               MAX_EXPRESSION_LENGTH,
@@ -299,7 +301,8 @@ export const normalizeGraphSpec = (value: unknown): GraphSpec | null => {
           )
           .slice(0, MAX_DATA_POINTS)
           .map((item) => ({
-            label: typeof item.label === "string" ? item.label.slice(0, 40) : "",
+            label:
+              typeof item.label === "string" ? item.label.slice(0, 40) : "",
             value:
               typeof item.value === "number" && Number.isFinite(item.value)
                 ? item.value
@@ -392,9 +395,9 @@ export const describeGraph = (spec: GraphSpec): string => {
     .join(", ");
   const extremes =
     peak && trough && rows.length > 1
-      ? ` Highest ${peak.label} at ${prettyNumber(
-          max,
-        )}, lowest ${trough.label} at ${prettyNumber(min)}.`
+      ? ` Highest ${peak.label} at ${prettyNumber(max)}, lowest ${
+          trough.label
+        } at ${prettyNumber(min)}.`
       : "";
   return `${title}${kindWord} of ${rows.length} values${axis}: ${listing}.${extremes}`;
 };

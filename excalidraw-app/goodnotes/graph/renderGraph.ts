@@ -146,7 +146,10 @@ export const renderGraphToCanvas = (
     120,
     Math.round(options.height ?? DEFAULT_GRAPH_HEIGHT),
   );
-  const pixelRatio = Math.max(1, Math.min(4, options.pixelRatio ?? DEFAULT_PIXEL_RATIO));
+  const pixelRatio = Math.max(
+    1,
+    Math.min(4, options.pixelRatio ?? DEFAULT_PIXEL_RATIO),
+  );
 
   canvas.width = Math.round(width * pixelRatio);
   canvas.height = Math.round(height * pixelRatio);
@@ -169,21 +172,20 @@ export const renderGraphToCanvas = (
 /* shared chrome                                                              */
 /* -------------------------------------------------------------------------- */
 
-interface ChromeLayout {
-  plot: Rect;
-  titleBottom: number;
-  legendRows: number;
-}
-
-const measureTickWidth = (
-  ctx: Ctx,
-  labels: string[],
-): number => {
+const measureTickWidth = (ctx: Ctx, labels: string[]): number => {
   ctx.font = font(FONT_TICK);
-  return labels.reduce((max, label) => Math.max(max, ctx.measureText(label).width), 0);
+  return labels.reduce(
+    (max, label) => Math.max(max, ctx.measureText(label).width),
+    0,
+  );
 };
 
-const drawTitle = (ctx: Ctx, title: string | undefined, x: number, y: number) => {
+const drawTitle = (
+  ctx: Ctx,
+  title: string | undefined,
+  x: number,
+  y: number,
+) => {
   if (!title?.trim()) {
     return;
   }
@@ -385,7 +387,11 @@ const renderFunctionPlot = (
 
   const xScale = createScale(xMin, safeXMax, plot.x, plot.x + plot.width);
   const yScale = createScale(yMin, yMax, plot.y + plot.height, plot.y);
-  const xTicks = niceTicks(xMin, safeXMax, Math.max(4, Math.round(plot.width / 90)));
+  const xTicks = niceTicks(
+    xMin,
+    safeXMax,
+    Math.max(4, Math.round(plot.width / 90)),
+  );
   const xCompact = shouldUseCompactTicks(xTicks.values);
 
   // ---- grid ---------------------------------------------------------------
@@ -555,15 +561,22 @@ const renderChart = (
   const data = spec.data.filter(
     (row) => row.label.trim() !== "" || Number.isFinite(row.value),
   );
-  const values = data.map((row) => (Number.isFinite(row.value) ? row.value : 0));
+  const values = data.map((row) =>
+    Number.isFinite(row.value) ? row.value : 0,
+  );
   const rawMax = values.length ? Math.max(...values) : 1;
   const rawMin = values.length ? Math.min(...values) : 0;
   const domainMax = rawMax > 0 ? rawMax : 0;
   const domainMin = rawMin < 0 ? rawMin : 0;
   const span = domainMax - domainMin || 1;
-  const ticks = niceTicks(domainMin, domainMax + span * 0.08, 6);
-  const yTop = Math.max(domainMax, ticks.values[ticks.values.length - 1] ?? 1);
-  const yBottom = Math.min(domainMin, ticks.values[0] ?? 0);
+  // headroom on whichever side has data, so a bar never touches the frame and
+  // a value label always has somewhere to sit
+  const padding = span * 0.08;
+  const paddedMax = domainMax > 0 ? domainMax + padding : domainMax;
+  const paddedMin = domainMin < 0 ? domainMin - padding : domainMin;
+  const ticks = niceTicks(paddedMin, paddedMax, 6);
+  const yTop = Math.max(paddedMax, ticks.values[ticks.values.length - 1] ?? 1);
+  const yBottom = Math.min(paddedMin, ticks.values[0] ?? 0);
   const compact = shouldUseCompactTicks(ticks.values);
   const tickLabels = ticks.values.map((v) =>
     formatTick(v, ticks.decimals, compact),
@@ -582,8 +595,10 @@ const renderChart = (
   const band = plotWidth / Math.max(1, data.length);
   const widest = labelWidths.length ? Math.max(...labelWidths) : 0;
   const rotate = widest + 8 > band;
+  // a 45° label is about 0.71 × its width tall; reserve that, so the x-axis
+  // band is inside the canvas instead of being cropped by it
   const labelBand = rotate
-    ? Math.min(64, Math.ceil(widest * 0.72) + 10)
+    ? Math.min(Math.round(height * 0.35), Math.ceil(widest * 0.72) + 12)
     : FONT_TICK + 8;
   const bottom = PAD / 2 + labelBand + 8 + (spec.xLabel?.trim() ? 16 : 0);
 
@@ -712,7 +727,10 @@ const renderChart = (
       const py = yScale(value);
       const text = formatTick(value, ticks.decimals, compact);
       // never let a label overflow the top of the plot
-      const y = value >= 0 ? Math.max(plot.y + 9, py - 6) : py + 14;
+      const y =
+        value >= 0
+          ? Math.max(plot.y + 9, py - 6)
+          : Math.min(plot.y + plot.height - 3, py + 14);
       ctx.fillText(text, centre, y);
     });
   }
