@@ -52,6 +52,14 @@ export {
   movePage,
   /** Sets a page's paper template (stored in the frame's `customData`). */
   setPageTemplate,
+  /** Sets (or clears) a page's image background. */
+  setPageImage,
+  /** A page's image background, if it has one. */
+  getPageImage,
+  /** Whether a page frame is landscape. */
+  isLandscapePage,
+  /** Size-preset geometry, honouring orientation. */
+  getPageDimensions,
   /** Re-lays out the whole column: positions, names and child offsets. */
   restackPages,
   /** Creates page 1 when the document has none. Idempotent. */
@@ -73,6 +81,52 @@ export type {
   AddPageResult,
   PageCustomData,
 } from "./pageModel";
+
+// ---------------------------------------------------------------------------
+// the "new page" flow: format picker + remembered choice + image pages
+// ---------------------------------------------------------------------------
+
+/**
+ * React hook owning the whole add-a-page flow. Gives you a bare `open()`
+ * callback for any button (nav bar, page panel, shortcut), the `dialog` to
+ * render once, and a headless `addPageWithChoice()`.
+ */
+export { useNewPage } from "./useNewPage";
+export type {
+  UseNewPageOptions,
+  UseNewPageResult,
+  NewPageRequest,
+} from "./useNewPage";
+
+/** The dialog itself, if you would rather drive the open state yourself. */
+export { NewPageDialog, IMAGE_FORMAT_ID } from "./NewPageDialog";
+export type {
+  NewPageDialogProps,
+  NewPageSubmission,
+  NewPageFormatId,
+} from "./NewPageDialog";
+
+/** Per-document memory of the last chosen format. */
+export {
+  loadNewPageChoice,
+  readNewPageChoice,
+  writeNewPageChoice,
+  getCurrentDocId,
+  DEFAULT_NEW_PAGE_CHOICE,
+} from "./newPageChoice";
+export type { NewPageChoice } from "./newPageChoice";
+
+/** Turning a picked `File` into page-background bytes in `BinaryFiles`. */
+export {
+  attachPageImageFile,
+  preparePageImage,
+  isSupportedPageImage,
+  PageImageError,
+  PAGE_IMAGE_ACCEPT,
+  PAGE_IMAGE_MIME_TYPES,
+  PAGE_IMAGE_MAX_BYTES,
+} from "./pageImageFile";
+export type { PreparedPageImage } from "./pageImageFile";
 
 /** React hook: live page list, active page index and page actions. */
 export { usePages } from "./usePages";

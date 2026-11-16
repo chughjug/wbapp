@@ -44,6 +44,14 @@ export interface PagePanelProps {
   theme?: "light" | "dark";
   /** Forwarded to `PageSidebar`: render page bitmaps. Default `true`. */
   thumbnails?: boolean;
+  /**
+   * Forwarded to `PageSidebar`. Without these the sidebar spins up its own
+   * new-page dialog instead of sharing the host's, so the panel's "+ Add
+   * page" and the nav bar's would be two separate instances.
+   */
+  onAddPage?: () => void;
+  addPageMode?: "picker" | "repeat";
+  docId?: string;
   /** Panel width in px. Default {@link PAGE_PANEL_WIDTH}. */
   width?: number;
   /**
@@ -65,6 +73,9 @@ export const PagePanel = ({
   onClose,
   theme = "light",
   thumbnails = true,
+  onAddPage,
+  addPageMode,
+  docId,
   width = PAGE_PANEL_WIDTH,
   placement = "flow",
   title = "Pages",
@@ -116,7 +127,13 @@ export const PagePanel = ({
 
       <div className="gn-page-panel__body">
         {/* owned by `goodnotes/pages`; re-skinned, never forked */}
-        <PageSidebar excalidrawAPI={excalidrawAPI} thumbnails={thumbnails} />
+        <PageSidebar
+          excalidrawAPI={excalidrawAPI}
+          thumbnails={thumbnails}
+          onAddPage={onAddPage}
+          addPageMode={addPageMode}
+          docId={docId}
+        />
       </div>
     </aside>
   );

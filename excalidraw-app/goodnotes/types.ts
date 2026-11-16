@@ -47,11 +47,31 @@ export interface PaperTemplate {
   ) => void;
 }
 
+/** How a page's background picture is fitted to the page. */
+export type PageImageFit = "cover" | "contain" | "stretch";
+
+/**
+ * A picture used as a page's background. Orthogonal to the ruling: a scan
+ * can still have lines drawn over it, so this is a sibling of the template
+ * rather than a seventh PaperTemplateId.
+ */
+export interface PageImageBackground {
+  fileId: string;
+  mimeType?: string;
+  fit?: PageImageFit;
+  opacity?: number;
+  name?: string;
+  naturalWidth?: number;
+  naturalHeight?: number;
+}
+
 export interface Page {
   /** The frame element backing this page. */
   frame: ExcalidrawFrameElement;
   index: number;
   template: PaperTemplateId;
+  /** Background picture, if this page has one. */
+  image?: PageImageBackground;
 }
 
 /** Metadata row shown on the home shelf. Scene data is stored separately. */
@@ -69,6 +89,8 @@ export interface DocMeta {
   pageCount: number;
   defaultTemplate: PaperTemplateId;
   defaultPageSize: PageSizeName;
+  defaultLandscape?: boolean;
+  defaultImageFit?: PageImageFit;
 }
 
 /** Full persisted scene for one document. */

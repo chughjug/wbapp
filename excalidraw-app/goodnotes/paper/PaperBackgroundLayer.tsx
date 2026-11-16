@@ -91,9 +91,8 @@ export const getPaperPageRects = (
 
     if (!template) {
       // the pages module stores the ruling in `customData`, not in the name
-      const stored = (
-        element.customData as Record<string, unknown> | undefined
-      )?.goodnotesPage as { template?: PaperTemplateId } | undefined;
+      const stored = (element.customData as Record<string, unknown> | undefined)
+        ?.goodnotesPage as { template?: PaperTemplateId } | undefined;
       if (stored?.template && isPaperTemplateId(stored.template)) {
         template = stored.template;
       }
@@ -164,6 +163,7 @@ export const PaperBackgroundLayer = (props: PaperBackgroundLayerProps) => {
     offsetTop = 0,
     defaultTemplate = "blank",
     templateForPage,
+    imageForPage,
     className,
   } = props;
 

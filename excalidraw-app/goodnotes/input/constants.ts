@@ -55,11 +55,15 @@ export const SWIPE_MAX_PINCH_RATIO = 0.25;
 export const SWIPE_COOLDOWN_MS = 450;
 
 /**
- * How the viewport frames the destination page.
+ * How the viewport frames the destination page **in continuous mode**.
  *
  * `"none"` keeps the current zoom — swiping to the next page while zoomed in
  * to write must not zoom back out. (`scrollToPage`'s own default is
  * `"scale-down"`, which is right for the page panel but wrong here.)
+ *
+ * In PAGED mode this constant is unused: the flick is handed to
+ * `goodnotes/paged`'s controller, which always re-fits the destination page
+ * to the workspace (that is the whole point of the mode).
  */
 export const SWIPE_PAGE_FIT = "none" as const;
 

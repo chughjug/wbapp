@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ExcalidrawElement } from "@excalidraw/element/types";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
+import { syncPageImageCache } from "../paper/pageImages";
+
 import {
   addPage as addPageToElements,
   deletePage as deletePageInElements,
@@ -19,6 +21,7 @@ import {
 } from "./pageModel";
 import { scrollToPage as scrollViewportToPage } from "./scrollToPage";
 
+import type { PageImageBackground } from "../paper/pageImages";
 import type { Page, PageSizeName, PaperTemplateId } from "../types";
 
 export interface UsePagesResult {
@@ -33,6 +36,14 @@ export interface UsePagesResult {
     at?: number;
     size?: PageSizeName;
     template?: PaperTemplateId;
+    /** Swap the size preset's width and height. */
+    landscape?: boolean;
+    /**
+     * Image background for the new page. The bytes must already be in the
+     * editor's `BinaryFiles` — use `useNewPage` / `attachPageImageFile` if
+     * you are starting from a `File`.
+     */
+    image?: PageImageBackground | null;
     scrollTo?: boolean;
   }) => void;
   /** Delete a page and everything on it. */
@@ -92,6 +103,10 @@ export const usePages = (
         pagesRef.current = next;
       }
 
+      // keep the paper layer's decoded-image cache in step with the scene,
+      // so image-backed pages paint without any extra host wiring
+      syncPageImageCache(elements, excalidrawAPI.getFiles());
+
       const appState = excalidrawAPI.getAppState();
       const sceneCentreY =
         appState.height / 2 / appState.zoom.value - appState.scrollY;
@@ -142,6 +157,7 @@ export const usePages = (
         elements: result.elements,
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
       });
+      syncPageImageCache(result.elements, excalidrawAPI.getFiles());
       if (opts.scrollTo !== false) {
         // after the scene has committed
         requestAnimationFrame(() => {

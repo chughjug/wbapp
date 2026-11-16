@@ -119,6 +119,12 @@ The gesture is resolved **when the last finger lifts**, never mid-drag, so an am
 
 `scrollToPage` is called with `fit: "none"` so a flick keeps your zoom, and with `animate: !prefersReducedMotion()`.
 
+### Paged view
+
+When `goodnotes/paged` is active (`getActivePagedView()` returns a controller — i.e. the user is in paged mode and the editor has mounted), the flick does **not** scroll: it calls that controller's `next()` / `prev()`, so the flick lands exactly where the arrow keys and the page controls land — the destination page animated into a fit, and the change announced through the module's `aria-live` region. `SWIPE_PAGE_FIT` then applies to continuous mode only.
+
+The recogniser itself is unchanged, so the thresholds below still describe what counts as a flick in either mode.
+
 ---
 
 ## 6. Accessibility

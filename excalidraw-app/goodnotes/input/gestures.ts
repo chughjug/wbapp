@@ -37,6 +37,7 @@ import {
   prefersReducedMotion,
   scrollToPage,
 } from "../pages";
+import { getActivePagedView } from "../paged";
 
 import {
   PEN_ACTIVE_WINDOW_MS,
@@ -268,6 +269,29 @@ export const attachInputGestures = (
   };
 
   const flipPage = (direction: -1 | 1): boolean => {
+    // PAGED VIEW OWNS THE VIEWPORT when it is on: ask it to turn the page, so
+    // a flick lands exactly where the arrow keys and the page controls land
+    // (animated, re-fitted, announced) instead of free-scrolling the canvas
+    // out of the lock. `getActivePagedView()` is null in continuous mode and
+    // before the editor has mounted, which falls through to the scroll below.
+    const paged = getActivePagedView();
+    if (paged) {
+      const from = paged.getPageIndex();
+      const moved =
+        direction === 1
+          ? paged.next({ cause: "swipe" })
+          : paged.prev({ cause: "swipe" });
+      if (moved) {
+        options.onGesture?.({
+          type: "swipe",
+          direction,
+          from,
+          to: from + direction,
+        });
+      }
+      return moved;
+    }
+
     const from = currentPageIndex();
     if (from === -1) {
       return false;

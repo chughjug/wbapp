@@ -36,9 +36,11 @@ import type {
 } from "@excalidraw/excalidraw/types";
 
 import { renderPaper } from "../paper";
+import { getPageImageBackground, preloadPageImages } from "../paper/pageImages";
 
 import { getPageChildren } from "./pageModel";
 import { usePages } from "./usePages";
+import { useNewPage } from "./useNewPage";
 
 import "./PageSidebar.scss";
 
@@ -61,23 +63,53 @@ export interface PageSidebarProps {
   excalidrawAPI: ExcalidrawImperativeAPI | null;
   /** Render page bitmaps. Defaults to true. */
   thumbnails?: boolean;
+  /**
+   * "+ Add page" behaviour. `"picker"` (default) opens the format dialog —
+   * template, size, orientation, or an image background — and remembers the
+   * choice; `"repeat"` silently re-uses the last remembered choice.
+   *
+   * Pass `onAddPage` to take the action over entirely (e.g. when the host
+   * owns one shared `useNewPage` instance for both this panel and the nav
+   * bar — see INTEGRATION.md).
+   */
+  addPageMode?: "picker" | "repeat";
+  /** Overrides `addPageMode` and this component's own dialog. */
+  onAddPage?: () => void;
+  /** Document id for the remembered new-page choice. Default: from the URL. */
+  docId?: string | null;
   className?: string;
 }
 
 export const PageSidebar: React.FC<PageSidebarProps> = ({
   excalidrawAPI,
   thumbnails = true,
+  addPageMode = "picker",
+  onAddPage,
+  docId,
   className,
 }) => {
   const {
     pages,
     activePageIndex,
     goToPage,
-    addPage,
     deletePage,
     movePageUp,
     movePageDown,
   } = usePages(excalidrawAPI);
+
+  // The format picker. Owned here so the panel works standalone; a host that
+  // wants ONE flow shared with the nav bar passes `onAddPage` instead.
+  const newPage = useNewPage(excalidrawAPI, { docId });
+
+  const handleAddPage = useCallback(() => {
+    if (onAddPage) {
+      onAddPage();
+    } else if (addPageMode === "repeat") {
+      void newPage.repeatLastChoice();
+    } else {
+      newPage.open();
+    }
+  }, [onAddPage, addPageMode, newPage]);
 
   const thumbs = usePageThumbnails(
     excalidrawAPI,
@@ -223,12 +255,16 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
         <button
           type="button"
           className="goodnotes-pages__add"
-          onClick={() => addPage()}
+          onClick={handleAddPage}
+          aria-haspopup={
+            !onAddPage && addPageMode === "picker" ? "dialog" : undefined
+          }
         >
           <PlusIcon />
           <span>Add page</span>
         </button>
       </div>
+      {!onAddPage && newPage.dialog}
     </nav>
   );
 };
@@ -284,6 +320,9 @@ export const renderPageThumbnail = async ({
   renderPaper(ctx, page.template, pageWidth, pageHeight, {
     theme,
     sheet: true,
+    // image-backed pages: the bitmap has already been awaited by the caller
+    // (`preloadPageImages`), so this synchronous draw gets the real pixels
+    image: getPageImageBackground(page.frame),
   });
   ctx.restore();
 
@@ -368,6 +407,13 @@ const usePageThumbnails = (
       const theme = appState.theme === "dark" ? "dark" : "light";
       const next = new Map<string, string>();
 
+      // `renderPaper` is synchronous; decode every page image FIRST so an
+      // image page's thumbnail is the picture, not the placeholder.
+      await preloadPageImages(elements, files);
+      if (cancelled) {
+        return;
+      }
+
       for (const page of pages) {
         if (cancelled) {
           return;
@@ -377,7 +423,12 @@ const usePageThumbnails = (
         for (const child of children) {
           sum += child.version;
         }
-        const key = `${children.length}:${sum}:${page.frame.width}x${page.frame.height}:${page.template}:${theme}`;
+        const image = getPageImageBackground(page.frame);
+        const key = `${children.length}:${sum}:${page.frame.width}x${
+          page.frame.height
+        }:${page.template}:${image?.fileId ?? "-"}:${
+          image?.fit ?? "-"
+        }:${theme}`;
         const cached = cacheRef.current.get(page.frame.id);
         if (cached?.key === key) {
           next.set(page.frame.id, cached.url);

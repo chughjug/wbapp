@@ -140,3 +140,74 @@ A per-page override is also available without touching frame names:
 ```tsx
 <PaperBackgroundLayer … templateForPage={(page) => templates[page.id]} />
 ```
+
+---
+
+# ADDENDUM — image-backed pages
+
+`renderPaper`'s options object gained one **optional** field. The signature is otherwise unchanged and every existing call site still compiles and behaves identically:
+
+```ts
+renderPaper(ctx, templateId, width, height, {
+  theme,
+  sheet,
+  image: PageImageBackground, // <- new, optional
+});
+```
+
+When `image` is present the draw order becomes **sheet → image → rulings → border**, so a ruling can be overlaid on a scan (`template: "lined"` + an image is a working combination).
+
+## The decoded-image cache
+
+`renderPaper` is synchronous and image decode is not, so `./pageImages.ts` owns a process-wide cache keyed by `fileId`:
+
+| Export | Use |
+| --- | --- |
+| `syncPageImageCache(elements, files)` | fire-and-forget; cheap on every scene change. Already called from `goodnotes/pages`' `usePages`, so **the live canvas needs no App.tsx wiring**. |
+| `preloadPageImages(elements, files)` | `await` this before a synchronous render that must not miss an image (thumbnails, PDF export). |
+| `onPageImageReady(cb)` | repaint hook. `PaperBackgroundLayer` subscribes to it, so a placeholder is replaced the moment a decode lands. |
+| `getDecodedPageImage(fileId)` | the synchronous lookup `renderPaper` itself uses. |
+| `getPageImageBackground(element)` / `withPageImageBackground(customData, image \| null)` | read/write the `customData.goodnotesPageImage` record. |
+
+Before a decode lands (and if one fails) a neutral, theme-aware placeholder is painted: never a transparent hole, never a white rectangle that reads as content.
+
+## `renderPaperForFrame` — prefer this
+
+```ts
+renderPaperForFrame(ctx, frame, {
+  theme,
+  sheet,
+  defaultTemplate,
+  width,
+  height,
+});
+```
+
+Reads **both** the ruling (`customData.goodnotesPage.template`) and the image (`customData.goodnotesPageImage`) off the frame, so a caller cannot forget the image. Still synchronous. `goodnotes/export/exportPdf.ts` should switch to it — see §A5 of `../pages/INTEGRATION.md` for the exact three-line patch; until then image pages print as plain paper.
+
+## `PaperBackgroundLayer`
+
+Two new optional props, both inert when unused:
+
+- `imageForPage?: (page) => PageImageBackground | null | undefined` — per-page override; return `null` to suppress the frame's own image.
+- `PaperPageRect.image` — the layer now reads the image off each frame's `customData` by itself, which is why image pages render in the running app without any change to `App.tsx`.
+
+`getPaperPageRects` additionally falls back to `customData.goodnotesPage.template` when the frame name encodes no template, so the rects are now self-sufficient (the `templateForPage` prop still wins).
+
+## `PaperPicker` is now generic
+
+```tsx
+<PaperPicker<"blank" | "lined" | "__image__">
+  value={format}
+  onChange={setFormat}
+  options={[…]}        // default: the six built-in templates
+  theme={theme}
+  idPrefix="unique-when-more-than-one-picker"
+/>
+```
+
+`PaperPickerOption` is `{ id, label, ariaLabel?, preview? }`; `preview` replaces the default live `PaperPreview` swatch. Defaulting `Id` to `PaperTemplateId` keeps every existing usage source-compatible. This is how the new-page dialog puts **Image** into the _same_ radiogroup as the templates rather than bolting on a second control.
+
+### Focus rings inside `.excalidraw`
+
+`packages/excalidraw/css/styles.scss` has `.excalidraw button:focus-visible { outline: transparent; box-shadow: 0 0 0 1px … }`, which out-specifies a plain `.goodnotes-paper-picker__option:focus-visible`. `PaperPicker.scss` now restates the ring under `.excalidraw &:focus-visible`. Measured in the running app: `outline: 2px solid rgb(105, 101, 219)` with `:focus-visible` matching. If you re-skin the picker, keep that extra level of specificity.

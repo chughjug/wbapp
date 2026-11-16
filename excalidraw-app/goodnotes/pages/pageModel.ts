@@ -29,6 +29,12 @@ import type {
 } from "@excalidraw/element/types";
 
 import {
+  getPageImageBackground,
+  withPageImageBackground,
+  type PageImageBackground,
+} from "../paper/pageImages";
+
+import {
   PAGE_FRAME_PREFIX,
   PAGE_GAP,
   PAGE_SIZES,
@@ -52,7 +58,23 @@ export const PAGE_CUSTOM_DATA_KEY = "goodnotesPage";
 export interface PageCustomData {
   template: PaperTemplateId;
   size: PageSizeName;
+  /**
+   * Landscape pages swap the preset's width and height. Optional so every
+   * page frame written before this existed still reads back correctly.
+   */
+  landscape?: boolean;
 }
+
+/** The geometry of a size preset, honouring orientation. */
+export const getPageDimensions = (
+  size: PageSizeName,
+  landscape = false,
+): { width: number; height: number } => {
+  const preset = PAGE_SIZES[size];
+  return landscape
+    ? { width: preset.height, height: preset.width }
+    : { width: preset.width, height: preset.height };
+};
 
 type Elements = readonly ExcalidrawElement[];
 
@@ -108,15 +130,32 @@ export const getPageSizeName = (
   if (stored && stored in PAGE_SIZES) {
     return stored;
   }
-  // fall back to matching the geometry
+  // fall back to matching the geometry, in either orientation
   for (const name of Object.keys(PAGE_SIZES) as PageSizeName[]) {
     const size = PAGE_SIZES[name];
-    if (size.width === frame.width && size.height === frame.height) {
+    if (
+      (size.width === frame.width && size.height === frame.height) ||
+      (size.height === frame.width && size.width === frame.height)
+    ) {
       return name;
     }
   }
   return "A4";
 };
+
+/** Whether a page frame was created in landscape orientation. */
+export const isLandscapePage = (frame: ExcalidrawFrameElement): boolean => {
+  const stored = readCustomData(frame).landscape;
+  return typeof stored === "boolean" ? stored : frame.width > frame.height;
+};
+
+/**
+ * A page's image background (`customData.goodnotesPageImage`), or
+ * `undefined`. Owned by `../paper`; re-exported here for convenience.
+ */
+export const getPageImage = (
+  frame: ExcalidrawFrameElement,
+): PageImageBackground | undefined => getPageImageBackground(frame);
 
 /**
  * All pages in the scene, sorted by vertical position (top first). `index` is
@@ -211,9 +250,21 @@ export const pageFrameName = (index: number): string =>
 export const createPageFrame = (
   index: number,
   size: PageSizeName,
-  opts?: { template?: PaperTemplateId; y?: number },
+  opts?: {
+    template?: PaperTemplateId;
+    y?: number;
+    /** Swap the preset's width and height. Default `false`. */
+    landscape?: boolean;
+    /**
+     * Image background for the page. The bytes must already be in the
+     * editor's `BinaryFiles` (see `createImagePageFile`); only the SHA-1
+     * `fileId` is recorded here.
+     */
+    image?: PageImageBackground | null;
+  },
 ): NonDeleted<ExcalidrawFrameElement> => {
-  const { width, height } = PAGE_SIZES[size];
+  const landscape = opts?.landscape ?? false;
+  const { width, height } = getPageDimensions(size, landscape);
   return newFrameElement({
     x: PAGE_ORIGIN_X,
     y: opts?.y ?? PAGE_ORIGIN_Y,
@@ -221,12 +272,16 @@ export const createPageFrame = (
     height,
     backgroundColor: "transparent",
     name: pageFrameName(index),
-    customData: {
-      [PAGE_CUSTOM_DATA_KEY]: identityPageCustomData({
-        template: opts?.template ?? "blank",
-        size,
-      }),
-    },
+    customData: withPageImageBackground(
+      {
+        [PAGE_CUSTOM_DATA_KEY]: identityPageCustomData({
+          template: opts?.template ?? "blank",
+          size,
+          ...(landscape ? { landscape: true } : {}),
+        }),
+      },
+      opts?.image ?? null,
+    ),
   });
 };
 
@@ -354,6 +409,10 @@ export interface AddPageOptions {
   size?: PageSizeName;
   /** Defaults to the template of the page it is inserted after, else blank. */
   template?: PaperTemplateId;
+  /** Defaults to the orientation of the page it is inserted after. */
+  landscape?: boolean;
+  /** Image background for the new page. Not inherited from the neighbour. */
+  image?: PageImageBackground | null;
 }
 
 export interface AddPageResult {
@@ -377,6 +436,8 @@ export const addPage = (
   const size =
     opts.size ?? (reference ? getPageSizeName(reference.frame) : "A4");
   const template = opts.template ?? (reference ? reference.template : "blank");
+  const landscape =
+    opts.landscape ?? (reference ? isLandscapePage(reference.frame) : false);
 
   // y is provisional; restackPages assigns the real slot. We place it just
   // above the page currently at `at` so the sort puts it in the right place.
@@ -387,7 +448,12 @@ export const addPage = (
       ? getStackHeight(pages) + PAGE_GAP
       : pages[at].frame.y - PAGE_GAP / 2;
 
-  const frame = createPageFrame(at, size, { template, y: provisionalY });
+  const frame = createPageFrame(at, size, {
+    template,
+    y: provisionalY,
+    landscape,
+    image: opts.image ?? null,
+  });
 
   return {
     elements: restackPages([...elements, frame]),
@@ -462,9 +528,35 @@ export const setPageTemplate = (
             [PAGE_CUSTOM_DATA_KEY]: identityPageCustomData({
               ...readCustomData(page.frame),
               size: getPageSizeName(page.frame),
+              landscape: isLandscapePage(page.frame),
               template,
             }),
           },
+        })
+      : element,
+  );
+};
+
+/**
+ * Sets (or clears, with `null`) a page's image background. The bytes must
+ * already live in the editor's `BinaryFiles`; only the `fileId` is stored.
+ */
+export const setPageImage = (
+  elements: Elements,
+  index: number,
+  image: PageImageBackground | null,
+): ExcalidrawElement[] => {
+  const page = getPageAt(elements, index);
+  if (!page) {
+    return elements.slice();
+  }
+  return elements.map((element) =>
+    element.id === page.frame.id
+      ? newElementWith(element, {
+          customData: withPageImageBackground(
+            element.customData as Record<string, unknown> | undefined,
+            image,
+          ),
         })
       : element,
   );

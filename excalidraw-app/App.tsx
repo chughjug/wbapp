@@ -91,7 +91,12 @@ import {
   useFuzzySelectActive,
 } from "./goodnotes/fuzzy-select";
 import { BackdropPanel, useBackdropPanel } from "./goodnotes/backdrops";
-import { usePages, isPageFrame, getPageTemplate } from "./goodnotes/pages";
+import {
+  usePages,
+  useNewPage,
+  isPageFrame,
+  getPageTemplate,
+} from "./goodnotes/pages";
 import { PaperBackgroundLayer } from "./goodnotes/paper";
 import {
   Shelf,
@@ -418,7 +423,7 @@ const ExcalidrawWrapper = ({
     offsetTop: 0,
   });
 
-  const { seedFirstPage, pages, addPage } = usePages(excalidrawAPI);
+  const { seedFirstPage, pages } = usePages(excalidrawAPI);
   const toolMenu = useActiveToolMenu({ excalidrawAPI });
   // palm rejection, page flick and tap gestures go live from here
   const input = useInputGestures(excalidrawAPI);
@@ -487,6 +492,11 @@ const ExcalidrawWrapper = ({
   }, []);
 
   const { editorTheme, appTheme, setAppTheme } = useDarkMode();
+  // one shared new-page dialog, used by both the nav bar and the page panel
+  const newPage = useNewPage(excalidrawAPI, {
+    docId: docId ?? undefined,
+    theme: editorTheme,
+  });
 
   const [langCode, setLangCode] = useAppLangCode();
 
@@ -1134,7 +1144,7 @@ const ExcalidrawWrapper = ({
         backdropsDisabled={!backdrops.hasImageSelection}
         onUndo={input.undo}
         onRedo={input.redo}
-        onAddPage={() => addPage()}
+        onAddPage={newPage.open}
         pageCount={pages.length}
         currentPage={currentPageNumber ?? undefined}
         moreItems={[
@@ -1171,6 +1181,8 @@ const ExcalidrawWrapper = ({
           onClose={() => setIsPagePanelOpen(false)}
           theme={editorTheme}
           excalidrawAPI={excalidrawAPI}
+          onAddPage={newPage.open}
+          docId={docId ?? undefined}
         />
         <div className="gn-shell-canvas">
           <PaperBackgroundLayer
@@ -1453,6 +1465,7 @@ const ExcalidrawWrapper = ({
           </div>
         </div>
       )}
+      {newPage.dialog}
       <GlobalPdfDropOverlay mode="document" />
       <ObjectMenu
         excalidrawAPI={excalidrawAPI}

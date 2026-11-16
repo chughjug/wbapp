@@ -22,7 +22,11 @@ import type {
 } from "@excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 
-import { getPaperPageRects, renderPaper } from "../paper";
+import {
+  getPaperPageRects,
+  preloadPageImages,
+  renderPaperForFrame,
+} from "../paper";
 import { PAGE_CUSTOM_DATA_KEY } from "../pages";
 import { PAGE_FRAME_PREFIX, PAGE_SIZES } from "../types";
 
@@ -313,6 +317,10 @@ export const exportDocumentToPdf = async ({
       templateByFrameId.set(rect.id, rect.template);
     }
   }
+  // page background pictures decode asynchronously; renderPaperForFrame
+  // is synchronous, so prime the decode cache before rendering any page.
+  await preloadPageImages(elements, files ?? null);
+
   for (const frame of allPageFrames) {
     const stored = (frame.customData as Record<string, unknown> | undefined)?.[
       PAGE_CUSTOM_DATA_KEY
@@ -410,13 +418,15 @@ export const exportDocumentToPdf = async ({
         const sy = inkCanvas.height / frame.height;
         ctx.save();
         ctx.scale(sx, sy);
-        renderPaper(
-          ctx,
-          templateByFrameId.get(frame.id) ?? defaultPaperTemplate,
-          frame.width,
-          frame.height,
-          { theme: "light", sheet: true },
-        );
+        // renderPaperForFrame, not renderPaper: a page's background picture
+        // hangs off the frame, so passing only a template id gave the image
+        // no channel and image pages exported blank.
+        renderPaperForFrame(ctx, frame, {
+          theme: "light",
+          sheet: true,
+          defaultTemplate:
+            templateByFrameId.get(frame.id) ?? defaultPaperTemplate,
+        });
         ctx.restore();
         ctx.drawImage(inkCanvas, 0, 0);
         pageCanvas = composite;

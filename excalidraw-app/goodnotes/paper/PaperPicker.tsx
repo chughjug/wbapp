@@ -11,11 +11,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { ReactNode } from "react";
-
 import { PAPER_TEMPLATE_LIST, renderPaper } from "./templates";
 
 import "./PaperPicker.scss";
+
+import type { ReactNode } from "react";
 
 import type { PaperTheme } from "./templates";
 import type { PaperTemplateId } from "../types";
