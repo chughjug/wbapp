@@ -153,7 +153,8 @@ type Token =
   | { kind: "number"; value: number; text: string; position: number }
   | { kind: "name"; text: string; position: number }
   | { kind: "operator"; text: BinaryOperator; position: number }
-  | { kind: "lparen" | "rparen"; text: string; position: number };
+  | { kind: "lparen"; text: string; position: number }
+  | { kind: "rparen"; text: string; position: number };
 
 const isDigit = (ch: string) => ch >= "0" && ch <= "9";
 const isLetter = (ch: string) => /[a-zA-Z]/.test(ch);
@@ -176,14 +177,8 @@ const splitNameRun = (
   const pieces: { name: string; position: number }[] = [];
   let index = 0;
   while (index < run.length) {
-    const match = known.find(
-      (candidate) =>
-        run.startsWith(candidate, index) &&
-        // a variable/constant must not swallow the head of a longer unknown
-        // word silently: that is handled by continuing the loop, which will
-        // throw on the remainder.
-        true,
-    );
+    // longest-first, so `exp` wins over `e` and `sinh` over `sin`
+    const match = known.find((candidate) => run.startsWith(candidate, index));
     if (!match) {
       // report the whole remaining word — that is what the user sees as wrong
       const rest = /^[a-zA-Z]+/.exec(run.slice(index))?.[0] ?? run.slice(index);
@@ -333,7 +328,11 @@ export const parseExpression = (
   /** True when the next token continues a value (so `-` would be binary). */
   let afterValue = false;
 
-  const fail = (message: string, position: number, token: string): never => {
+  const fail: (message: string, position: number, token: string) => never = (
+    message,
+    position,
+    token,
+  ) => {
     throw new ExpressionError(message, { position, token, source });
   };
 

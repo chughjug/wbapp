@@ -255,9 +255,36 @@ export const attachInputGestures = (
     });
     penModeRequested = want;
     penModeRaisedByUs = want;
+    lastSeenPenMode = want;
     capabilities.rejectingTouch = want;
     options.onGesture?.({ type: "palm-rejection", active: want });
     emitCapabilities();
+  };
+
+  /**
+   * The `penMode` value we last saw in the editor. Anything that moves the
+   * flag without going through {@link syncPenMode} — most importantly the
+   * app loading a document, which pushes a whole restored `appState` and
+   * resets `penMode` to `false` — invalidates `penModeRequested`, which
+   * otherwise reads "already asked for, just not rendered yet" forever and
+   * silently leaves "pencil only" off for the rest of the session.
+   */
+  let lastSeenPenMode = api.isDestroyed ? false : api.getAppState().penMode;
+
+  const onEditorChange = () => {
+    if (api.isDestroyed) {
+      return;
+    }
+    const current = api.getAppState().penMode;
+    if (current !== lastSeenPenMode) {
+      lastSeenPenMode = current;
+      if (penModeRequested !== null && current !== penModeRequested) {
+        penModeRequested = null;
+      }
+    }
+    // cheap: a no-op write-free check unless the flag has actually drifted
+    // away from what the settings ask for
+    syncPenMode();
   };
 
   const notePenActivity = () => {
@@ -607,6 +634,8 @@ export const attachInputGestures = (
     hover.hide();
   };
 
+  const unsubscribeChange = api.onChange(onEditorChange);
+
   const capture = { capture: true, passive: true } as const;
   doc.addEventListener("pointerdown", onPointerDown, capture);
   doc.addEventListener("pointermove", onPointerMove, capture);
@@ -629,6 +658,7 @@ export const attachInputGestures = (
       doc.removeEventListener("pointerover", onPointerOver, capture);
       doc.removeEventListener("pointerout", onPointerOut, capture);
       win.removeEventListener("blur", onBlur);
+      unsubscribeChange();
       win.clearTimeout(penReleaseTimer);
       pan.destroy();
       hover.destroy();

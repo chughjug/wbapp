@@ -48,9 +48,13 @@ const sceneStore = createStore("goodnotes-scenes", "scenes");
   }),
 };
 
+const params = new URLSearchParams(location.search);
+
 const App = () => {
-  const [open, setOpen] = useState(true);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [open, setOpen] = useState(params.get("open") !== "0");
+  const [theme, setTheme] = useState<"light" | "dark">(
+    params.get("theme") === "dark" ? "dark" : "light",
+  );
   return (
     <div>
       <button id="reopen" onClick={() => setOpen(true)}>open</button>

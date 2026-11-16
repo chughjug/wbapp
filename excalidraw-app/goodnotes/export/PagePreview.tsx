@@ -40,70 +40,36 @@ export interface PagePreviewItem {
   failed: boolean;
 }
 
-export interface UsePagePreviewsOptions {
+export interface UseSceneRendererOptions {
   elements: readonly ExcalidrawElement[];
   files: BinaryFiles | null;
   appState?: Partial<AppState>;
   defaultPaperTemplate?: PaperTemplateId;
-  /** 1-based page numbers to preview, in order. */
-  pages: readonly number[];
-  includeBackground: boolean;
-  /** Pause rendering (e.g. while an export is running). */
-  paused?: boolean;
 }
 
-export interface UsePagePreviewsResult {
-  items: PagePreviewItem[];
-  /** Pages selected but not thumbnailed, because of {@link MAX_THUMBNAILS}. */
-  overflowCount: number;
-  /** Total page frames found in the scene. */
-  totalPages: number;
-  /** Size samples for `estimateExportBytes`. */
-  samples: PageSizeSample[];
-  /** The renderer, reusable by the real export so nothing is set up twice. */
+export interface UseSceneRendererResult {
+  /** `null` until the scene's page images have decoded. */
   renderer: PageRenderer | null;
-  isRendering: boolean;
   /** Scene-level failure (not a single page). */
   error: string | null;
 }
 
 /**
- * Renders preview thumbnails for `pages`, sequentially and cancellably.
+ * Builds the shared page renderer for a scene, once.
  *
- * Thumbnails are cached per page *version*, so changing the range re-uses
- * what's already drawn and only new pages cost anything.
+ * The `preloadPageImages` inside `createPageRenderer` is what stops
+ * image-backed pages previewing (and exporting) blank, so everything that
+ * draws a page waits on this.
  */
-export const usePagePreviews = ({
+export const useSceneRenderer = ({
   elements,
   files,
   appState,
   defaultPaperTemplate = "blank",
-  pages,
-  includeBackground,
-  paused = false,
-}: UsePagePreviewsOptions): UsePagePreviewsResult => {
+}: UseSceneRendererOptions): UseSceneRendererResult => {
   const [renderer, setRenderer] = useState<PageRenderer | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [, forceRender] = useState(0);
-  const [isRendering, setIsRendering] = useState(false);
 
-  // key -> object URL. Lives for the dialog's lifetime; revoked on unmount.
-  const cacheRef = useRef(new Map<string, string>());
-  const failedRef = useRef(new Set<string>());
-  const samplesRef = useRef(new Map<number, PageSizeSample>());
-  const generationRef = useRef(0);
-
-  useEffect(() => {
-    const cache = cacheRef.current;
-    return () => {
-      cache.forEach((url) => URL.revokeObjectURL(url));
-      cache.clear();
-      generationRef.current++;
-    };
-  }, []);
-
-  // Build the renderer once per scene. `preloadPageImages` inside it is what
-  // stops image-backed pages previewing (and exporting) blank.
   useEffect(() => {
     let cancelled = false;
     setError(null);
@@ -121,21 +87,65 @@ export const usePagePreviews = ({
     return () => {
       cancelled = true;
     };
+    // appState is read once, at build time; it must not retrigger the build
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elements, files, defaultPaperTemplate]);
 
-  const visiblePages = useMemo(
-    () => pages.slice(0, MAX_THUMBNAILS),
-    [pages],
-  );
-  const visibleKey = visiblePages.join(",");
+  return { renderer, error };
+};
 
-  const keyFor = (pageNumber: number): string | null => {
-    const frame = renderer?.frames[pageNumber - 1];
-    return frame
-      ? `${frame.id}:${frame.version}:${includeBackground ? "bg" : "nobg"}`
-      : null;
-  };
+export interface UsePagePreviewsOptions {
+  renderer: PageRenderer | null;
+  /** 1-based page numbers to preview, in order. */
+  pages: readonly number[];
+  includeBackground: boolean;
+  /** Pause rendering (e.g. while an export is running). */
+  paused?: boolean;
+}
+
+export interface UsePagePreviewsResult {
+  items: PagePreviewItem[];
+  /** Pages selected but not thumbnailed, because of {@link MAX_THUMBNAILS}. */
+  overflowCount: number;
+  /** Size samples for `estimateExportBytes`. */
+  samples: PageSizeSample[];
+  isRendering: boolean;
+}
+
+/**
+ * Renders preview thumbnails for `pages`, sequentially and cancellably.
+ *
+ * Thumbnails are cached per page *version*, so changing the range re-uses
+ * what's already drawn and only new pages cost anything.
+ */
+export const usePagePreviews = ({
+  renderer,
+  pages,
+  includeBackground,
+  paused = false,
+}: UsePagePreviewsOptions): UsePagePreviewsResult => {
+  const [, forceRender] = useState(0);
+  const [isRendering, setIsRendering] = useState(false);
+
+  // key -> object URL. Lives for the dialog's lifetime; revoked on unmount.
+  const cacheRef = useRef(new Map<string, string>());
+  const failedRef = useRef(new Set<string>());
+  const samplesRef = useRef(new Map<number, PageSizeSample>());
+  const generationRef = useRef(0);
+
+  useEffect(() => {
+    const cache = cacheRef.current;
+    const generation = generationRef;
+    return () => {
+      cache.forEach((url) => URL.revokeObjectURL(url));
+      cache.clear();
+      // invalidate any in-flight render loop
+      generation.current++;
+    };
+  }, []);
+
+  const visiblePages = useMemo(() => pages.slice(0, MAX_THUMBNAILS), [pages]);
+  const visibleKey = visiblePages.join(",");
 
   useEffect(() => {
     if (!renderer || paused) {
@@ -144,10 +154,24 @@ export const usePagePreviews = ({
     const generation = ++generationRef.current;
     let active = true;
 
+    const stillCurrent = () => active && generation === generationRef.current;
+
+    const measure = async (pageNumber: number, scale: number) => {
+      const frame = renderer.frames[pageNumber - 1];
+      if (!frame) {
+        return null;
+      }
+      const canvas = await renderer.renderPage(frame, {
+        scale,
+        includeBackground,
+      });
+      return canvasToBlob(canvas, "image/png");
+    };
+
     const run = async () => {
       setIsRendering(true);
       for (const pageNumber of visiblePages) {
-        if (!active || generation !== generationRef.current) {
+        if (!stillCurrent()) {
           return;
         }
         const frame = renderer.frames[pageNumber - 1];
@@ -161,15 +185,16 @@ export const usePagePreviews = ({
           continue;
         }
         try {
-          const canvas = await renderer.renderPage(frame, {
-            scale: THUMB_TARGET_PX / Math.max(frame.width, 1),
-            includeBackground,
-          });
-          const blob = await canvasToBlob(canvas, "image/png");
-          if (!active || generation !== generationRef.current) {
+          const blob = await measure(
+            pageNumber,
+            THUMB_TARGET_PX / Math.max(frame.width, 1),
+          );
+          if (!stillCurrent()) {
             return;
           }
-          cacheRef.current.set(key, URL.createObjectURL(blob));
+          if (blob) {
+            cacheRef.current.set(key, URL.createObjectURL(blob));
+          }
         } catch {
           failedRef.current.add(key);
         }
@@ -178,40 +203,34 @@ export const usePagePreviews = ({
       }
 
       // Size calibration: a couple of pages at a bigger scale, so the
-      // estimate isn't extrapolated 10x from a thumbnail.
+      // estimate isn't extrapolated ten-fold from a thumbnail.
       for (const pageNumber of visiblePages.slice(0, CALIBRATION_PAGES)) {
-        if (!active || generation !== generationRef.current) {
+        if (!stillCurrent()) {
           return;
         }
         if (samplesRef.current.has(pageNumber)) {
           continue;
         }
-        const frame = renderer.frames[pageNumber - 1];
-        if (!frame) {
-          continue;
-        }
         try {
-          const canvas = await renderer.renderPage(frame, {
-            scale: CALIBRATION_SCALE,
-            includeBackground,
-          });
-          const blob = await canvasToBlob(canvas, "image/png");
-          if (!active || generation !== generationRef.current) {
+          const blob = await measure(pageNumber, CALIBRATION_SCALE);
+          if (!stillCurrent()) {
             return;
           }
-          samplesRef.current.set(pageNumber, {
-            pageNumber,
-            scale: CALIBRATION_SCALE,
-            bytes: blob.size,
-          });
-          forceRender((n) => n + 1);
+          if (blob) {
+            samplesRef.current.set(pageNumber, {
+              pageNumber,
+              scale: CALIBRATION_SCALE,
+              bytes: blob.size,
+            });
+            forceRender((n) => n + 1);
+          }
         } catch {
           // a page that won't render is reported by its thumbnail already
         }
         await yieldToUi();
       }
 
-      if (active && generation === generationRef.current) {
+      if (stillCurrent()) {
         setIsRendering(false);
       }
     };
@@ -225,7 +244,9 @@ export const usePagePreviews = ({
 
   const items: PagePreviewItem[] = visiblePages.map((pageNumber) => {
     const frame = renderer?.frames[pageNumber - 1];
-    const key = keyFor(pageNumber);
+    const key = frame
+      ? `${frame.id}:${frame.version}:${includeBackground ? "bg" : "nobg"}`
+      : null;
     return {
       pageNumber,
       url: key ? cacheRef.current.get(key) ?? null : null,
@@ -237,11 +258,8 @@ export const usePagePreviews = ({
   return {
     items,
     overflowCount: Math.max(0, pages.length - visiblePages.length),
-    totalPages: renderer?.frames.length ?? 0,
     samples: [...samplesRef.current.values()],
-    renderer,
     isRendering,
-    error,
   };
 };
 
@@ -266,9 +284,7 @@ export const PagePreviewStrip: React.FC<PagePreviewStripProps> = ({
   label,
 }) => {
   if (items.length === 0) {
-    return (
-      <p className="gn-export-preview__empty">{emptyMessage}</p>
-    );
+    return <p className="gn-export-preview__empty">{emptyMessage}</p>;
   }
 
   return (

@@ -1,0 +1,79 @@
+/**
+ * InkFeelSettings styles.
+ *
+ * Driven by Excalidraw's own theme variables so the control is correct in
+ * both themes without a second palette.
+ */
+
+.goodnotes-ink-feel {
+  --gn-ink-radius: 0.625rem;
+  --gn-ink-fg: var(--color-on-surface, #1b1b1f);
+  --gn-ink-muted: var(--color-gray-60, #6b7280);
+  --gn-ink-bg: var(--island-bg-color, #ffffff);
+  --gn-ink-border: var(--default-border-color, rgba(0, 0, 0, 0.12));
+  --gn-ink-active-bg: var(--color-primary, #6965db);
+  --gn-ink-active-fg: #ffffff;
+
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  color: var(--gn-ink-fg);
+  font-family: inherit;
+
+  &__options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  &__option {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--gn-ink-border);
+    border-radius: var(--gn-ink-radius);
+    background: var(--gn-ink-bg);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--gn-ink-active-bg);
+      outline-offset: 2px;
+    }
+
+    &.is-active {
+      border-color: var(--gn-ink-active-bg);
+      background: var(--gn-ink-active-bg);
+      color: var(--gn-ink-active-fg);
+    }
+  }
+
+  &__option-label,
+  &__pressure-label {
+    font-weight: 600;
+    font-size: 0.8125rem;
+  }
+
+  &__option-description {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.75;
+  }
+
+  &__pressure {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    cursor: pointer;
+
+    input {
+      margin-top: 0.15rem;
+      flex: none;
+    }
+  }
+}

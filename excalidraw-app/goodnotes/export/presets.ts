@@ -101,9 +101,7 @@ export const settingsEqual = (a: ExportSettings, b: ExportSettings): boolean =>
   (a.pageMode !== "custom" || a.customRange.trim() === b.customRange.trim());
 
 /** The preset these settings match exactly, or `null` for a custom mix. */
-export const matchPreset = (
-  settings: ExportSettings,
-): ExportPresetId | null =>
+export const matchPreset = (settings: ExportSettings): ExportPresetId | null =>
   EXPORT_PRESETS.find((preset) => settingsEqual(preset.settings, settings))
     ?.id ?? null;
 
@@ -182,10 +180,7 @@ export const getLastExport = (): LastExport | null => {
 export const setLastExport = (value: LastExport): void => {
   cache = value;
   try {
-    window.localStorage.setItem(
-      LAST_EXPORT_STORAGE_KEY,
-      JSON.stringify(value),
-    );
+    window.localStorage.setItem(LAST_EXPORT_STORAGE_KEY, JSON.stringify(value));
   } catch {
     // storage full / blocked — the in-memory value still works this session
   }

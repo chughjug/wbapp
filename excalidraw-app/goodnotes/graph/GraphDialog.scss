@@ -1,0 +1,453 @@
+// Styles for the GoodNotes "Insert a graph" dialog.
+//
+// Every colour comes from an Excalidraw theme custom property (with a literal
+// fallback), so the dialog is correct in both light and dark theme.
+//
+// NOTE: `--color-muted` is a *background* grey in Excalidraw's palette. Body
+// text uses `--text-primary-color`; secondary text is a transparency of the
+// same ink, never `--color-muted`.
+//
+// The rendered graph itself is deliberately NOT themed — it is drawn on white
+// because it ends up as a picture on a white page and in exported PDFs.
+
+.excalidraw.gn-graph-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: var(--overlay-bg-color, rgba(0, 0, 0, 0.5));
+  animation: gn-graph-fade 120ms ease-out;
+}
+
+.gn-graph-dialog {
+  box-sizing: border-box;
+  width: min(60rem, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-radius: var(--border-radius-lg, 0.5rem);
+  border: 1px solid var(--dialog-border-color, var(--color-gray-20));
+  background-color: var(--island-bg-color, var(--color-surface-lowest));
+  color: var(--text-primary-color, var(--color-on-surface));
+  box-shadow: var(--modal-shadow, 0 20px 40px rgba(0, 0, 0, 0.25));
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  animation: gn-graph-pop 140ms ease-out;
+
+  *:focus-visible {
+    outline: 2px solid var(--color-primary, #6965db);
+    outline-offset: 2px;
+    border-radius: var(--border-radius-md, 0.375rem);
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8125em;
+    padding: 0.05rem 0.25rem;
+    border-radius: 0.25rem;
+    background-color: var(--color-surface-high, rgba(128, 128, 128, 0.18));
+    color: inherit;
+  }
+}
+
+.gn-graph-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.gn-graph-dialog__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary-color, var(--color-on-surface));
+}
+
+.gn-graph-dialog__intro {
+  margin: 0;
+  opacity: 0.8;
+}
+
+.gn-graph-dialog__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-md, 0.375rem);
+
+  &:hover {
+    background-color: var(--button-hover-bg, var(--color-surface-high));
+  }
+}
+
+.gn-graph-dialog__body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.gn-graph-dialog__form {
+  flex: 1 1 20rem;
+  min-width: 18rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.gn-graph-preview {
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  max-width: 100%;
+}
+
+.gn-graph-preview__heading {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.gn-graph-preview__canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  // the graph is drawn on white on purpose — give it a ring so it still has
+  // an edge against the dark-theme dialog surface
+  border: 1px solid var(--dialog-border-color, rgba(0, 0, 0, 0.12));
+  border-radius: var(--border-radius-md, 0.375rem);
+  background-color: #ffffff;
+}
+
+.gn-graph-preview__alt {
+  margin: 0;
+  max-width: 31rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+.gn-graph-preview__alt-label {
+  font-weight: 600;
+}
+
+.gn-graph-fieldset {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--dialog-border-color, var(--color-gray-20));
+  border-radius: var(--border-radius-md, 0.375rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  > legend {
+    padding: 0 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.7;
+  }
+}
+
+.gn-graph-row {
+  display: flex;
+  gap: 0.5rem;
+
+  > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+.gn-graph-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+
+  > label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.85;
+  }
+}
+
+.gn-graph-dialog input[type="text"],
+.gn-graph-dialog input[type="number"] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  font: inherit;
+  color: var(--text-primary-color, var(--color-on-surface));
+  background-color: var(--input-bg-color, var(--color-surface-low));
+  border: 1px solid var(--input-border-color, var(--color-gray-20));
+  border-radius: var(--border-radius-md, 0.375rem);
+
+  &[aria-invalid="true"] {
+    border-color: var(--color-danger, #c92a2a);
+  }
+}
+
+.gn-graph-series {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.gn-graph-series__swatch {
+  flex: 0 0 auto;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-top: 1.5rem;
+  border-radius: 0.25rem;
+}
+
+.gn-graph-series__field {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  > label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.85;
+  }
+}
+
+.gn-graph-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  opacity: 0.8;
+}
+
+.gn-graph-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+
+  > input {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+}
+
+.gn-graph-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+
+  th {
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0.75;
+    padding: 0 0.25rem 0.25rem 0;
+  }
+
+  td {
+    padding: 0.125rem 0.25rem 0.125rem 0;
+    vertical-align: middle;
+  }
+
+  td:last-child,
+  th:last-child {
+    width: 2rem;
+    padding-right: 0;
+  }
+}
+
+.gn-graph-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-top: 1.25rem;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-md, 0.375rem);
+
+  &:hover {
+    background-color: var(--button-hover-bg, var(--color-surface-high));
+  }
+}
+
+.gn-graph-table .gn-graph-icon-button {
+  margin-top: 0;
+}
+
+.gn-graph-text-button {
+  align-self: flex-start;
+  padding: 0.25rem 0.375rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--color-primary, #6965db);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-md, 0.375rem);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--button-hover-bg, var(--color-surface-high));
+  }
+}
+
+.gn-graph-segmented {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.gn-graph-segmented__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.625rem;
+  border: 1px solid var(--dialog-border-color, var(--color-gray-20));
+  border-radius: var(--border-radius-md, 0.375rem);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--button-hover-bg, var(--color-surface-high));
+  }
+
+  // the radio stays in the accessibility tree and keeps keyboard behaviour
+  > input {
+    margin: 0;
+  }
+
+  &:has(> input:checked) {
+    border-color: var(--color-primary, #6965db);
+    background-color: var(--color-primary-light, rgba(105, 101, 219, 0.12));
+  }
+
+  &:has(> input:focus-visible) {
+    outline: 2px solid var(--color-primary, #6965db);
+    outline-offset: 2px;
+  }
+}
+
+.gn-graph-error {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--color-danger, #c92a2a);
+}
+
+.gn-graph-error--summary {
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--color-danger, #c92a2a);
+  border-radius: var(--border-radius-md, 0.375rem);
+  background-color: var(--color-danger-background, rgba(201, 42, 42, 0.08));
+  font-size: 0.8125rem;
+}
+
+.gn-graph-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+}
+
+.gn-graph-button {
+  padding: 0.4375rem 0.875rem;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-primary-color, var(--color-on-surface));
+  background-color: var(--button-bg, var(--color-surface-high));
+  border: 1px solid var(--dialog-border-color, var(--color-gray-20));
+  border-radius: var(--border-radius-md, 0.375rem);
+
+  &:hover:not(:disabled) {
+    background-color: var(--button-hover-bg, var(--color-surface-mid));
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.gn-graph-button--primary {
+  color: var(--color-primary-contrast, #ffffff);
+  background-color: var(--color-primary, #6965db);
+  border-color: var(--color-primary, #6965db);
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary-darker, #5b57d1);
+  }
+}
+
+.gn-graph-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes gn-graph-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes gn-graph-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .excalidraw.gn-graph-backdrop,
+  .gn-graph-dialog {
+    animation: none !important;
+    transition: none !important;
+  }
+}

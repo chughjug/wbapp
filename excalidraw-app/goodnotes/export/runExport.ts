@@ -150,7 +150,9 @@ export const runExport = async ({
       signal,
       renderer: pageRenderer,
     });
-    out.push(...images.map(({ fileName: name, blob }) => ({ fileName: name, blob })));
+    out.push(
+      ...images.map(({ fileName: name, blob }) => ({ fileName: name, blob })),
+    );
   } else {
     const blob = await exportDocumentToPdf({
       elements,

@@ -42,6 +42,8 @@
  * gesture exactly on the clamp.
  */
 
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+
 import {
   EMPTY_INSETS,
   clampViewport,
@@ -56,8 +58,6 @@ import {
   OVERSCROLL_MAX_PX,
   OVERSCROLL_SPRING_MS,
 } from "./constants";
-
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 /** Tools for which the editor still honours a touch pointer in pen mode. */
 const TOUCH_TOOLS_IN_PEN_MODE = new Set([
@@ -145,10 +145,7 @@ const readLimits = (api: ExcalidrawImperativeAPI): Limits | null => {
 };
 
 /** The clamped (resting) viewport for a desired one, honouring the lock. */
-const clampToLock = (
-  viewport: Viewport,
-  limits: Limits | null,
-): Viewport =>
+const clampToLock = (viewport: Viewport, limits: Limits | null): Viewport =>
   limits
     ? clampViewport(viewport, limits.rect, limits.box, limits.insets, 0)
     : viewport;
@@ -241,7 +238,10 @@ export const createOneFingerPan = (
       if (api.isDestroyed || active) {
         return;
       }
-      const t = Math.min(1, (performance.now() - startedAt) / OVERSCROLL_SPRING_MS);
+      const t = Math.min(
+        1,
+        (performance.now() - startedAt) / OVERSCROLL_SPRING_MS,
+      );
       // ease-out cubic: fast release, soft landing
       const eased = 1 - (1 - t) ** 3;
       write(from.scrollX + dx * eased, from.scrollY + dy * eased);

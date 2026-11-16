@@ -13,7 +13,7 @@ import { jsPDF } from "jspdf";
 import type { ExcalidrawElement } from "@excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 
-import { getOrderedPageFrames, pxToPt } from "./pageFrames";
+import { pxToPt } from "./pageFrames";
 import { createPageRenderer, DEFAULT_SCALE } from "./renderPage";
 
 import type { PageRenderer } from "./renderPage";

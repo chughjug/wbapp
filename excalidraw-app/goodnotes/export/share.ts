@@ -9,17 +9,21 @@
  */
 
 /** `navigator.share` with a `files` payload, feature-detected. */
-interface FileShareNavigator extends Navigator {
-  canShare?: (data?: { files?: File[]; title?: string; text?: string }) => boolean;
-  share?: (data: {
-    files?: File[];
-    title?: string;
-    text?: string;
-  }) => Promise<void>;
+interface FileSharePayload {
+  files?: File[];
+  title?: string;
+  text?: string;
+}
+
+interface FileShareNavigator {
+  canShare?: (data?: FileSharePayload) => boolean;
+  share?: (data: FileSharePayload) => Promise<void>;
 }
 
 const getNav = (): FileShareNavigator | null =>
-  typeof navigator === "undefined" ? null : (navigator as FileShareNavigator);
+  typeof navigator === "undefined"
+    ? null
+    : (navigator as unknown as FileShareNavigator);
 
 /**
  * True when this browser can share *these* files.
@@ -29,7 +33,11 @@ const getNav = (): FileShareNavigator | null =>
  */
 export const canShareFiles = (files: readonly File[]): boolean => {
   const nav = getNav();
-  if (!nav || typeof nav.share !== "function" || typeof nav.canShare !== "function") {
+  if (
+    !nav ||
+    typeof nav.share !== "function" ||
+    typeof nav.canShare !== "function"
+  ) {
     return false;
   }
   if (files.length === 0) {
@@ -49,7 +57,9 @@ export const canShareFiles = (files: readonly File[]): boolean => {
 export const supportsFileShare = (): boolean => {
   const nav = getNav();
   return (
-    !!nav && typeof nav.share === "function" && typeof nav.canShare === "function"
+    !!nav &&
+    typeof nav.share === "function" &&
+    typeof nav.canShare === "function"
   );
 };
 

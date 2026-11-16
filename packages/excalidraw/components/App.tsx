@@ -2636,21 +2636,20 @@ class App extends React.Component<AppProps, AppState> {
                               </ElementCanvasButtons>
                             )}
 
-                          {this.isDefaultUIEnabled() &&
-                            this.state.contextMenu && (
-                              <ContextMenu
-                                items={this.state.contextMenu.items}
-                                top={this.state.contextMenu.top}
-                                left={this.state.contextMenu.left}
-                                actionManager={this.actionManager}
-                                onClose={(callback) => {
-                                  this.setState({ contextMenu: null }, () => {
-                                    this.focusContainer();
-                                    callback?.();
-                                  });
-                                }}
-                              />
-                            )}
+                          {this.isDefaultUIEnabled() && this.state.contextMenu && (
+                            <ContextMenu
+                              items={this.state.contextMenu.items}
+                              top={this.state.contextMenu.top}
+                              left={this.state.contextMenu.left}
+                              actionManager={this.actionManager}
+                              onClose={(callback) => {
+                                this.setState({ contextMenu: null }, () => {
+                                  this.focusContainer();
+                                  callback?.();
+                                });
+                              }}
+                            />
+                          )}
                           <StaticCanvas
                             canvas={this.canvas}
                             rc={this.rc}
@@ -9926,6 +9925,11 @@ class App extends React.Component<AppProps, AppState> {
           dy += 0.0001;
           dx += 0.0001;
         }
+
+        // the throttled move handler was flushed above, so anything still in
+        // the bank is at most one frame old and is superseded by this final
+        // point; drop it so it cannot leak into the next stroke
+        this.freedrawSampleBuffer = [];
 
         const pressures = newElement.simulatePressure
           ? []
