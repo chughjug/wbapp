@@ -211,7 +211,9 @@ export const DocumentActions = ({
   <div className={`gn-card__actions${className ? ` ${className}` : ""}`}>
     <button
       type="button"
-      className={`gn-icon-button${isFavourite ? " gn-icon-button--star-on" : ""}`}
+      className={`gn-icon-button${
+        isFavourite ? " gn-icon-button--star-on" : ""
+      }`}
       tabIndex={tabIndex}
       aria-pressed={isFavourite}
       aria-label={

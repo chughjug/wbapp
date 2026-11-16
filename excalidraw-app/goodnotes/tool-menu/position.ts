@@ -84,7 +84,9 @@ export const loadToolMenuPosition = (
     }
     const value = parsed as Partial<ToolMenuPosition>;
     const base = fallback();
-    const offsets = (value.offsets ?? {}) as Partial<Record<ToolMenuEdge, number>>;
+    const offsets = (value.offsets ?? {}) as Partial<
+      Record<ToolMenuEdge, number>
+    >;
     return {
       edge: isEdge(value.edge) ? value.edge : base.edge,
       offsets: {

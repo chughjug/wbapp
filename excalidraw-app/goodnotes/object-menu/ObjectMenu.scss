@@ -162,6 +162,18 @@
   }
 }
 
+// Excalidraw's own `.excalidraw button:focus-visible` rule (styles.scss) sets
+// `outline: transparent` and draws its ring as a box-shadow, and it outranks a
+// single-class selector. These doubly-scoped rules take the specificity back
+// and paint a real, visible ring (outline *and* shadow, so it survives either
+// being overridden).
+.goodnotes-object-menu .goodnotes-object-menu__button:focus-visible,
+.goodnotes-object-menu .goodnotes-object-menu__swatch:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 1px var(--island-bg-color), 0 0 0 3px var(--color-primary);
+}
+
 @keyframes goodnotes-object-menu-in {
   from {
     opacity: 0;

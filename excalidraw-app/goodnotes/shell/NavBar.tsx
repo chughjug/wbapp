@@ -963,7 +963,7 @@ export const NavBar = ({
     moreItems,
   ]);
 
-  const renderAction = (action: (typeof rightActions)[number]) => (
+  const renderAction = (action: typeof rightActions[number]) => (
     <button
       key={action.id}
       type="button"
@@ -1000,7 +1000,9 @@ export const NavBar = ({
     event.preventDefault();
     const next: ShellMode = mode === "read" ? "write" : "read";
     onModeChange?.(next);
-    requestAnimationFrame(() => buttonRefs.current.get(`mode-${next}`)?.focus());
+    requestAnimationFrame(() =>
+      buttonRefs.current.get(`mode-${next}`)?.focus(),
+    );
   };
 
   const resolvedTheme = theme ?? editorTheme;

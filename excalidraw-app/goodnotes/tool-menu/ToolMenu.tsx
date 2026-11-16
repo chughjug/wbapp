@@ -49,7 +49,11 @@ import {
 
 import "./ToolMenu.scss";
 
-import type { ToolMenuShapeId, ToolMenuToolId, ToolMenuWidthKey } from "./editor";
+import type {
+  ToolMenuShapeId,
+  ToolMenuToolId,
+  ToolMenuWidthKey,
+} from "./editor";
 import type { ToolMenuPosition } from "./position";
 import type { PenPreset } from "../types";
 
@@ -342,23 +346,20 @@ export const ToolMenu = ({
    * opacity change is written back onto that preset and persisted, which is
    * what makes the retired PenTray's saved pens keep working here.
    */
-  const updateActivePreset = useCallback(
-    (patch: Partial<PenPreset>) => {
-      setActivePresetId((id) => {
-        if (id) {
-          setPresets((current) => {
-            const next = current.map((preset) =>
-              preset.id === id ? { ...preset, ...patch } : preset,
-            );
-            savePenPresets(next);
-            return next;
-          });
-        }
-        return id;
-      });
-    },
-    [],
-  );
+  const updateActivePreset = useCallback((patch: Partial<PenPreset>) => {
+    setActivePresetId((id) => {
+      if (id) {
+        setPresets((current) => {
+          const next = current.map((preset) =>
+            preset.id === id ? { ...preset, ...patch } : preset,
+          );
+          savePenPresets(next);
+          return next;
+        });
+      }
+      return id;
+    });
+  }, []);
 
   const onPresetClick = useCallback(
     (preset: PenPreset) => {
@@ -589,7 +590,11 @@ export const ToolMenu = ({
         <input
           type="color"
           className="gn-tool-menu__color-input"
-          value={/^#[0-9a-f]{6}$/i.test(style.strokeColor) ? style.strokeColor : "#1e1e1e"}
+          value={
+            /^#[0-9a-f]{6}$/i.test(style.strokeColor)
+              ? style.strokeColor
+              : "#1e1e1e"
+          }
           onChange={(event) => onPick(event.target.value)}
         />
         <span
@@ -887,7 +892,9 @@ export const ToolMenu = ({
             />
           ))}
         </Group>
-        {opacityControl((opacity) => applyTextStyle(excalidrawAPI, { opacity }))}
+        {opacityControl((opacity) =>
+          applyTextStyle(excalidrawAPI, { opacity }),
+        )}
       </>
     );
   }

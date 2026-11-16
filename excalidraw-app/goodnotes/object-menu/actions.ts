@@ -48,14 +48,6 @@ import {
 } from "@excalidraw/element";
 import { pointFrom } from "@excalidraw/math";
 
-import {
-  BACKDROP_CUSTOM_DATA_KEY,
-  GOODNOTES_CUSTOM_DATA_NAMESPACE,
-  fileIdFromDataURL,
-  loadImageFromDataURL,
-  makeBinaryFileData,
-} from "../backdrops";
-
 import type { GlobalPoint } from "@excalidraw/math";
 import type {
   ExcalidrawElement,
@@ -66,6 +58,14 @@ import type {
   NonDeletedExcalidrawElement,
 } from "@excalidraw/element/types";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+
+import {
+  BACKDROP_CUSTOM_DATA_KEY,
+  GOODNOTES_CUSTOM_DATA_NAMESPACE,
+  fileIdFromDataURL,
+  loadImageFromDataURL,
+  makeBinaryFileData,
+} from "../backdrops";
 
 /* -------------------------------------------------------------------------- */
 /* option sets shown in the bar                                                */
@@ -151,9 +151,7 @@ const mapSelected = <T extends ExcalidrawElement>(
     return changes ? newElementWith(element as T, changes) : element;
   });
 
-const selectedIdSet = (
-  excalidrawAPI: ExcalidrawImperativeAPI,
-): Set<string> => {
+const selectedIdSet = (excalidrawAPI: ExcalidrawImperativeAPI): Set<string> => {
   const appState = excalidrawAPI.getAppState();
   return new Set(
     getSelectedElements(excalidrawAPI.getSceneElements(), appState, {
@@ -301,15 +299,13 @@ export const groupSelection = (
   const groupId = randomId();
   const ids = new Set(selected.map((element) => element.id));
 
-  const next = excalidrawAPI
-    .getSceneElementsIncludingDeleted()
-    .map((element) =>
-      ids.has(element.id)
-        ? newElementWith(element, {
-            groupIds: [...element.groupIds, groupId],
-          })
-        : element,
-    );
+  const next = excalidrawAPI.getSceneElementsIncludingDeleted().map((element) =>
+    ids.has(element.id)
+      ? newElementWith(element, {
+          groupIds: [...element.groupIds, groupId],
+        })
+      : element,
+  );
 
   commit(excalidrawAPI, next);
   excalidrawAPI.selection.select(Array.from(ids));
@@ -480,10 +476,7 @@ export const replaceImage = async (
 
   const dataURL = await readFileAsDataURL(chosen);
   const image = await loadImageFromDataURL(dataURL);
-  const binary = await makeBinaryFileData(
-    dataURL,
-    chosen.type || "image/png",
-  );
+  const binary = await makeBinaryFileData(dataURL, chosen.type || "image/png");
   const fileId = await fileIdFromDataURL(dataURL);
 
   const ratio =
@@ -573,8 +566,9 @@ export const canConvertToShape = (
     return false;
   }
   try {
-    return recognizeShape(toGlobalPoints(stroke), null, zoom).type !==
-      "freedraw";
+    return (
+      recognizeShape(toGlobalPoints(stroke), null, zoom).type !== "freedraw"
+    );
   } catch {
     return false;
   }

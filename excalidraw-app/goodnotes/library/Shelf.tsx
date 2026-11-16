@@ -60,11 +60,7 @@ import type { SidebarCourse } from "./Sidebar";
 import type { DocMeta, SortKey } from "../types";
 
 // re-exported for API compatibility with the previous Shelf module
-export {
-  getDueUrgency,
-  formatDueDate,
-  formatUpdatedAt,
-} from "./format";
+export { getDueUrgency, formatDueDate, formatUpdatedAt } from "./format";
 export type { DueUrgency } from "./format";
 
 export type LibraryView = "grid" | "list";
@@ -151,7 +147,9 @@ export const Shelf = ({
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("updatedAt");
   const [filter, setFilter] = useState<LibraryFilter>(FILTER_ALL);
-  const [view, setView] = useState<LibraryView>(() => readStoredView(defaultView));
+  const [view, setView] = useState<LibraryView>(() =>
+    readStoredView(defaultView),
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<DocMeta | null>(null);

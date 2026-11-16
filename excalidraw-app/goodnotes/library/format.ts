@@ -114,9 +114,9 @@ export const formatBytes = (bytes: number): string => {
     Math.floor(Math.log(bytes) / Math.log(1024)),
   );
   const value = bytes / 1024 ** exponent;
-  return `${value >= 10 || exponent === 0 ? Math.round(value) : value.toFixed(1)} ${
-    units[exponent]
-  }`;
+  return `${
+    value >= 10 || exponent === 0 ? Math.round(value) : value.toFixed(1)
+  } ${units[exponent]}`;
 };
 
 /** The accessible name of a document card/row: never relies on colour. */
@@ -129,7 +129,9 @@ export const describeDocument = (
   [
     `Open ${doc.title}`,
     doc.course ? `course ${doc.course}` : "no course",
-    doc.dueDate != null ? formatDueDate(doc.dueDate, now).toLowerCase() : "no due date",
+    doc.dueDate != null
+      ? formatDueDate(doc.dueDate, now).toLowerCase()
+      : "no due date",
     `${doc.pageCount} ${doc.pageCount === 1 ? "page" : "pages"}`,
     isFavourite ? "favourite" : null,
     visibleTags.length ? `tags ${visibleTags.join(", ")}` : null,

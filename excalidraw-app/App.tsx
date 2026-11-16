@@ -7,8 +7,6 @@ import {
   useEditorInterface,
   ExcalidrawAPIProvider,
   useExcalidrawAPI,
-  Sidebar,
-  Footer,
 } from "@excalidraw/excalidraw";
 import { trackEvent } from "@excalidraw/excalidraw/analytics";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
@@ -73,7 +71,10 @@ import type { ResolutionType } from "@excalidraw/common/utility-types";
 import type { ResolvablePromise } from "@excalidraw/common/utils";
 
 import { ExportDialog, getOrderedPageFrames } from "./goodnotes/export";
-import { Taskbar } from "./goodnotes/taskbar";
+import { NavBar, PagePanel } from "./goodnotes/shell";
+import { TabBar, useOpenDocs } from "./goodnotes/tabs";
+import { ToolMenu, useActiveToolMenu } from "./goodnotes/tool-menu";
+import { useDarkMode } from "./goodnotes/dark";
 import { ImportPdfDialog } from "./goodnotes/import-pdf";
 import {
   FuzzySelectOverlay,
@@ -82,13 +83,7 @@ import {
   useFuzzySelectActive,
 } from "./goodnotes/fuzzy-select";
 import { BackdropPanel, useBackdropPanel } from "./goodnotes/backdrops";
-import { PenTray } from "./goodnotes/pens";
-import {
-  PageSidebar,
-  usePages,
-  isPageFrame,
-  getPageTemplate,
-} from "./goodnotes/pages";
+import { usePages, isPageFrame, getPageTemplate } from "./goodnotes/pages";
 import { PaperBackgroundLayer } from "./goodnotes/paper";
 import {
   Shelf,
@@ -145,7 +140,6 @@ import {
 import { isBrowserStorageStateNewer } from "./data/tabSync";
 import { ShareDialog, shareDialogStateAtom } from "./share/ShareDialog";
 import CollabError, { collabErrorIndicatorAtom } from "./collab/CollabError";
-import { useHandleAppTheme } from "./useHandleAppTheme";
 import { getPreferredLanguage } from "./app-language/language-detector";
 import { useAppLangCode } from "./app-language/language-state";
 import DebugCanvas, {
@@ -416,6 +410,28 @@ const ExcalidrawWrapper = ({
   });
 
   const { seedFirstPage, pages, addPage } = usePages(excalidrawAPI);
+  const toolMenu = useActiveToolMenu({ excalidrawAPI });
+  const [isPagePanelOpen, setIsPagePanelOpen] = useState(true);
+  const openDocs = useOpenDocs(docId ?? undefined);
+  const { preference: themePreference, setPreference: setThemePreference } =
+    useDarkMode();
+
+  const onActivateTab = useCallback(
+    (id: string) => {
+      window.history.pushState({}, "", `/d/${encodeURIComponent(id)}`);
+      openDocs.actions.activate(id);
+      // the editor is keyed on docId, so navigating remounts it
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    },
+    [openDocs.actions],
+  );
+
+  const onCloseTab = useCallback(
+    (id: string) => {
+      openDocs.actions.close(id);
+    },
+    [openDocs.actions],
+  );
 
   // 1-based page under the viewport centre, for the export dialog's
   // "current page" option. Keyed off `paperView` so it tracks scrolling.
@@ -449,15 +465,6 @@ const ExcalidrawWrapper = ({
     });
   }, [excalidrawAPI, docId, seedFirstPage]);
 
-  // show the page strip by default; a notebook's page list is not something
-  // the user should have to go looking for
-  useEffect(() => {
-    if (!excalidrawAPI) {
-      return;
-    }
-    excalidrawAPI.toggleSidebar({ name: "goodnotes-pages", force: true });
-  }, [excalidrawAPI]);
-
   // flush any debounced scene write before the tab goes away
   useEffect(() => {
     const flush = () => void flushSceneSaves();
@@ -468,7 +475,7 @@ const ExcalidrawWrapper = ({
     };
   }, []);
 
-  const { editorTheme, appTheme, setAppTheme } = useHandleAppTheme();
+  const { editorTheme, appTheme, setAppTheme } = useDarkMode();
 
   const [langCode, setLangCode] = useAppLangCode();
 
@@ -1060,255 +1067,40 @@ const ExcalidrawWrapper = ({
   return (
     <div
       style={{ height: "100%", position: "relative" }}
-      className={clsx("excalidraw-app", {
+      className={clsx("excalidraw-app", "gn-shell-layout", {
         "is-collaborating": isCollaborating,
       })}
     >
-      <PaperBackgroundLayer
-        elements={paperView.elements}
-        scrollX={paperView.scrollX}
-        scrollY={paperView.scrollY}
-        zoom={paperView.zoom}
-        theme={paperView.theme}
-        offsetLeft={paperView.offsetLeft}
-        offsetTop={paperView.offsetTop}
-        // Resolve by frame id, not by `page.index`: the paper module derives
-        // that index from the frame NAME (so "page:1" gives 1), while the
-        // pages module's index accessors are 0-based array positions. Going
-        // through the id sidesteps the mismatch entirely.
-        templateForPage={(page) => {
-          const frame = paperView.elements.find((el) => el.id === page.id);
-          return frame && isPageFrame(frame)
-            ? getPageTemplate(frame)
-            : undefined;
-        }}
-      />
-      <Excalidraw
-        viewportStatusFrame={viewportStatusFrame}
-        userToFollow={userToFollow}
-        onChange={onChange}
-        onExport={onExport}
-        initialData={initialStatePromiseRef.current.promise}
-        isCollaborating={isCollaborating}
-        onPointerUpdate={collabAPI?.onPointerUpdate}
-        UIOptions={{
-          canvasActions: {
-            toggleTheme: true,
-            export: {
-              onExportToBackend,
-            },
-          },
-        }}
-        langCode={langCode}
-        renderCustomStats={renderCustomStats}
-        detectScroll={false}
-        handleKeyboardGlobally={true}
-        autoFocus={true}
+      {/* band 1 — document tabs */}
+      <TabBar
+        tabs={openDocs.tabs}
+        activeId={openDocs.activeId}
         theme={editorTheme}
-        onThemeChange={setAppTheme}
-        renderTopRightUI={(isMobile) => {
-          if (isMobile || !collabAPI || !isCollabAvailable) {
-            return null;
-          }
-
-          return (
-            <div className="excalidraw-ui-top-right">
-              {collabError.message && <CollabError collabError={collabError} />}
-              <LiveCollaborationTrigger
-                isCollaborating={isCollaborating}
-                onSelect={() =>
-                  setShareDialogState({ isOpen: true, type: "share" })
-                }
-                editorInterface={editorInterface}
-              />
-            </div>
-          );
-        }}
-        onLinkOpen={(element, event) => {
-          if (element.link && isElementLink(element.link)) {
-            event.preventDefault();
-            excalidrawAPI?.setViewport({
-              target: element.link,
-              fit: "scale-down",
-              animation: true,
-            });
-          }
-        }}
-      >
-        <AppMainMenu
-          onCollabDialogOpen={onCollabDialogOpen}
-          isCollaborating={isCollaborating}
-          isCollabEnabled={isCollabAvailable}
-          theme={appTheme}
-          refresh={() => forceRefresh((prev) => !prev)}
-          onExportPdf={() => setIsPdfExportOpen(true)}
-          onCloseDocument={onCloseDocument}
-        />
-        <AppWelcomeScreen
-          onCollabDialogOpen={onCollabDialogOpen}
-          isCollabEnabled={isCollabAvailable}
-        />
-        <OverwriteConfirmDialog>
-          <OverwriteConfirmDialog.Actions.ExportToImage />
-          <OverwriteConfirmDialog.Actions.SaveToDisk />
-        </OverwriteConfirmDialog>
-        <AppFooter onChange={() => excalidrawAPI?.refresh()} />
-        {excalidrawAPI && <AIComponents excalidrawAPI={excalidrawAPI} />}
-
-        {/* GoodNotes layer. The tray goes in <Footer>, a real Excalidraw
-            slot: as a bare child it joined the container's layout flow and
-            pushed the static canvas sideways by its own width. Footer also
-            keeps it inside `.excalidraw`, where the CSS custom properties
-            it uses are scoped. */}
-        <Footer>
-          <PenTray excalidrawAPI={excalidrawAPI} />
-        </Footer>
-        {excalidrawAPI && (
-          <Sidebar name="goodnotes-pages" docked onDock={() => {}}>
-            <Sidebar.Header />
-            <PageSidebar excalidrawAPI={excalidrawAPI} />
-          </Sidebar>
-        )}
-
-        <TTDDialogTrigger />
-        {isCollaborating && isOffline && (
-          <div className="alertalert--warning">
-            {t("alerts.collabOfflineWarning")}
-          </div>
-        )}
-        {localStorageQuotaExceeded && (
-          <div className="alert alert--danger">
-            {t("alerts.localStorageQuotaExceeded")}
-          </div>
-        )}
-        {latestShareableLink && (
-          <ShareableLinkDialog
-            link={latestShareableLink}
-            onCloseRequest={() => setLatestShareableLink(null)}
-            setErrorMessage={setErrorMessage}
-          />
-        )}
-        {excalidrawAPI && !isCollabDisabled && (
-          <Collab excalidrawAPI={excalidrawAPI} />
-        )}
-
-        <ShareDialog
-          collabAPI={collabAPI}
-          onExportToBackend={async () => {
-            if (excalidrawAPI) {
-              try {
-                await onExportToBackend(
-                  excalidrawAPI.getSceneElements(),
-                  excalidrawAPI.getAppState(),
-                  excalidrawAPI.getFiles(),
-                );
-              } catch (error: any) {
-                setErrorMessage(error.message);
-              }
-            }
-          }}
-        />
-
-        <AppSidebar />
-
-        {errorMessage && (
-          <ErrorDialog onClose={() => setErrorMessage("")}>
-            {errorMessage}
-          </ErrorDialog>
-        )}
-
-        <CommandPalette
-          customCommandPaletteItems={[
-            {
-              label: t("labels.liveCollaboration"),
-              category: DEFAULT_CATEGORIES.app,
-              predicate: isCollabAvailable,
-              keywords: [
-                "team",
-                "multiplayer",
-                "share",
-                "public",
-                "session",
-                "invite",
-              ],
-              icon: usersIcon,
-              perform: () => {
-                setShareDialogState({
-                  isOpen: true,
-                  type: "collaborationOnly",
-                });
-              },
-            },
-            {
-              label: t("roomDialog.button_stopSession"),
-              category: DEFAULT_CATEGORIES.app,
-              predicate: () => !!collabAPI?.isCollaborating(),
-              keywords: [
-                "stop",
-                "session",
-                "end",
-                "leave",
-                "close",
-                "exit",
-                "collaboration",
-              ],
-              perform: () => {
-                if (collabAPI) {
-                  collabAPI.stopCollaboration();
-                  if (!collabAPI.isCollaborating()) {
-                    setShareDialogState({ isOpen: false });
-                  }
-                }
-              },
-            },
-            {
-              label: t("labels.share"),
-              category: DEFAULT_CATEGORIES.app,
-              predicate: isCollabAvailable,
-              icon: share,
-              keywords: [
-                "link",
-                "shareable",
-                "readonly",
-                "export",
-                "publish",
-                "snapshot",
-                "url",
-                "collaborate",
-                "invite",
-              ],
-              perform: async () => {
-                setShareDialogState({ isOpen: true, type: "share" });
-              },
-            },
-            {
-              label: t("labels.installPWA"),
-              category: DEFAULT_CATEGORIES.app,
-              predicate: () => !!pwaEvent,
-              perform: () => {
-                if (pwaEvent) {
-                  pwaEvent.prompt();
-                  pwaEvent.userChoice.then(() => {
-                    // event cannot be reused, but we'll hopefully
-                    // grab new one as the event should be fired again
-                    pwaEvent = null;
-                  });
-                }
-              },
-            },
-          ]}
-        />
-        {isVisualDebuggerEnabled() && excalidrawAPI && (
-          <DebugCanvas
-            appState={excalidrawAPI.getAppState()}
-            scale={window.devicePixelRatio}
-            ref={debugCanvasRef}
-          />
-        )}
-      </Excalidraw>
-      <Taskbar
+        onActivate={onActivateTab}
+        onClose={onCloseTab}
+        onReorder={openDocs.actions.reorder}
+        onCloseOthers={openDocs.actions.closeOthers}
+        onNewTab={onCloseDocument}
+      />
+      {/* band 2 — the one nav bar */}
+      <NavBar
         excalidrawAPI={excalidrawAPI}
-        suppressDefaultToolbar
+        suppressDefaultChrome
+        theme={editorTheme}
+        pagePanelOpen={isPagePanelOpen}
+        onTogglePagePanel={() => setIsPagePanelOpen((v) => !v)}
+        // the bar knows more tools than the menu has panels for
+        onActiveToolMenu={(tool, anchor) => {
+          if (
+            tool === "pen" ||
+            tool === "highlighter" ||
+            tool === "eraser" ||
+            tool === "shape" ||
+            tool === "text"
+          ) {
+            toolMenu.onToolSelect(tool, anchor);
+          }
+        }}
         onFuzzySelect={() => {
           backdrops.close();
           toggleFuzzySelect();
@@ -1332,7 +1124,275 @@ const ExcalidrawWrapper = ({
         onAddPage={() => addPage()}
         pageCount={pages.length}
         currentPage={currentPageNumber ?? undefined}
+        moreItems={[
+          {
+            id: "theme",
+            label:
+              themePreference === "dark"
+                ? "Theme: Dark"
+                : themePreference === "light"
+                ? "Theme: Light"
+                : "Theme: Auto",
+            onSelect: () =>
+              setThemePreference(
+                themePreference === "light"
+                  ? "dark"
+                  : themePreference === "dark"
+                  ? "system"
+                  : "light",
+              ),
+          },
+        ]}
       />
+      {/* band 3 — page panel + canvas */}
+      <div className="gn-shell-body">
+        <PagePanel
+          open={isPagePanelOpen}
+          onClose={() => setIsPagePanelOpen(false)}
+          theme={editorTheme}
+          excalidrawAPI={excalidrawAPI}
+        />
+        <div className="gn-shell-canvas">
+          <PaperBackgroundLayer
+            elements={paperView.elements}
+            scrollX={paperView.scrollX}
+            scrollY={paperView.scrollY}
+            zoom={paperView.zoom}
+            theme={paperView.theme}
+            // The layer is a sibling of <Excalidraw> inside .gn-shell-canvas,
+            // so it already shares the editor canvas's box.
+            // appState.offsetLeft/Top measure that box from the VIEWPORT, so
+            // passing them here shifts the paper a second time.
+            offsetLeft={0}
+            offsetTop={0}
+            // Resolve by frame id, not by `page.index`: the paper module derives
+            // that index from the frame NAME (so "page:1" gives 1), while the
+            // pages module's index accessors are 0-based array positions. Going
+            // through the id sidesteps the mismatch entirely.
+            templateForPage={(page) => {
+              const frame = paperView.elements.find((el) => el.id === page.id);
+              return frame && isPageFrame(frame)
+                ? getPageTemplate(frame)
+                : undefined;
+            }}
+          />
+          <Excalidraw
+            viewportStatusFrame={viewportStatusFrame}
+            userToFollow={userToFollow}
+            onChange={onChange}
+            onExport={onExport}
+            initialData={initialStatePromiseRef.current.promise}
+            isCollaborating={isCollaborating}
+            onPointerUpdate={collabAPI?.onPointerUpdate}
+            UIOptions={{
+              canvasActions: {
+                toggleTheme: true,
+                export: {
+                  onExportToBackend,
+                },
+              },
+            }}
+            langCode={langCode}
+            renderCustomStats={renderCustomStats}
+            detectScroll={false}
+            handleKeyboardGlobally={true}
+            autoFocus={true}
+            theme={editorTheme}
+            // Dark mode is a VIEWING mode. Without this the editor mirrors the
+            // view theme into appState.exportWithDarkMode and every exported
+            // PNG/SVG — and so every submitted PDF — comes out black.
+            exportTheme="light"
+            onThemeChange={setAppTheme}
+            renderTopRightUI={(isMobile) => {
+              if (isMobile || !collabAPI || !isCollabAvailable) {
+                return null;
+              }
+
+              return (
+                <div className="excalidraw-ui-top-right">
+                  {collabError.message && (
+                    <CollabError collabError={collabError} />
+                  )}
+                  <LiveCollaborationTrigger
+                    isCollaborating={isCollaborating}
+                    onSelect={() =>
+                      setShareDialogState({ isOpen: true, type: "share" })
+                    }
+                    editorInterface={editorInterface}
+                  />
+                </div>
+              );
+            }}
+            onLinkOpen={(element, event) => {
+              if (element.link && isElementLink(element.link)) {
+                event.preventDefault();
+                excalidrawAPI?.setViewport({
+                  target: element.link,
+                  fit: "scale-down",
+                  animation: true,
+                });
+              }
+            }}
+          >
+            <AppMainMenu
+              onCollabDialogOpen={onCollabDialogOpen}
+              isCollaborating={isCollaborating}
+              isCollabEnabled={isCollabAvailable}
+              theme={appTheme}
+              refresh={() => forceRefresh((prev) => !prev)}
+              onExportPdf={() => setIsPdfExportOpen(true)}
+              onCloseDocument={onCloseDocument}
+            />
+            <AppWelcomeScreen
+              onCollabDialogOpen={onCollabDialogOpen}
+              isCollabEnabled={isCollabAvailable}
+            />
+            <OverwriteConfirmDialog>
+              <OverwriteConfirmDialog.Actions.ExportToImage />
+              <OverwriteConfirmDialog.Actions.SaveToDisk />
+            </OverwriteConfirmDialog>
+            <AppFooter onChange={() => excalidrawAPI?.refresh()} />
+            {excalidrawAPI && <AIComponents excalidrawAPI={excalidrawAPI} />}
+
+            <TTDDialogTrigger />
+            {isCollaborating && isOffline && (
+              <div className="alertalert--warning">
+                {t("alerts.collabOfflineWarning")}
+              </div>
+            )}
+            {localStorageQuotaExceeded && (
+              <div className="alert alert--danger">
+                {t("alerts.localStorageQuotaExceeded")}
+              </div>
+            )}
+            {latestShareableLink && (
+              <ShareableLinkDialog
+                link={latestShareableLink}
+                onCloseRequest={() => setLatestShareableLink(null)}
+                setErrorMessage={setErrorMessage}
+              />
+            )}
+            {excalidrawAPI && !isCollabDisabled && (
+              <Collab excalidrawAPI={excalidrawAPI} />
+            )}
+
+            <ShareDialog
+              collabAPI={collabAPI}
+              onExportToBackend={async () => {
+                if (excalidrawAPI) {
+                  try {
+                    await onExportToBackend(
+                      excalidrawAPI.getSceneElements(),
+                      excalidrawAPI.getAppState(),
+                      excalidrawAPI.getFiles(),
+                    );
+                  } catch (error: any) {
+                    setErrorMessage(error.message);
+                  }
+                }
+              }}
+            />
+
+            <AppSidebar />
+
+            {errorMessage && (
+              <ErrorDialog onClose={() => setErrorMessage("")}>
+                {errorMessage}
+              </ErrorDialog>
+            )}
+
+            <CommandPalette
+              customCommandPaletteItems={[
+                {
+                  label: t("labels.liveCollaboration"),
+                  category: DEFAULT_CATEGORIES.app,
+                  predicate: isCollabAvailable,
+                  keywords: [
+                    "team",
+                    "multiplayer",
+                    "share",
+                    "public",
+                    "session",
+                    "invite",
+                  ],
+                  icon: usersIcon,
+                  perform: () => {
+                    setShareDialogState({
+                      isOpen: true,
+                      type: "collaborationOnly",
+                    });
+                  },
+                },
+                {
+                  label: t("roomDialog.button_stopSession"),
+                  category: DEFAULT_CATEGORIES.app,
+                  predicate: () => !!collabAPI?.isCollaborating(),
+                  keywords: [
+                    "stop",
+                    "session",
+                    "end",
+                    "leave",
+                    "close",
+                    "exit",
+                    "collaboration",
+                  ],
+                  perform: () => {
+                    if (collabAPI) {
+                      collabAPI.stopCollaboration();
+                      if (!collabAPI.isCollaborating()) {
+                        setShareDialogState({ isOpen: false });
+                      }
+                    }
+                  },
+                },
+                {
+                  label: t("labels.share"),
+                  category: DEFAULT_CATEGORIES.app,
+                  predicate: isCollabAvailable,
+                  icon: share,
+                  keywords: [
+                    "link",
+                    "shareable",
+                    "readonly",
+                    "export",
+                    "publish",
+                    "snapshot",
+                    "url",
+                    "collaborate",
+                    "invite",
+                  ],
+                  perform: async () => {
+                    setShareDialogState({ isOpen: true, type: "share" });
+                  },
+                },
+                {
+                  label: t("labels.installPWA"),
+                  category: DEFAULT_CATEGORIES.app,
+                  predicate: () => !!pwaEvent,
+                  perform: () => {
+                    if (pwaEvent) {
+                      pwaEvent.prompt();
+                      pwaEvent.userChoice.then(() => {
+                        // event cannot be reused, but we'll hopefully
+                        // grab new one as the event should be fired again
+                        pwaEvent = null;
+                      });
+                    }
+                  },
+                },
+              ]}
+            />
+            {isVisualDebuggerEnabled() && excalidrawAPI && (
+              <DebugCanvas
+                appState={excalidrawAPI.getAppState()}
+                scale={window.devicePixelRatio}
+                ref={debugCanvasRef}
+              />
+            )}
+          </Excalidraw>
+        </div>
+      </div>
+      <ToolMenu {...toolMenu.menuProps} />
       <FuzzySelectOverlay excalidrawAPI={excalidrawAPI} />
       <BackdropPanel {...backdrops.panelProps} />
       {isPdfImportOpen && excalidrawAPI && (
@@ -1381,7 +1441,7 @@ const GoodNotesRoot = () => {
   });
   // the editor, not the shelf, is what a shared link resolves to
   const [isTransientScene] = useState(hasTransientSceneInUrl);
-  const { editorTheme } = useHandleAppTheme();
+  const { editorTheme } = useDarkMode();
 
   const openDocument = useCallback((doc: DocMeta) => {
     window.history.pushState({}, "", `/d/${encodeURIComponent(doc.id)}`);

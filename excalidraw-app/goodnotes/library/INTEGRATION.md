@@ -2,8 +2,7 @@
 
 Everything below is a change the **integrator** makes. Nothing in `goodnotes/library/` needs to be edited to wire this up.
 
-> **If you already integrated the previous version of this module: there is nothing to change.**
-> `<Shelf theme={editorTheme} onOpenDocument={openDocument} />` is still the entry point, with the same props and the same behaviour. The restructure (sidebar, course folders, grid/list, favourites, in-app delete confirmation) is entirely internal. The only removed export is the internal `ShelfCard` type helper, which was never exported. Skip to §9 for the new optional props and exports.
+> **If you already integrated the previous version of this module: there is nothing to change.** > `<Shelf theme={editorTheme} onOpenDocument={openDocument} />` is still the entry point, with the same props and the same behaviour. The restructure (sidebar, course folders, grid/list, favourites, in-app delete confirmation) is entirely internal. The only removed export is the internal `ShelfCard` type helper, which was never exported. Skip to §9 for the new optional props and exports.
 
 ---
 
@@ -184,12 +183,12 @@ await setThumbnail(docId, dataUrl);
 <Shelf
   theme={editorTheme}
   onOpenDocument={openDocument}
-  defaultView="list"   // NEW, optional: "grid" (default) | "list"
-  headerExtra={<MyMenu />}  // unchanged
+  defaultView="list" // NEW, optional: "grid" (default) | "list"
+  headerExtra={<MyMenu />} // unchanged
 />
 ```
 
-`defaultView` is only the *initial* value. The user's last choice is remembered in `localStorage` under `goodnotes-library-view` and wins on subsequent loads.
+`defaultView` is only the _initial_ value. The user's last choice is remembered in `localStorage` under `goodnotes-library-view` and wins on subsequent loads.
 
 ### Screen anatomy
 
@@ -218,8 +217,8 @@ Starring a document appends the reserved tag **`"favourite"`** to `DocMeta.tags`
 ```ts
 import { visibleTags, isFavourite } from "./goodnotes/library";
 
-const chips = visibleTags(doc);       // user tags only
-const starred = isFavourite(doc);     // the flag
+const chips = visibleTags(doc); // user tags only
+const starred = isFavourite(doc); // the flag
 ```
 
 Rationale: a star is a one-bit label, and `tags` is the contract's label field. One source of truth means the flag can never drift from the document, `duplicateDoc` carries it for free, and `deleteDoc` (which this module must not change) needs no extra bookkeeping. The cost is that the literal tag name `favourite` is reserved.

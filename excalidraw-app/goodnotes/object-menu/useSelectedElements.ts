@@ -37,7 +37,10 @@ import type {
   ExcalidrawElement,
   NonDeletedExcalidrawElement,
 } from "@excalidraw/element/types";
-import type { AppState, ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import type {
+  AppState,
+  ExcalidrawImperativeAPI,
+} from "@excalidraw/excalidraw/types";
 
 /** The kinds of selection the menu knows how to build a bar for. */
 export type ObjectSelectionKind =

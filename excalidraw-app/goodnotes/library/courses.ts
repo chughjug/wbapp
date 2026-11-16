@@ -53,9 +53,30 @@ export const COURSE_COLOR_PRESETS: { value: string; label: string }[] = [
 
 /** Emoji offered by the folder customisation picker. */
 export const COURSE_EMOJI_PRESETS = [
-  "📘", "📗", "📙", "📕", "📓", "🧪", "🔬", "🧬",
-  "🧮", "📐", "📊", "💻", "⚙️", "🎨", "🎵", "🏛️",
-  "🌍", "🧠", "❤️", "⚖️", "🗣️", "✍️", "🏃", "⭐",
+  "📘",
+  "📗",
+  "📙",
+  "📕",
+  "📓",
+  "🧪",
+  "🔬",
+  "🧬",
+  "🧮",
+  "📐",
+  "📊",
+  "💻",
+  "⚙️",
+  "🎨",
+  "🎵",
+  "🏛️",
+  "🌍",
+  "🧠",
+  "❤️",
+  "⚖️",
+  "🗣️",
+  "✍️",
+  "🏃",
+  "⭐",
 ];
 
 /** Stable hex colour for a course that has never been customised. */
@@ -83,7 +104,9 @@ export const resolveCourseStyle = (
  * `#abc` / `abc` / `#AABBCC` -> `#aabbcc`. Returns null for anything else, so
  * a half-typed hex in the colour input never reaches storage or CSS.
  */
-export const normalizeHex = (value: string | undefined | null): string | null => {
+export const normalizeHex = (
+  value: string | undefined | null,
+): string | null => {
   if (!value) {
     return null;
   }
@@ -165,9 +188,7 @@ export const setCourseStyle = async (
   const current = (await listCourseStyles())[key];
   const next: CourseStyle = {
     color:
-      normalizeHex(patch.color) ??
-      current?.color ??
-      defaultCourseColor(key),
+      normalizeHex(patch.color) ?? current?.color ?? defaultCourseColor(key),
     emoji:
       patch.emoji === undefined ? current?.emoji ?? null : patch.emoji || null,
   };
@@ -209,7 +230,10 @@ export const useCourseStyles = (): UseCourseStylesResult => {
           }
         })
         .catch((error: any) => {
-          console.error("goodnotes/library: failed to read course styles", error);
+          console.error(
+            "goodnotes/library: failed to read course styles",
+            error,
+          );
         });
     };
     read();

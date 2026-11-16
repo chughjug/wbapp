@@ -75,6 +75,7 @@ import { useSelectedElements } from "./useSelectedElements";
 import "./ObjectMenu.scss";
 
 import type { ObjectSelection } from "./useSelectedElements";
+
 import type {
   ExcalidrawFreeDrawElement,
   ExcalidrawImageElement,
@@ -129,7 +130,10 @@ const computePlacement = (
   let left = centerX - size.width / 2;
   left = Math.min(
     Math.max(left, canvasLeft + VIEWPORT_MARGIN),
-    Math.max(canvasLeft + VIEWPORT_MARGIN, canvasRight - size.width - VIEWPORT_MARGIN),
+    Math.max(
+      canvasLeft + VIEWPORT_MARGIN,
+      canvasRight - size.width - VIEWPORT_MARGIN,
+    ),
   );
 
   const above = box.y1 - MENU_GAP - size.height;
@@ -139,7 +143,10 @@ const computePlacement = (
 
   top = Math.min(
     Math.max(top, canvasTop + VIEWPORT_MARGIN),
-    Math.max(canvasTop + VIEWPORT_MARGIN, canvasBottom - size.height - VIEWPORT_MARGIN),
+    Math.max(
+      canvasTop + VIEWPORT_MARGIN,
+      canvasBottom - size.height - VIEWPORT_MARGIN,
+    ),
   );
 
   return { left, top, placement };
@@ -291,7 +298,9 @@ export const ObjectMenu = ({
       if (!buttons.length) {
         return;
       }
-      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const index = buttons.indexOf(
+        document.activeElement as HTMLButtonElement,
+      );
       event.preventDefault();
       const next =
         event.key === "Home"
@@ -363,7 +372,9 @@ export const ObjectMenu = ({
       <MenuButton
         key="crop"
         label="Crop"
-        onClick={() => run("crop", () => startCropping(excalidrawAPI, image.id))}
+        onClick={() =>
+          run("crop", () => startCropping(excalidrawAPI, image.id))
+        }
       />,
       <MenuButton
         key="replace"

@@ -194,9 +194,7 @@ body.gn-shell-page-panel-open {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  body.gn-shell-page-panel-open
-    .excalidraw
-    .layer-ui__wrapper__footer-left {
+  body.gn-shell-page-panel-open .excalidraw .layer-ui__wrapper__footer-left {
     transition: none;
   }
 }

@@ -45,7 +45,8 @@ export const ICON_CALENDAR =
   "M4 8h16M7 3v3m10-3v3M5 21h14a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1z";
 export const ICON_FILES =
   "M4 6a1 1 0 0 1 1-1h4l2 2h8a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6z";
-export const ICON_GRID = "M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z";
+export const ICON_GRID =
+  "M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z";
 export const ICON_LIST = "M4 6h16M4 12h16M4 18h16";
 export const ICON_CHEVRON_DOWN = "M6 9l6 6 6-6";
 export const ICON_DATABASE =

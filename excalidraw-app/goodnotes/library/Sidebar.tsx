@@ -214,7 +214,9 @@ export const Sidebar = ({
               className="gn-sidebar__meter"
               role="img"
               aria-label={`${formatBytes(estimate.usage)} used${
-                estimate.quota ? ` of ${formatBytes(estimate.quota)} available` : ""
+                estimate.quota
+                  ? ` of ${formatBytes(estimate.quota)} available`
+                  : ""
               }`}
             >
               <span

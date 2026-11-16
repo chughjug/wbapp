@@ -56,7 +56,7 @@ export const SHAPE_TOOL_TYPES = [
   "line",
 ] as const;
 
-export type ToolMenuShapeId = (typeof SHAPE_TOOL_TYPES)[number];
+export type ToolMenuShapeId = typeof SHAPE_TOOL_TYPES[number];
 
 const SHAPE_TOOL_SET: ReadonlySet<string> = new Set(SHAPE_TOOL_TYPES);
 

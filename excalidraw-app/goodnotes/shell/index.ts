@@ -68,10 +68,7 @@ export type { NavBarProps, ShellMode, ShellPlacement } from "./NavBar";
  * added while the page panel is open. Both are removed on unmount — the
  * suppression is opt-in and reversible.
  */
-export {
-  SUPPRESS_DEFAULT_CHROME_CLASS,
-  PAGE_PANEL_OPEN_CLASS,
-} from "./NavBar";
+export { SUPPRESS_DEFAULT_CHROME_CLASS, PAGE_PANEL_OPEN_CLASS } from "./NavBar";
 
 /** The left page rail. Wraps `goodnotes/pages`' `PageSidebar`. */
 export { PagePanel, PAGE_PANEL_WIDTH } from "./PagePanel";

@@ -1,8 +1,6 @@
 # `goodnotes/taskbar` — superseded by `goodnotes/shell`
 
-The single centred taskbar this folder used to export has been replaced by the
-three-zone navigation bar in [`../shell`](../shell/INTEGRATION.md). Follow that
-file for the `App.tsx` changes.
+The single centred taskbar this folder used to export has been replaced by the three-zone navigation bar in [`../shell`](../shell/INTEGRATION.md). Follow that file for the `App.tsx` changes.
 
 ## What is left here (and still maintained)
 
@@ -30,9 +28,4 @@ So the existing `App.tsx` line
 import { Taskbar } from "./goodnotes/taskbar";
 ```
 
-keeps compiling and renders the new bar — as a floating, viewport-fixed bar
-(`placement="fixed"`, the legacy default; `NavBar`'s own default is `"flow"`,
-a band in the host's layout) and with the left zone empty until you pass its
-callbacks. The alias is deprecated: migrate the call site to
-`NavBar` + `PagePanel` as described in `../shell/INTEGRATION.md`, after which
-nothing should import `Taskbar` any more.
+keeps compiling and renders the new bar — as a floating, viewport-fixed bar (`placement="fixed"`, the legacy default; `NavBar`'s own default is `"flow"`, a band in the host's layout) and with the left zone empty until you pass its callbacks. The alias is deprecated: migrate the call site to `NavBar` + `PagePanel` as described in `../shell/INTEGRATION.md`, after which nothing should import `Taskbar` any more.

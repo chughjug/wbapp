@@ -126,7 +126,11 @@ const CustomisePopover = ({
         <span className="gn-field__label" id={`${id}-colour`}>
           Folder colour
         </span>
-        <div className="gn-swatches" role="group" aria-labelledby={`${id}-colour`}>
+        <div
+          className="gn-swatches"
+          role="group"
+          aria-labelledby={`${id}-colour`}
+        >
           {COURSE_COLOR_PRESETS.map((preset) => {
             const selected = preset.value === normalizeHex(style.color);
             return (
@@ -143,7 +147,9 @@ const CustomisePopover = ({
                 aria-label={preset.label}
                 onClick={() => onSetColor(course, preset.value)}
               >
-                {selected && <span className="gn-swatch__tick" aria-hidden="true" />}
+                {selected && (
+                  <span className="gn-swatch__tick" aria-hidden="true" />
+                )}
               </button>
             );
           })}
@@ -201,7 +207,11 @@ const CustomisePopover = ({
         <span className="gn-field__label" id={`${id}-emoji`}>
           Folder icon
         </span>
-        <div className="gn-emoji-grid" role="group" aria-labelledby={`${id}-emoji`}>
+        <div
+          className="gn-emoji-grid"
+          role="group"
+          aria-labelledby={`${id}-emoji`}
+        >
           <button
             type="button"
             className={`gn-emoji${!style.emoji ? " gn-emoji--selected" : ""}`}
