@@ -4,7 +4,7 @@ One page at a time, filling the workspace, with swipe / arrow keys / the shell's
 
 > **Changed (chrome reduction):** the permanent bottom bar (prev / "Page N of M" / next, 1194×36 = 42,984 px²) is gone. It duplicated the page count the shell's bar already shows.
 >
-> - `<PagedViewControls {...paged.controlsProps} />` now renders **only the visually-hidden `aria-live` region** (1×1, absolutely positioned — zero layout area). Keep rendering it: it is what announces "Page 2 of 7" for *every* route to a page, including the flick and the arrow keys. Pass `controls` to get the old visible strip back.
+> - `<PagedViewControls {...paged.controlsProps} />` now renders **only the visually-hidden `aria-live` region** (1×1, absolutely positioned — zero layout area). Keep rendering it: it is what announces "Page 2 of 7" for _every_ route to a page, including the flick and the arrow keys. Pass `controls` to get the old visible strip back.
 > - The capability moved, not away: `paged.prev()`, `paged.next()`, `paged.goToPage(i)` on the hook drive the same controller, and the keyboard routes (←/→/↑/↓, PageUp/PageDown, Home/End) are installed by the controller and untouched.
 > - The paged/continuous switch is **only** in Settings → View mode now; `controlsProps` no longer carries `mode` / `onToggleMode`. Both read and write the same `goodnotes:view-mode` store (`loadViewMode` / `saveViewMode` / `subscribeViewMode`), so the control and the controller stay in step.
 
@@ -182,6 +182,24 @@ The desk colour is _sampled_ from the rendered paper-layer canvas, because this 
 | drawing | freedraw through the matte works and binds to the page frame |
 
 ---
+
+## 6b. The view-mode override (added for `goodnotes/surface`)
+
+`ViewMode` is still exactly `"paged" | "continuous"`, and Settings → View mode still reads and writes `loadViewMode` / `saveViewMode` / `subscribeViewMode` unchanged. What is new is an **override** on top of that store, for documents that are not made of paper at all (whiteboard mode, `goodnotes/surface`): paged view has no page to fit, so it must stand down while such a document is open.
+
+```ts
+import {
+  getEffectiveViewMode, // override ?? stored preference — what the viewport obeys
+  getViewModeOverride, // the override itself, or null
+  setViewModeOverride, // install / remove it; returns the effective mode
+  subscribeEffectiveViewMode, // fires on stored-preference AND override changes
+} from "./goodnotes/paged";
+```
+
+- The override is **never persisted**. The user's paged/continuous choice survives opening a whiteboard and is in force again the moment a paper document is opened.
+- The controller now follows `getEffectiveViewMode()` / `subscribeEffectiveViewMode()`; `usePagedView`'s initial state does too. `paged.setPaged()` / `togglePaged()` still write the user's preference, but while an override is installed the viewport stays on the override (the preference takes effect when it is removed).
+- `goodnotes/surface`'s `useSurface` installs and removes the override for you (and clears it on unmount). A host that wants its own non-paper surface can call `setViewModeOverride("continuous")` directly.
+- Measured: entering whiteboard mode removes `appState.scrollConstraints` (the lock) and the matte within one frame; leaving it re-installs both and re-fits the page under the viewport centre.
 
 ## 7. Known gaps / fragile bits
 

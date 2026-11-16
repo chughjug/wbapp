@@ -87,6 +87,18 @@ export {
   subscribeViewMode,
   resetViewModeCache,
 } from "./mode";
+
+/**
+ * The override a non-paper document installs (see `goodnotes/surface`): the
+ * controller follows `getEffectiveViewMode()`, while Settings keeps reading
+ * and writing the stored preference above.
+ */
+export {
+  getEffectiveViewMode,
+  getViewModeOverride,
+  setViewModeOverride,
+  subscribeEffectiveViewMode,
+} from "./mode";
 export type { ViewMode } from "./mode";
 
 /**

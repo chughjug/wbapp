@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import { attachPagedView } from "./controller";
-import { loadViewMode } from "./mode";
+import { getEffectiveViewMode } from "./mode";
 
 import type {
   AttachPagedViewOptions,
@@ -87,8 +87,8 @@ export interface UsePagedViewResult {
 }
 
 const INITIAL_STATE = (): PagedViewState => ({
-  mode: loadViewMode(),
-  isPaged: loadViewMode() === "paged",
+  mode: getEffectiveViewMode(),
+  isPaged: getEffectiveViewMode() === "paged",
   pageIndex: -1,
   pageCount: 0,
   isZoomedIn: false,

@@ -61,9 +61,9 @@ import {
 
 import { createPageMatte } from "./matte";
 import {
-  loadViewMode,
+  getEffectiveViewMode,
   saveViewMode,
-  subscribeViewMode,
+  subscribeEffectiveViewMode,
   type ViewMode,
 } from "./mode";
 import {
@@ -206,7 +206,7 @@ export const attachPagedView = (
   const matte =
     options.matte === false ? null : createPageMatte(doc, getContainer);
 
-  let mode: ViewMode = loadViewMode();
+  let mode: ViewMode = getEffectiveViewMode();
   let destroyed = false;
   /** The frame we are following. Survives reorder; index is derived from it. */
   let currentFrameId: string | null = null;
@@ -601,13 +601,16 @@ export const attachPagedView = (
   // --- mode ----------------------------------------------------------------
 
   const applyMode = (next: ViewMode, { persist }: { persist: boolean }) => {
-    if (mode === next) {
-      return;
-    }
-    mode = next;
     if (persist) {
+      // record the user's preference first; the effective mode may still be
+      // pinned to "continuous" by a whiteboard document's override
       saveViewMode(next);
     }
+    const effective = getEffectiveViewMode();
+    if (mode === effective) {
+      return;
+    }
+    mode = effective;
     if (mode === "paged") {
       const pages = pagesNow();
       const centred =
@@ -623,7 +626,7 @@ export const attachPagedView = (
     options.onState?.(getState());
   };
 
-  const unsubscribeMode = subscribeViewMode((next) =>
+  const unsubscribeMode = subscribeEffectiveViewMode((next) =>
     applyMode(next, { persist: false }),
   );
 
