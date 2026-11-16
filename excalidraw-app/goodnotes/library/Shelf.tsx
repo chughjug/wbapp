@@ -35,6 +35,7 @@ import {
   isArchived,
   isDueThisWeek,
   isFavourite,
+  hasUserTag,
   isInView,
   isPinned,
   isRecent,
@@ -44,6 +45,7 @@ import {
 import {
   coursePathLabel,
   formatCoursePath,
+  isInCourseTree,
   normalizeCoursePath,
 } from "./coursePath";
 import { useSelection } from "./selection";
@@ -327,12 +329,24 @@ export const Shelf = ({
       course ? map.get(course) ?? courseStyles.styleOf(course) : null;
   }, [courseRows, courseStyles]);
 
-  // a filter whose course disappeared (last document moved/deleted) resets
+  // A filter whose subject disappeared (last document moved, tag deleted)
+  // resets. For courses this must test the whole sub-tree, not the exact
+  // string: "MATH 221" is a real, selectable node even when every document
+  // lives in "MATH 221 / Problem sets".
   useEffect(() => {
-    if (filter.kind === "course" && !courses.includes(filter.course)) {
+    if (
+      filter.kind === "course" &&
+      !documents.some((doc) => isInCourseTree(doc.course, filter.course))
+    ) {
       setFilter(FILTER_ALL);
     }
-  }, [filter, courses]);
+    if (
+      filter.kind === "tag" &&
+      !documents.some((doc) => hasUserTag(doc, filter.tag))
+    ) {
+      setFilter(FILTER_ALL);
+    }
+  }, [filter, documents]);
 
   const visible = useMemo(() => {
     return documents
