@@ -75,6 +75,7 @@ import { NavBar, PagePanel } from "./goodnotes/shell";
 import { TabBar, useOpenDocs } from "./goodnotes/tabs";
 import { ToolMenu, useActiveToolMenu } from "./goodnotes/tool-menu";
 import { ObjectMenu } from "./goodnotes/object-menu";
+import { useGraphDialog } from "./goodnotes/graph";
 import { useInputGestures } from "./goodnotes/input";
 import { useSettingsScreen } from "./goodnotes/settings";
 import {
@@ -101,6 +102,7 @@ import {
 import { PaperBackgroundLayer } from "./goodnotes/paper";
 import { PagedViewControls, usePagedView } from "./goodnotes/paged";
 import { Dashboard } from "./goodnotes/dashboard";
+import { CourseBrowser, useCanvasConnect } from "./goodnotes/canvas";
 import {
   createDoc,
   getScene,
@@ -431,6 +433,7 @@ const ExcalidrawWrapper = ({
   const toolMenu = useActiveToolMenu({ excalidrawAPI });
   // palm rejection, page flick and tap gestures go live from here
   const input = useInputGestures(excalidrawAPI);
+  const graph = useGraphDialog(excalidrawAPI);
   // one page at a time, fitted to the workspace; swipe/arrows move between
   const paged = usePagedView(excalidrawAPI);
   const [isPagePanelOpen, setIsPagePanelOpen] = useState(true);
@@ -1161,6 +1164,11 @@ const ExcalidrawWrapper = ({
         currentPage={currentPageNumber ?? undefined}
         moreItems={[
           {
+            id: "insert-graph",
+            label: "Insert graph…",
+            onSelect: () => graph.open(),
+          },
+          {
             id: "settings",
             label: "Settings…",
             onSelect: () => settings.open(),
@@ -1423,6 +1431,7 @@ const ExcalidrawWrapper = ({
           lasso overlay is active; it does not need hiding for the tool menu,
           because selecting an object switches to the selection tool, which
           the tool menu has no panel for and closes on. */}
+      {graph.dialog}
       {settings.screen}
       {settings.firstRunHint}
       <PagedViewControls {...paged.controlsProps} />
@@ -1482,7 +1491,11 @@ const GoodNotesRoot = () => {
   const [isTransientScene] = useState(hasTransientSceneInUrl);
   // a PDF arriving from the OS share sheet
   const [isShareTarget, setIsShareTarget] = useState(isShareTargetUrl);
+  const [isCanvasRoute, setIsCanvasRoute] = useState(
+    () => window.location.pathname === "/canvas",
+  );
   const { editorTheme } = useDarkMode();
+  const canvasConnect = useCanvasConnect({ theme: editorTheme });
 
   const openDocument = useCallback((doc: DocMeta) => {
     window.history.pushState({}, "", `/d/${encodeURIComponent(doc.id)}`);
@@ -1510,6 +1523,7 @@ const GoodNotesRoot = () => {
       const match = window.location.pathname.match(/^\/d\/([^/]+)$/);
       setDocId(match ? decodeURIComponent(match[1]) : null);
       setIsShareTarget(isShareTargetUrl());
+      setIsCanvasRoute(window.location.pathname === "/canvas");
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -1521,6 +1535,19 @@ const GoodNotesRoot = () => {
     return <ShareTargetReceiver theme={editorTheme} />;
   }
 
+  if (isCanvasRoute) {
+    return (
+      <>
+        <CourseBrowser
+          theme={editorTheme}
+          onOpenDocument={openDocument}
+          onConnect={canvasConnect.open}
+        />
+        {canvasConnect.dialog}
+      </>
+    );
+  }
+
   if (!docId && !isTransientScene) {
     return (
       <>
@@ -1528,8 +1555,10 @@ const GoodNotesRoot = () => {
           theme={editorTheme}
           onOpenDocument={openDocument}
           headerExtra={<PdfDropZone variant="inline" />}
+          onConnectCanvas={canvasConnect.open}
         />
         <GlobalPdfDropOverlay mode="library" />
+        {canvasConnect.dialog}
       </>
     );
   }
