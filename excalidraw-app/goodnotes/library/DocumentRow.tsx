@@ -67,7 +67,14 @@ export const DocumentRow = React.memo((props: DocumentItemProps) => {
         }${selectionActive ? " gn-row--selecting" : ""}`}
         role="gridcell"
       >
-        {onToggleSelect && (
+        {/*
+          The checkbox is only resident once a selection exists. At rest it
+          was one more control on every card for a gesture almost nobody uses
+          on a home screen; it is still reachable without it — Space on the
+          focused card, Cmd/Ctrl-click, or "Select" in the card's own menu —
+          and the moment any of those fires, every checkbox appears.
+        */}
+        {onToggleSelect && selectionActive && (
           <SelectionCheckbox
             doc={doc}
             isSelected={isSelected}

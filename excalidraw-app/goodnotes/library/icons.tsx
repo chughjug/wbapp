@@ -58,3 +58,8 @@ export const ICON_ARCHIVE =
 export const ICON_TAG =
   "M3 12.5V4a1 1 0 0 1 1-1h8.5L21 11.5 12.5 20 3 12.5zM7.5 7.5h.01";
 export const ICON_CHEVRON_RIGHT = "M9 6l6 6-6 6";
+export const ICON_MORE =
+  "M5.4 12a.6.6 0 1 0 1.2 0 .6.6 0 1 0-1.2 0M11.4 12a.6.6 0 1 0 1.2 0 .6.6 0 1 0-1.2 0M17.4 12a.6.6 0 1 0 1.2 0 .6.6 0 1 0-1.2 0";
+export const ICON_SORT = "M4 7h16M7 12h10M10 17h4";
+export const ICON_FOLDER_OPEN =
+  "M3 7a1 1 0 0 1 1-1h4l2 2h9a1 1 0 0 1 1 1v2H3V7zm0 4h18l-1.6 7.2a1 1 0 0 1-1 .8H5.6a1 1 0 0 1-1-.8L3 11z";

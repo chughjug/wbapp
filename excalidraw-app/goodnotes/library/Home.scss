@@ -1,0 +1,556 @@
+/**
+ * The redesigned home screen.
+ *
+ * Loaded after Shelf.scss, which still owns the cards, rows, dialogs and the
+ * sidebar's internals — all of which survive the redesign unchanged, they
+ * just live somewhere else now. This file owns the three surfaces that are
+ * new (the bar, the rail, the popovers/drawer) and the handful of overrides
+ * that make the old ones smaller.
+ *
+ * Every colour is an Excalidraw custom property. `--color-muted` is
+ * deliberately never used for text: it is a *background* grey and fails
+ * contrast as a foreground in both themes. De-emphasised text is
+ * `--input-label-color` or the shelf's own `--gn-text-muted`.
+ *
+ * Touch: every control in the bar, the rail and the popovers is at least
+ * 40px on its smallest axis, because the device this app is for is an iPad
+ * and the pointer is a finger.
+ */
+
+.excalidraw.gn-shelf {
+  // the sidebar is no longer a column of the shell; the shell is one column
+  display: block;
+
+  .gn-shelf__main {
+    height: 100%;
+  }
+
+  // ------------------------------------------------------------------ bar
+  .gn-home__bar {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3.25rem;
+    padding: 0.4375rem 1rem;
+    background-color: var(--island-bg-color);
+    border-bottom: 1px solid var(--default-border-color);
+  }
+
+  .gn-home__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    color: var(--text-primary-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gn-home__bar-end {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  // finger-sized, in a bar that is itself only 52px tall
+  .gn-home__iconbtn {
+    width: 2.5rem;
+    height: 2.5rem;
+
+    .gn-icon {
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  .gn-home__new {
+    min-height: 2.5rem;
+    padding-inline: 0.875rem;
+    border-radius: 999px;
+  }
+
+  .gn-home__search {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+
+    .gn-search__input {
+      min-height: 2.5rem;
+      border-radius: 999px;
+      padding-inline-end: 0.75rem;
+    }
+  }
+
+  .gn-search__done {
+    flex: 0 0 auto;
+    margin-inline-start: 0.5rem;
+    min-height: 2.5rem;
+  }
+
+  // ----------------------------------------------------------------- rail
+  .gn-rail {
+    margin: 0 0 1rem;
+  }
+
+  .gn-rail__list {
+    list-style: none;
+    display: flex;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0 0 0.25rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .gn-chipnav {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    white-space: nowrap;
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    min-height: 2.25rem;
+    padding: 0 0.75rem;
+    color: var(--text-primary-color);
+    background-color: var(--island-bg-color);
+    border: 1px solid var(--default-border-color);
+    border-radius: 999px;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--button-hover-bg, var(--color-surface-high));
+    }
+
+    // active = filled *and* bolder: never colour alone
+    &--on {
+      font-weight: 700;
+      color: var(--gn-on-fill);
+      background-color: var(--color-primary);
+      border-color: var(--color-primary);
+
+      .gn-chipnav__count {
+        color: var(--gn-on-fill);
+        opacity: 0.85;
+      }
+
+      .gn-course-dot {
+        box-shadow: 0 0 0 1px var(--gn-on-fill);
+      }
+    }
+
+    &--browse {
+      color: var(--input-label-color);
+    }
+  }
+
+  .gn-chipnav__count {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--input-label-color);
+  }
+
+  // -------------------------------------------------------------- content
+  .gn-shelf__content {
+    padding: 1rem 1rem 3rem;
+  }
+
+  .gn-grid {
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 0.875rem;
+  }
+
+  @media (min-width: 900px) {
+    .gn-grid {
+      grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+    }
+  }
+
+  // ------------------------------------------------------- continue card
+  .gn-card-wrapper--hero {
+    grid-column: span 2;
+  }
+
+  .gn-card--hero {
+    .gn-card__cover {
+      aspect-ratio: 16 / 9;
+    }
+
+    .gn-card__title {
+      font-size: 1rem;
+    }
+  }
+
+  .gn-card__continue {
+    position: absolute;
+    inset-block-start: 0.5rem;
+    inset-inline-start: 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 999px;
+    color: var(--gn-on-fill);
+    background-color: var(--color-primary);
+  }
+
+  // ------------------------------------------------------ one menu a card
+  .gn-card__actions,
+  .gn-row__actions {
+    opacity: 1;
+  }
+
+  .gn-card__more {
+    width: 2.25rem;
+    height: 2.25rem;
+    background-color: var(--island-bg-color);
+  }
+
+  // the cluster is a single button now, so it needs no chrome of its own
+  .gn-card__actions {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  // ---------------------------------------------------------------- empty
+  .gn-empty {
+    padding: 2.5rem 1rem;
+  }
+
+  // ------------------------------------------------------------- narrower
+  @media (max-width: 600px) {
+    .gn-home__bar {
+      padding-inline: 0.75rem;
+    }
+
+    .gn-shelf__content {
+      padding: 0.75rem 0.75rem 4rem;
+    }
+
+    .gn-grid {
+      grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+      gap: 0.75rem;
+    }
+
+    .gn-home__new-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .gn-home__new {
+      width: 2.5rem;
+      padding-inline: 0;
+      justify-content: center;
+    }
+  }
+}
+
+// ===========================================================================
+// portalled surfaces — popovers and the browse drawer
+//
+// These render into document.body, outside the themed `.gn-shelf` subtree,
+// so they re-declare the theme class and repeat the few shared rules they
+// need rather than inheriting them.
+// ===========================================================================
+
+.excalidraw.gn-portal {
+  // the shelf root (Shelf.scss) makes this a full-size flex row; a portal
+  // wrapper must take no space at all and let its fixed children stand.
+  position: static;
+  display: contents;
+
+  // ------------------------------------------------------------- popover
+  .gn-popover {
+    position: fixed;
+    z-index: 1000;
+    min-width: 13rem;
+    max-width: min(22rem, calc(100vw - 1rem));
+    max-height: calc(100vh - 1rem);
+    overflow-y: auto;
+    padding: 0.3125rem;
+    color: var(--text-primary-color);
+    background-color: var(--island-bg-color);
+    border: 1px solid var(--default-border-color);
+    border-radius: var(--border-radius-lg, 0.5rem);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
+
+    &--wide {
+      min-width: 15rem;
+    }
+  }
+
+  .gn-menugroup {
+    & + .gn-menugroup {
+      margin-top: 0.3125rem;
+      padding-top: 0.3125rem;
+      border-top: 1px solid var(--default-border-color);
+    }
+
+    &--slot {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+      padding: 0.375rem 0.25rem 0.125rem;
+    }
+  }
+
+  .gn-menugroup__label {
+    margin: 0.125rem 0 0.25rem;
+    padding-inline: 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--input-label-color);
+  }
+
+  .gn-menuitem {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.375rem 0.5rem;
+    font: inherit;
+    font-size: 0.875rem;
+    text-align: start;
+    color: var(--text-primary-color);
+    background: none;
+    border: 0;
+    border-radius: var(--border-radius-md, 0.375rem);
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--button-hover-bg, var(--color-surface-high));
+    }
+
+    &[aria-checked="true"] {
+      font-weight: 650;
+    }
+
+    &--danger {
+      color: var(--color-danger);
+
+      &:hover {
+        background-color: var(--color-danger-background);
+      }
+    }
+  }
+
+  .gn-menuitem__glyph {
+    flex: 0 0 1.125rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--icon-fill-color);
+  }
+
+  .gn-menuitem__label {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .gn-menuitem__desc {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--input-label-color);
+  }
+
+  // the PDF import slot ships a bare <input type="file"> that no stylesheet
+  // in its own module hides; it is aria-hidden and tabindex=-1, so showing it
+  // is purely a visual bug. Hide it where we host the slot.
+  .gn-share-dropzone__input {
+    display: none;
+  }
+
+  // ------------------------------------------------- the sidebar, in here
+  // Shelf.scss still gives `.gn-sidebar` its 15rem column geometry, which is
+  // wrong inside a drawer that is itself the column — and, because the
+  // drawer is portalled, the override has to live on this root rather than
+  // on `.gn-shelf`.
+  .gn-sidebar {
+    flex: 0 0 auto;
+    width: 100%;
+    border-inline-end: 0;
+    overflow: visible;
+    padding: 0;
+    background-color: transparent;
+  }
+
+  // -------------------------------------------------------------- drawer
+  .gn-drawer__scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background-color: rgb(0 0 0 / 40%);
+  }
+
+  .gn-drawer {
+    position: fixed;
+    z-index: 1001;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: min(21rem, 90vw);
+    display: flex;
+    flex-direction: column;
+    color: var(--text-primary-color);
+    background-color: var(--island-bg-color);
+    border-inline-end: 1px solid var(--default-border-color);
+    box-shadow: 0 0 40px rgb(0 0 0 / 25%);
+    animation: gn-drawer-in 180ms ease;
+  }
+
+  .gn-drawer__head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 3.25rem;
+    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    border-bottom: 1px solid var(--default-border-color);
+
+    .gn-icon-button {
+      width: 2.5rem;
+      height: 2.5rem;
+    }
+  }
+
+  .gn-drawer__title {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 650;
+  }
+
+  .gn-drawer__body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  @keyframes gn-drawer-in {
+    from {
+      transform: translateX(-100%);
+    }
+
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gn-drawer {
+      animation: none;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// card trim — appended so it wins over Shelf.scss without raising specificity
+// ---------------------------------------------------------------------------
+.excalidraw.gn-shelf {
+  .gn-card__body {
+    gap: 0.25rem;
+    padding: 0.625rem 0.75rem 0.75rem;
+  }
+
+  .gn-card__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .gn-card__updated {
+    font-size: 0.75rem;
+  }
+
+  .gn-card__tags {
+    padding: 0 0.75rem 0.625rem;
+  }
+
+  // the card menu reads as part of the cover, like the page count badge,
+  // instead of a white chip punched through it
+  .gn-card__more {
+    width: 2.25rem;
+    height: 2.25rem;
+    color: #fff;
+    background-color: rgb(0 0 0 / 38%);
+    border: 0;
+
+    &:hover:not(:disabled) {
+      background-color: rgb(0 0 0 / 58%);
+    }
+  }
+
+  // grid cards only — the list row centres its own menu vertically
+  .gn-card .gn-card__actions {
+    inset-block-start: 0.4375rem;
+    inset-inline-end: 0.4375rem;
+  }
+
+  // the row reserved 7.5rem for six buttons; one needs a fraction of that
+  .gn-row__open {
+    padding-inline-end: 3.25rem;
+  }
+
+  .gn-row .gn-card__more {
+    color: var(--icon-fill-color);
+    background-color: transparent;
+
+    &:hover:not(:disabled) {
+      background-color: var(--button-hover-bg, var(--color-surface-high));
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// the folder cards, now a customisation panel at the foot of the drawer
+// ---------------------------------------------------------------------------
+.excalidraw.gn-portal {
+  .gn-folders {
+    margin: 0.5rem 0 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--default-border-color);
+  }
+
+  .gn-folders__list {
+    grid-template-columns: 1fr;
+    gap: 0.375rem;
+  }
+
+  .gn-folder {
+    min-height: 2.75rem;
+  }
+}
+
+// the favourite star and the Continue badge both claimed the cover's
+// top-left; the star moves to the bottom-left, opposite the page count
+.excalidraw.gn-shelf .gn-card__star {
+  inset-block-start: auto;
+  inset-block-end: 0.4rem;
+  inset-inline-start: 0.5rem;
+  font-size: 1rem;
+}

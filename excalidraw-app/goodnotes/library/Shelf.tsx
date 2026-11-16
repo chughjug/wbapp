@@ -1,10 +1,32 @@
 /**
- * The home library: a document *manager*, not a flat grid.
+ * The home screen: the notebooks, and almost nothing else.
  *
  * Layout
- *   [ sidebar ][ header: title + search + sort + view toggle + new ]
- *              [ course folders                                   ]
- *              [ grid of cover cards  |  dense list of rows       ]
+ *   [ title                          search  ⋯  + New ]   one 52px bar
+ *   [ All · Recent · MATH 221 · … · Browse ]              only when non-empty
+ *   [ the notebooks — first one double-size, "Continue" ]
+ *
+ * WHAT MOVED, AND WHY NOTHING WAS LOST
+ * The previous screen rendered, permanently: a 15rem sidebar (five smart
+ * filters with counters, a COURSES section, a TAGS section, a storage meter),
+ * a title row, a view toggle, a New button, a search field, a Sort select, a
+ * Course select, a row of course folder cards, and six action buttons on
+ * every card. On a first run — one untitled notebook, nothing tagged, no
+ * courses — most of that was empty-state prose about features the student has
+ * never used, and the notebooks themselves got under a tenth of the screen.
+ *
+ * So: the sidebar and the course folders moved into the Browse drawer
+ * (`BrowseDrawer`, which renders the very same `Sidebar` and `CourseFolders`
+ * components, unchanged); sort, view, PDF import and "select several" moved
+ * into one ⋯ popover; the Course select was dropped as a duplicate of the
+ * course chips and the drawer; the six per-card buttons became one ⋯ menu per
+ * card; and the filter rail only renders chips that would actually select
+ * something, so a first run shows no rail at all.
+ *
+ * The default order is now *recently opened*, and the first card is rendered
+ * double-size and badged "Continue", because the single most common reason a
+ * student opens this screen is to get back into the notebook they were just
+ * in.
  *
  * Accessibility contract honoured here:
  *  - the sidebar is a real list of buttons; the active one has aria-current
@@ -49,25 +71,30 @@ import {
   normalizeCoursePath,
 } from "./coursePath";
 import { useSelection } from "./selection";
+import { queueThumbnails } from "./thumbnails";
 import { SelectionBar } from "./SelectionBar";
 import { PromptDialog } from "./PromptDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { CourseFolders } from "./CourseFolders";
 import { DocumentCard } from "./DocumentCard";
 import { fromDateInputValue } from "./DocumentEditor";
 import { DocumentRow } from "./DocumentRow";
-import { Sidebar } from "./Sidebar";
+import { BrowseDrawer } from "./BrowseDrawer";
+import { FilterRail } from "./FilterRail";
+import { MenuButton, MenuGroup, MenuItem } from "./Popover";
+import { ShelfThemeContext } from "./theme";
 import {
   Icon,
-  ICON_CLOSE,
-  ICON_GRID,
+  ICON_CHECK,
   ICON_LIST,
+  ICON_MORE,
   ICON_PLUS,
   ICON_SEARCH,
 } from "./icons";
 
 import "./Shelf.scss";
+import "./Home.scss";
 
+import type { RailCourse } from "./FilterRail";
 import type { CourseFolder } from "./CourseFolders";
 import type { LibraryFilter } from "./filters";
 import type { PromptDialogProps } from "./PromptDialog";
@@ -80,7 +107,17 @@ export type { DueUrgency } from "./format";
 
 export type LibraryView = "grid" | "list";
 
+/**
+ * The shelf's own sort keys. `SortKey` (goodnotes/types.ts) is the shared
+ * contract and is not ours to widen, so the one order this screen actually
+ * defaults to — *recently opened*, which is the whole point of a home screen
+ * — is added locally. Nothing outside this module sees it: the sort lives in
+ * component state and never reaches the store.
+ */
+export type ShelfSortKey = SortKey | "lastOpenedAt";
+
 const VIEW_STORAGE_KEY = "goodnotes-library-view";
+const SORT_STORAGE_KEY = "goodnotes-library-sort";
 
 export interface ShelfProps {
   /** Called when the user activates a card or creates a document. */
@@ -92,14 +129,25 @@ export interface ShelfProps {
   className?: string;
   /** Initial view. Otherwise the last used view is restored. */
   defaultView?: LibraryView;
+  /**
+   * Extra controls for the ⋯ popover — host features that are neither the
+   * library's business nor worth a permanent slot in the bar (the Canvas
+   * connect invitation is the one in the app today). Rendered last, under a
+   * separator.
+   */
+  menuExtra?: React.ReactNode;
 }
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "dueDate", label: "Due date" },
+const SORT_OPTIONS: { value: ShelfSortKey; label: string }[] = [
+  { value: "lastOpenedAt", label: "Recently opened" },
   { value: "updatedAt", label: "Last edited" },
+  { value: "dueDate", label: "Due date" },
   { value: "title", label: "Title" },
   { value: "course", label: "Course" },
 ];
+
+/** When was this notebook last in front of the student? */
+const lastTouched = (doc: DocMeta): number => doc.lastOpenedAt ?? doc.updatedAt;
 
 /**
  * Pinned documents come first in every sort order — that is what pinning
@@ -108,14 +156,16 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 const comparePinnedFirst = (
   a: DocMeta,
   b: DocMeta,
-  sortKey: SortKey,
+  sortKey: ShelfSortKey,
 ): number => {
   const pinDelta = Number(isPinned(b)) - Number(isPinned(a));
   return pinDelta !== 0 ? pinDelta : compareDocs(a, b, sortKey);
 };
 
-const compareDocs = (a: DocMeta, b: DocMeta, sortKey: SortKey): number => {
+const compareDocs = (a: DocMeta, b: DocMeta, sortKey: ShelfSortKey): number => {
   switch (sortKey) {
+    case "lastOpenedAt":
+      return lastTouched(b) - lastTouched(a);
     case "dueDate": {
       // documents without a due date sink to the bottom
       if (a.dueDate == null && b.dueDate == null) {
@@ -246,6 +296,17 @@ const readStoredView = (fallback: LibraryView): LibraryView => {
   }
 };
 
+const readStoredSort = (): ShelfSortKey => {
+  try {
+    const stored = window.localStorage.getItem(SORT_STORAGE_KEY);
+    return SORT_OPTIONS.some((it) => it.value === stored)
+      ? (stored as ShelfSortKey)
+      : "lastOpenedAt";
+  } catch {
+    return "lastOpenedAt";
+  }
+};
+
 // ---------------------------------------------------------------------------
 
 export const Shelf = ({
@@ -254,6 +315,7 @@ export const Shelf = ({
   headerExtra,
   className,
   defaultView = "grid",
+  menuExtra,
 }: ShelfProps) => {
   const { documents, loading, error, courses, courseTree, tags, actions } =
     useDocuments();
@@ -261,7 +323,9 @@ export const Shelf = ({
   const selection = useSelection();
 
   const [query, setQuery] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("updatedAt");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [browseOpen, setBrowseOpen] = useState(false);
+  const [sortKey, setSortKey] = useState<ShelfSortKey>(readStoredSort);
   const [filter, setFilter] = useState<LibraryFilter>(FILTER_ALL);
   const [view, setView] = useState<LibraryView>(() =>
     readStoredView(defaultView),
@@ -277,6 +341,7 @@ export const Shelf = ({
 
   const controlsId = useId();
   const gridRef = useRef<HTMLUListElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
   // id of a card that should take DOM focus once it renders
   const pendingFocusRef = useRef<string | null>(null);
@@ -288,6 +353,41 @@ export const Shelf = ({
       /* private mode: the view simply does not persist */
     }
   }, [view]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SORT_STORAGE_KEY, sortKey);
+    } catch {
+      /* private mode: the sort simply does not persist */
+    }
+  }, [sortKey]);
+
+  // Search is revealed, not resident — so it needs a keyboard way in that is
+  // as fast as the pointer one. "/" is the web-wide convention; Cmd/Ctrl+F is
+  // what the rest of the app's users will reach for first.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        !!target &&
+        (target.isContentEditable ||
+          ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+      const wantsFind = (event.metaKey || event.ctrlKey) && event.key === "f";
+      if (
+        !wantsFind &&
+        (typing || event.metaKey || event.ctrlKey || event.altKey)
+      ) {
+        return;
+      }
+      if (event.key === "/" || wantsFind) {
+        event.preventDefault();
+        setSearchOpen(true);
+        window.requestAnimationFrame(() => searchRef.current?.focus());
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // one clock read per documents-change keeps every badge mutually consistent
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -355,6 +455,16 @@ export const Shelf = ({
       )
       .sort((a, b) => comparePinnedFirst(a, b, sortKey));
   }, [documents, query, filter, sortKey, now]);
+
+  // Covers are generated here, from the scenes the library already owns,
+  // because nothing else in the app ever generated one — see thumbnails.ts.
+  // Only for what is on screen, one at a time, during idle time.
+  useEffect(() => {
+    if (loading || visible.length === 0) {
+      return undefined;
+    }
+    return queueThumbnails(visible.slice(0, 40));
+  }, [visible, loading]);
 
   /** Visible ids in visual order — the basis of every range selection. */
   const visibleIds = useMemo(() => visible.map((doc) => doc.id), [visible]);
@@ -437,19 +547,18 @@ export const Shelf = ({
     if (!grid) {
       return 1;
     }
-    const items = [...grid.children] as HTMLElement[];
-    if (items.length === 0) {
+    // Counting items that share the first row stopped being correct once the
+    // "Continue" card spans two tracks, so read the track count itself: it is
+    // exact in both views (the list is not a grid, hence a step of 1) and
+    // immune to any future item that spans.
+    const style = window.getComputedStyle(grid);
+    if (style.display !== "grid") {
       return 1;
     }
-    const firstTop = items[0].offsetTop;
-    let columns = 0;
-    for (const item of items) {
-      if (item.offsetTop !== firstTop) {
-        break;
-      }
-      columns++;
-    }
-    return Math.max(1, columns);
+    const tracks = style.gridTemplateColumns
+      .split(" ")
+      .filter((it) => it && it !== "none").length;
+    return Math.max(1, tracks);
   }, []);
 
   const onGridKeyDown = useCallback(
@@ -894,6 +1003,48 @@ export const Shelf = ({
   const heading = filterLabel(filter);
   const Item = view === "grid" ? DocumentCard : DocumentRow;
 
+  /** Top-level courses only — the rail is a shortcut, not the index. */
+  const railCourses: RailCourse[] = useMemo(
+    () =>
+      (courseTree ?? []).map((node) => ({
+        path: node.path,
+        count: node.totalCount,
+        style: courseStyles.styleOf(node.path),
+      })),
+    [courseTree, courseStyles],
+  );
+
+  /**
+   * The notebook to get back into. Only ever the first card, only in the
+   * default arrangement, and only when it really is the most recently opened
+   * one — a pinned document sorts to the top in every order, and calling
+   * *that* "Continue" would be a lie.
+   */
+  const heroId = useMemo(() => {
+    if (
+      sortKey !== "lastOpenedAt" ||
+      view !== "grid" ||
+      filter.kind !== "all" ||
+      query.trim() ||
+      visible.length === 0
+    ) {
+      return null;
+    }
+    // the only notebook there is gets the big card regardless — it is not
+    // "continue" until it has been opened, but it is certainly the subject
+    if (visible.length === 1) {
+      return visible[0].id;
+    }
+    const opened = visible.filter((doc) => doc.lastOpenedAt != null);
+    if (opened.length === 0) {
+      return null;
+    }
+    const newest = opened.reduce((best, doc) =>
+      lastTouched(doc) > lastTouched(best) ? doc : best,
+    );
+    return newest.id === visible[0].id ? newest.id : null;
+  }, [sortKey, view, filter, query, visible]);
+
   const itemProps = (doc: DocMeta) => ({
     doc,
     now,
@@ -910,6 +1061,7 @@ export const Shelf = ({
     onToggleArchived: handleToggleArchived,
     tagSuggestions,
     courseSuggestions,
+    isHero: doc.id === heroId,
     courseStyle: styleFor(doc.course),
     onOpen: handleOpen,
     onStartEdit: setEditingId,
@@ -926,362 +1078,400 @@ export const Shelf = ({
     registerRef,
   });
 
+  const sidebarProps = {
+    filter,
+    onSelectFilter: setFilter,
+    counts,
+    courses: sidebarCourses,
+    courseTree,
+    courseStyleOf: courseStyles.styleOf,
+    tags,
+    onRenameCourse: (course: string) =>
+      setPrompt({ kind: "rename-course", course }),
+    onRemoveCourse: (course: string) =>
+      setConfirming({
+        kind: "remove-course",
+        course,
+        count: docsInCourseTree(course),
+      }),
+    onRenameTag: (tag: string) => setPrompt({ kind: "rename-tag", tag }),
+    onDeleteTag: (tag: string) =>
+      setConfirming({
+        kind: "delete-tag",
+        tag,
+        count: tags.find((row) => row.tag === tag)?.count ?? 0,
+      }),
+    revision: documents.length,
+  };
+
   return (
-    <div
-      className={`excalidraw${theme === "dark" ? " theme--dark" : ""} gn-shelf${
-        className ? ` ${className}` : ""
-      }`}
-    >
-      <Sidebar
-        filter={filter}
-        onSelectFilter={setFilter}
-        counts={counts}
-        courses={sidebarCourses}
-        courseTree={courseTree}
-        courseStyleOf={courseStyles.styleOf}
-        tags={tags}
-        onRenameCourse={(course) =>
-          setPrompt({ kind: "rename-course", course })
-        }
-        onRemoveCourse={(course) =>
-          setConfirming({
-            kind: "remove-course",
-            course,
-            count: docsInCourseTree(course),
-          })
-        }
-        onRenameTag={(tag) => setPrompt({ kind: "rename-tag", tag })}
-        onDeleteTag={(tag) =>
-          setConfirming({
-            kind: "delete-tag",
-            tag,
-            count: tags.find((row) => row.tag === tag)?.count ?? 0,
-          })
-        }
-        revision={documents.length}
-      />
-
-      <div className="gn-shelf__main">
-        <header className="gn-shelf__header">
-          <div className="gn-shelf__header-row">
-            <h1 className="gn-shelf__heading">{heading}</h1>
-            <div className="gn-shelf__header-end">
-              {headerExtra}
-              <div
-                className="gn-viewtoggle"
-                role="group"
-                aria-label="Document view"
-              >
-                <button
-                  type="button"
-                  className={`gn-icon-button${
-                    view === "grid" ? " gn-icon-button--on" : ""
-                  }`}
-                  aria-pressed={view === "grid"}
-                  aria-label="Grid view"
-                  onClick={() => setView("grid")}
-                >
-                  <Icon path={ICON_GRID} />
-                </button>
-                <button
-                  type="button"
-                  className={`gn-icon-button${
-                    view === "list" ? " gn-icon-button--on" : ""
-                  }`}
-                  aria-pressed={view === "list"}
-                  aria-label="List view"
-                  onClick={() => setView("list")}
-                >
-                  <Icon path={ICON_LIST} />
-                </button>
-              </div>
-              <button
-                type="button"
-                className="gn-button gn-button--primary"
-                onClick={() => void handleCreate()}
-              >
-                <Icon path={ICON_PLUS} />
-                New document
-              </button>
-            </div>
-          </div>
-
-          <div className="gn-toolbar" role="search">
-            <div className="gn-search">
-              <span className="gn-search__icon" aria-hidden="true">
-                <Icon path={ICON_SEARCH} />
-              </span>
-              <input
-                id={`${controlsId}-search`}
-                className="gn-input gn-search__input"
-                type="search"
-                value={query}
-                placeholder="Search title, course or tag"
-                aria-label="Search documents by title, course or tag"
-                onChange={(event) => setQuery(event.target.value)}
-              />
-              {query && (
-                <button
-                  type="button"
-                  className="gn-icon-button gn-search__clear"
-                  aria-label="Clear search"
-                  onClick={() => setQuery("")}
-                >
-                  <Icon path={ICON_CLOSE} />
-                </button>
-              )}
-            </div>
-
-            <label className="gn-select-field" htmlFor={`${controlsId}-sort`}>
-              <span className="gn-field__label">Sort by</span>
-              <select
-                id={`${controlsId}-sort`}
-                className="gn-select"
-                value={sortKey}
-                onChange={(event) => setSortKey(event.target.value as SortKey)}
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="gn-select-field" htmlFor={`${controlsId}-course`}>
-              <span className="gn-field__label">Course</span>
-              <select
-                id={`${controlsId}-course`}
-                className="gn-select"
-                value={filter.kind === "course" ? filter.course : ""}
-                onChange={(event) =>
-                  setFilter(
-                    event.target.value
-                      ? { kind: "course", course: event.target.value }
-                      : FILTER_ALL,
-                  )
-                }
-              >
-                <option value="">All courses</option>
-                {courses.map((course) => (
-                  <option key={course} value={course}>
-                    {course}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </header>
-
-        <div className="gn-shelf__content">
-          <p className="gn-sr-only" role="status" aria-live="polite">
-            {loading
-              ? "Loading documents"
-              : `${heading}: ${visible.length} ${
-                  visible.length === 1 ? "document" : "documents"
-                } shown${
-                  selection.count > 0 ? `, ${selection.count} selected` : ""
-                }`}
-          </p>
-          <p className="gn-sr-only" role="status" aria-live="polite">
-            {announcement}
-          </p>
-
-          {error && (
-            <div className="gn-notice gn-notice--error" role="alert">
-              Could not read your document library: {error.message}
-            </div>
-          )}
-
-          {!loading && hasAnyDocuments && (
-            <CourseFolders
-              folders={folders}
-              activeCourse={filter.kind === "course" ? filter.course : null}
-              onOpenCourse={handleOpenCourse}
-              onSetColor={handleSetCourseColor}
-              onSetEmoji={handleSetCourseEmoji}
-            />
-          )}
-
-          {loading ? (
-            <div className="gn-empty" aria-hidden="true">
-              <p className="gn-empty__title">Loading your shelf…</p>
-            </div>
-          ) : !hasAnyDocuments ? (
-            <div className="gn-empty">
-              <div className="gn-empty__art" aria-hidden="true">
-                <span className="gn-empty__sheet" />
-                <span className="gn-empty__sheet" />
-                <span className="gn-empty__sheet" />
-              </div>
-              <h2 className="gn-empty__title">Your shelf is empty</h2>
-              <p className="gn-empty__text">
-                Create your first notebook or assignment. Everything stays on
-                this device until you share it.
-              </p>
-              <button
-                type="button"
-                className="gn-button gn-button--primary"
-                onClick={() => void handleCreate()}
-              >
-                <Icon path={ICON_PLUS} />
-                New document
-              </button>
-            </div>
-          ) : visible.length === 0 ? (
-            <div className="gn-empty">
-              <h2 className="gn-empty__title">No matching documents</h2>
-              <p className="gn-empty__text">
-                Nothing in {heading} matches your search.
-              </p>
-              <button
-                type="button"
-                className="gn-button"
-                onClick={() => {
-                  setQuery("");
-                  setFilter(FILTER_ALL);
-                }}
-              >
-                Clear search and filters
-              </button>
-            </div>
-          ) : (
-            <>
-              {selection.count > 0 && (
-                <SelectionBar
-                  count={selection.count}
-                  visibleCount={visible.length}
-                  allVisibleSelected={selection.count === visible.length}
-                  allFavourite={allSelectedFavourite}
-                  allPinned={allSelectedPinned}
-                  allArchived={allSelectedArchived}
-                  onSelectAll={handleSelectAll}
-                  onClear={handleClearSelection}
-                  onMove={() => setPrompt({ kind: "bulk-course" })}
-                  onAddTag={() => setPrompt({ kind: "bulk-add-tag" })}
-                  onRemoveTag={() => setPrompt({ kind: "bulk-remove-tag" })}
-                  onSetDueDate={() => setPrompt({ kind: "bulk-due" })}
-                  onToggleFavourite={handleBulkFavourite}
-                  onTogglePinned={handleBulkPinned}
-                  onToggleArchived={handleBulkArchived}
-                  onDuplicate={handleBulkDuplicate}
-                  onDelete={() =>
-                    setConfirming({ kind: "delete-docs", ids: selectedIds })
-                  }
+    <ShelfThemeContext.Provider value={theme}>
+      <div
+        className={`excalidraw${
+          theme === "dark" ? " theme--dark" : ""
+        } gn-shelf${className ? ` ${className}` : ""}`}
+      >
+        <div className="gn-shelf__main">
+          <header className="gn-home__bar">
+            {searchOpen || query ? (
+              <div className="gn-home__search gn-search" role="search">
+                <span className="gn-search__icon" aria-hidden="true">
+                  <Icon path={ICON_SEARCH} />
+                </span>
+                <input
+                  id={`${controlsId}-search`}
+                  ref={searchRef}
+                  className="gn-input gn-search__input"
+                  type="search"
+                  value={query}
+                  autoFocus
+                  placeholder="Search title, course or tag"
+                  aria-label="Search documents by title, course or tag"
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setQuery("");
+                      setSearchOpen(false);
+                    }
+                  }}
                 />
-              )}
-              {view === "list" && (
-                <div className="gn-list__head" aria-hidden="true">
-                  <span className="gn-list__head-thumb" />
-                  <span>Title</span>
-                  <span>Course</span>
-                  <span>Due</span>
-                  <span>Edited</span>
+                <button
+                  type="button"
+                  className="gn-button gn-button--small gn-search__done"
+                  onClick={() => {
+                    setQuery("");
+                    setSearchOpen(false);
+                  }}
+                >
+                  {query ? "Clear" : "Done"}
+                </button>
+              </div>
+            ) : (
+              <>
+                <h1 className="gn-home__title">{heading}</h1>
+                <div className="gn-home__bar-end">
+                  <button
+                    type="button"
+                    className="gn-icon-button gn-home__iconbtn"
+                    aria-label="Search documents"
+                    onClick={() => setSearchOpen(true)}
+                  >
+                    <Icon path={ICON_SEARCH} />
+                  </button>
+
+                  <MenuButton
+                    label="Library options"
+                    title="Library options"
+                    role="dialog"
+                    buttonClassName="gn-icon-button gn-home__iconbtn"
+                    panelClassName="gn-popover--wide"
+                    icon={<Icon path={ICON_MORE} filled />}
+                  >
+                    {(close) => (
+                      <>
+                        <MenuGroup label="Sort by">
+                          {SORT_OPTIONS.map((option) => (
+                            <MenuItem
+                              key={option.value}
+                              label={option.label}
+                              checked={sortKey === option.value}
+                              onClick={() => {
+                                setSortKey(option.value);
+                                close();
+                              }}
+                            />
+                          ))}
+                        </MenuGroup>
+                        <MenuGroup label="View">
+                          <MenuItem
+                            label="Grid"
+                            checked={view === "grid"}
+                            onClick={() => {
+                              setView("grid");
+                              close();
+                            }}
+                          />
+                          <MenuItem
+                            label="List"
+                            checked={view === "list"}
+                            onClick={() => {
+                              setView("list");
+                              close();
+                            }}
+                          />
+                        </MenuGroup>
+                        {hasAnyDocuments && (
+                          <div className="gn-menugroup">
+                            <MenuItem
+                              label="Browse courses and tags…"
+                              icon={<Icon path={ICON_LIST} />}
+                              onClick={() => {
+                                setBrowseOpen(true);
+                                close();
+                              }}
+                            />
+                            {visible.length > 0 && (
+                              <MenuItem
+                                label="Select several…"
+                                icon={<Icon path={ICON_CHECK} />}
+                                onClick={() => {
+                                  selection.toggle(visible[0].id);
+                                  close();
+                                }}
+                              />
+                            )}
+                          </div>
+                        )}
+                        {(headerExtra || menuExtra) && (
+                          <div className="gn-menugroup gn-menugroup--slot">
+                            {headerExtra}
+                            {menuExtra}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </MenuButton>
+
+                  <button
+                    type="button"
+                    className="gn-button gn-button--primary gn-home__new"
+                    onClick={() => void handleCreate()}
+                  >
+                    <Icon path={ICON_PLUS} />
+                    <span className="gn-home__new-label">New</span>
+                  </button>
                 </div>
-              )}
-              {/*
+              </>
+            )}
+          </header>
+
+          <div className="gn-shelf__content">
+            <p className="gn-sr-only" role="status" aria-live="polite">
+              {loading
+                ? "Loading documents"
+                : `${heading}: ${visible.length} ${
+                    visible.length === 1 ? "document" : "documents"
+                  } shown${
+                    selection.count > 0 ? `, ${selection.count} selected` : ""
+                  }`}
+            </p>
+            <p className="gn-sr-only" role="status" aria-live="polite">
+              {announcement}
+            </p>
+
+            {error && (
+              <div className="gn-notice gn-notice--error" role="alert">
+                Could not read your document library: {error.message}
+              </div>
+            )}
+
+            {!loading && hasAnyDocuments && (
+              <FilterRail
+                filter={filter}
+                onSelectFilter={setFilter}
+                counts={counts}
+                courses={railCourses}
+                onOpenBrowse={() => setBrowseOpen(true)}
+                browseCount={courses.length + tags.length}
+              />
+            )}
+
+            {loading ? (
+              <div className="gn-empty" aria-hidden="true">
+                <p className="gn-empty__title">Loading your shelf…</p>
+              </div>
+            ) : !hasAnyDocuments ? (
+              <div className="gn-empty">
+                <div className="gn-empty__art" aria-hidden="true">
+                  <span className="gn-empty__sheet" />
+                  <span className="gn-empty__sheet" />
+                  <span className="gn-empty__sheet" />
+                </div>
+                <h2 className="gn-empty__title">Your shelf is empty</h2>
+                <p className="gn-empty__text">
+                  Create your first notebook or assignment. Everything stays on
+                  this device until you share it.
+                </p>
+                <button
+                  type="button"
+                  className="gn-button gn-button--primary"
+                  onClick={() => void handleCreate()}
+                >
+                  <Icon path={ICON_PLUS} />
+                  New document
+                </button>
+              </div>
+            ) : visible.length === 0 ? (
+              <div className="gn-empty">
+                <h2 className="gn-empty__title">No matching documents</h2>
+                <p className="gn-empty__text">
+                  Nothing in {heading} matches your search.
+                </p>
+                <button
+                  type="button"
+                  className="gn-button"
+                  onClick={() => {
+                    setQuery("");
+                    setFilter(FILTER_ALL);
+                  }}
+                >
+                  Clear search and filters
+                </button>
+              </div>
+            ) : (
+              <>
+                {selection.count > 0 && (
+                  <SelectionBar
+                    count={selection.count}
+                    visibleCount={visible.length}
+                    allVisibleSelected={selection.count === visible.length}
+                    allFavourite={allSelectedFavourite}
+                    allPinned={allSelectedPinned}
+                    allArchived={allSelectedArchived}
+                    onSelectAll={handleSelectAll}
+                    onClear={handleClearSelection}
+                    onMove={() => setPrompt({ kind: "bulk-course" })}
+                    onAddTag={() => setPrompt({ kind: "bulk-add-tag" })}
+                    onRemoveTag={() => setPrompt({ kind: "bulk-remove-tag" })}
+                    onSetDueDate={() => setPrompt({ kind: "bulk-due" })}
+                    onToggleFavourite={handleBulkFavourite}
+                    onTogglePinned={handleBulkPinned}
+                    onToggleArchived={handleBulkArchived}
+                    onDuplicate={handleBulkDuplicate}
+                    onDelete={() =>
+                      setConfirming({ kind: "delete-docs", ids: selectedIds })
+                    }
+                  />
+                )}
+                {view === "list" && (
+                  <div className="gn-list__head" aria-hidden="true">
+                    <span className="gn-list__head-thumb" />
+                    <span>Title</span>
+                    <span>Course</span>
+                    <span>Due</span>
+                    <span>Edited</span>
+                  </div>
+                )}
+                {/*
                 role="grid" + aria-multiselectable is the one ARIA container
                 that legitimately holds interactive children (each item is a
                 row with a single gridcell), which a listbox/option pair does
                 not. Roving tabindex and the measured row step are unchanged.
               */}
-              <ul
-                className={view === "grid" ? "gn-grid" : "gn-list"}
-                ref={gridRef}
-                role="grid"
-                aria-multiselectable="true"
-                aria-label={`${heading}, ${
-                  view === "grid" ? "grid" : "list"
-                } view, ${
-                  selection.count
-                } selected. Press Space to select, Shift and arrow keys to extend.`}
-                onKeyDown={onGridKeyDown}
-              >
-                {visible.map((doc) => (
-                  <Item key={doc.id} {...itemProps(doc)} />
-                ))}
-              </ul>
-            </>
-          )}
+                <ul
+                  className={view === "grid" ? "gn-grid" : "gn-list"}
+                  ref={gridRef}
+                  role="grid"
+                  aria-multiselectable="true"
+                  aria-label={`${heading}, ${
+                    view === "grid" ? "grid" : "list"
+                  } view, ${
+                    selection.count
+                  } selected. Press Space to select, Shift and arrow keys to extend.`}
+                  onKeyDown={onGridKeyDown}
+                >
+                  {visible.map((doc) => (
+                    <Item key={doc.id} {...itemProps(doc)} />
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
         </div>
+
+        {browseOpen && (
+          <BrowseDrawer
+            {...sidebarProps}
+            onClose={() => setBrowseOpen(false)}
+            folders={folders}
+            activeCourse={filter.kind === "course" ? filter.course : null}
+            onOpenCourse={(course: string) => {
+              handleOpenCourse(course);
+              setBrowseOpen(false);
+            }}
+            onSetColor={handleSetCourseColor}
+            onSetEmoji={handleSetCourseEmoji}
+          />
+        )}
+
+        {prompt && (
+          <PromptDialog
+            {...promptConfig(
+              prompt,
+              selectedIds.length,
+              courseSuggestions,
+              tagSuggestions,
+              selectedTagSuggestions,
+            )}
+            onCancel={() => setPrompt(null)}
+            onConfirm={handlePromptConfirm}
+          />
+        )}
+
+        {confirming && (
+          <ConfirmDialog
+            title={
+              confirming.kind === "delete-docs"
+                ? `Delete ${confirming.ids.length} ${
+                    confirming.ids.length === 1 ? "document" : "documents"
+                  }?`
+                : confirming.kind === "delete-tag"
+                ? `Delete the tag “${confirming.tag}”?`
+                : `Remove the course “${coursePathLabel(confirming.course)}”?`
+            }
+            body={
+              confirming.kind === "delete-docs" ? (
+                <>
+                  This permanently removes {confirming.ids.length} documents and
+                  all of their pages from this device. It cannot be undone.
+                </>
+              ) : confirming.kind === "delete-tag" ? (
+                <>
+                  The tag is removed from {confirming.count}{" "}
+                  {confirming.count === 1 ? "document" : "documents"}. The
+                  documents themselves are kept.
+                </>
+              ) : (
+                <>
+                  {confirming.count}{" "}
+                  {confirming.count === 1 ? "document" : "documents"} in this
+                  course and its sub-courses lose their course. No document is
+                  deleted.
+                </>
+              )
+            }
+            confirmLabel={
+              confirming.kind === "delete-docs"
+                ? `Delete ${confirming.ids.length} ${
+                    confirming.ids.length === 1 ? "document" : "documents"
+                  }`
+                : confirming.kind === "delete-tag"
+                ? "Delete tag"
+                : "Remove course"
+            }
+            onCancel={() => setConfirming(null)}
+            onConfirm={handleConfirmDestructive}
+          />
+        )}
+
+        {pendingDelete && (
+          <ConfirmDialog
+            title={`Delete “${pendingDelete.title}”?`}
+            body={
+              <>
+                This removes the document and all {pendingDelete.pageCount}{" "}
+                {pendingDelete.pageCount === 1 ? "page" : "pages"} of its
+                contents from this device. It cannot be undone.
+              </>
+            }
+            confirmLabel="Delete document"
+            onCancel={() => setPendingDelete(null)}
+            onConfirm={handleConfirmDelete}
+          />
+        )}
       </div>
-
-      {prompt && (
-        <PromptDialog
-          {...promptConfig(
-            prompt,
-            selectedIds.length,
-            courseSuggestions,
-            tagSuggestions,
-            selectedTagSuggestions,
-          )}
-          onCancel={() => setPrompt(null)}
-          onConfirm={handlePromptConfirm}
-        />
-      )}
-
-      {confirming && (
-        <ConfirmDialog
-          title={
-            confirming.kind === "delete-docs"
-              ? `Delete ${confirming.ids.length} ${
-                  confirming.ids.length === 1 ? "document" : "documents"
-                }?`
-              : confirming.kind === "delete-tag"
-              ? `Delete the tag “${confirming.tag}”?`
-              : `Remove the course “${coursePathLabel(confirming.course)}”?`
-          }
-          body={
-            confirming.kind === "delete-docs" ? (
-              <>
-                This permanently removes {confirming.ids.length} documents and
-                all of their pages from this device. It cannot be undone.
-              </>
-            ) : confirming.kind === "delete-tag" ? (
-              <>
-                The tag is removed from {confirming.count}{" "}
-                {confirming.count === 1 ? "document" : "documents"}. The
-                documents themselves are kept.
-              </>
-            ) : (
-              <>
-                {confirming.count}{" "}
-                {confirming.count === 1 ? "document" : "documents"} in this
-                course and its sub-courses lose their course. No document is
-                deleted.
-              </>
-            )
-          }
-          confirmLabel={
-            confirming.kind === "delete-docs"
-              ? `Delete ${confirming.ids.length} ${
-                  confirming.ids.length === 1 ? "document" : "documents"
-                }`
-              : confirming.kind === "delete-tag"
-              ? "Delete tag"
-              : "Remove course"
-          }
-          onCancel={() => setConfirming(null)}
-          onConfirm={handleConfirmDestructive}
-        />
-      )}
-
-      {pendingDelete && (
-        <ConfirmDialog
-          title={`Delete “${pendingDelete.title}”?`}
-          body={
-            <>
-              This removes the document and all {pendingDelete.pageCount}{" "}
-              {pendingDelete.pageCount === 1 ? "page" : "pages"} of its contents
-              from this device. It cannot be undone.
-            </>
-          }
-          confirmLabel="Delete document"
-          onCancel={() => setPendingDelete(null)}
-          onConfirm={handleConfirmDelete}
-        />
-      )}
-    </div>
+    </ShelfThemeContext.Provider>
   );
 };
 

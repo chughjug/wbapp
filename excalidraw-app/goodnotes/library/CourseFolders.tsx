@@ -378,7 +378,7 @@ export const CourseFolders = ({
   return (
     <section className="gn-folders" aria-labelledby="gn-folders-heading">
       <h2 className="gn-folders__heading" id="gn-folders-heading">
-        Courses
+        Course colour and icon
       </h2>
       <ul className="gn-folders__list">
         {folders.map((folder) => (

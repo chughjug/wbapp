@@ -392,3 +392,107 @@ import type {
 - The bulk bar is a `role="group"` of real text buttons placed _before_ the grid in the DOM, so Tab reaches it immediately; each action names its scope ("Delete 12 documents").
 - Deleting many documents raises **one** confirmation, never N.
 - The roving tabindex and its measured row step are untouched.
+
+---
+
+## 11. Home-screen redesign — what changed in the contract
+
+**Nothing to change in `App.tsx`.** `<Shelf theme onOpenDocument headerExtra defaultView className />` is still the entry point, every prop keeps its name and type, and every previously exported symbol keeps its signature. Read on only if you care _where_ things render now.
+
+### One new optional prop
+
+```tsx
+<Shelf
+  theme={editorTheme}
+  onOpenDocument={openDocument}
+  headerExtra={<PdfDropZone variant="inline" />}
+  menuExtra={<MyConnectInvite />} // NEW, optional
+/>
+```
+
+`menuExtra?: React.ReactNode` — host controls that belong to the home screen but are not worth a permanent slot in the bar. Rendered last in the **⋯ popover**, under a separator. `goodnotes/dashboard` uses it for the Canvas connect invitation.
+
+### `headerExtra` moved — same prop, different place
+
+`headerExtra` used to render at the far right of a 3-row header. It now renders **inside the ⋯ popover**, above `menuExtra`. Hosts need no change; just be aware the slot is revealed rather than resident, so very wide content is fine but a control that must be seen at all times no longer will be.
+
+Two incidental notes for whoever owns `goodnotes/share-target`:
+
+- `PdfDropZone` renders a bare `<input type="file">` with **no CSS rule hiding it** anywhere in that module, so Chrome paints a "Choose Files / No file chosen" widget next to the real button. It is `aria-hidden` + `tabindex="-1"`, so this is purely visual. The library hides it inside the popover (`.gn-portal .gn-share-dropzone__input { display: none }`) — the real fix belongs in `shareTarget.scss`.
+- `.gn-share-dropzone--inline`'s button styling does not reach the popover; it renders as a plain UA button there. Harmless, and fixable from that module.
+
+### Screen anatomy, after
+
+```
+[ All documents                      🔍   ⋯   + New ]   one 52px bar, sticky
+[ All · Recent · Favourites · MATH 221 · … · Browse ]   only when non-empty
+[ the notebooks — first one double-size, "Continue" ]
+```
+
+- **No resident sidebar.** `Sidebar` is unchanged and now renders inside `BrowseDrawer`, a modal left drawer opened by the rail's **Browse** chip or by **Browse courses and tags…** in the ⋯ popover.
+- **No resident course-folder row.** `CourseFolders` is unchanged and now renders at the foot of the same drawer, re-labelled "Course colour and icon" — it is the only place colour/emoji are editable, so it had to travel with the sidebar.
+- **No resident Sort or Course `<select>`.** Sort is a `menuitemradio` group in the ⋯ popover. The Course select was **removed as a duplicate** — the course chips in the rail and the course tree in the drawer both do the same job and do it better (the select could not express nesting).
+- **No resident grid/list toggle.** It is a `menuitemradio` pair in the ⋯ popover.
+- **One menu per card instead of six buttons.** `DocumentActions` is now a single ⋯ `MenuButton`; favourite / pin / archive / select / edit details / duplicate / delete are the menu's items. Same callbacks, same accessible names, same `DocumentItemProps`.
+- **The selection checkbox is gated on `selectionActive`.** Entering selection mode: Space on the focused card, Cmd/Ctrl-click, **Select** in a card's menu, or **Select several…** in the ⋯ popover.
+
+### Default sort is now "Recently opened"
+
+`SortKey` in `goodnotes/types.ts` is untouched. The shelf declares its own superset locally:
+
+```ts
+export type ShelfSortKey = SortKey | "lastOpenedAt";
+```
+
+It never reaches the store — it is component state and a localStorage string. The order is `lastOpenedAt ?? updatedAt`, descending, so a brand-new or freshly imported notebook still sorts to the top.
+
+### The "Continue" card
+
+The first card is rendered double-width when the view is in its default arrangement (sort `lastOpenedAt`, filter All, no query, grid view) **and** it really is the most recently opened document — a pinned document sorts first in every order and is deliberately _not_ badged "Continue". The only notebook in a one-notebook library also gets the big card, but is badged only once it has been opened. `DocumentItemProps` gained an optional `isHero?: boolean`.
+
+### Thumbnails are now generated (new)
+
+`setThumbnail` had exactly one caller outside the store — `goodnotes/sync`, re-storing a cover that arrived from another device. **Nothing ever produced one locally**, so every card on a never-synced device showed the initials placeholder. `thumbnails.ts` now renders page 1 of a document's stored scene with `exportScene` from `@excalidraw/excalidraw`, lazily and one at a time during idle time, for the documents the shelf is currently showing. It skips a page with no ink on it (a blank white square is worse than the placeholder) and scenes over 4000 elements.
+
+Because `DocMeta` has nowhere to record _when_ a cover was taken, freshness is tracked in `localStorage` under `goodnotes:library:thumb-stamps` (`id → updatedAt`). **If the integrator is willing to add one field to `DocMeta`** (`thumbnailAt?: number`), that key can go away and the stamp becomes part of the synced record — a small, strictly-additive change worth making.
+
+A host that captures a better thumbnail from the live editor should keep doing so: `queueThumbnails` only ever touches a document whose stamp is older than its `updatedAt`, so an editor-side `setThumbnail` + a stamp write would suppress it. Without a stamp, the library will regenerate once after each edit.
+
+### New exports
+
+```ts
+// UI
+FilterRail, BrowseDrawer, Popover, MenuButton, MenuItem, MenuGroup;
+ShelfThemeContext, useShelfTheme;
+// types
+FilterRailProps,
+  RailCourse,
+  BrowseDrawerProps,
+  PopoverProps,
+  ShelfSortKey,
+  ShelfTheme;
+// thumbnails
+renderThumbnail, queueThumbnails, needsThumbnail, THUMBNAIL_MAX_PX;
+```
+
+### Storage keys added
+
+| key | meaning |
+| --- | --- |
+| `goodnotes-library-sort` | last chosen sort (`lastOpenedAt` by default) |
+| `goodnotes:library:thumb-stamps` | `{ [docId]: updatedAt }` when each cover was taken |
+
+### Portalled surfaces
+
+Popovers and the drawer render into `document.body`, so they leave the themed `.excalidraw.gn-shelf` subtree. Two consequences a host should know about:
+
+- the portal root re-declares `excalidraw` + `theme--dark`, taking the theme from `ShelfThemeContext` (which `Shelf` provides from its `theme` prop);
+- `Shelf.scss`'s root selector is now `.excalidraw.gn-shelf, .excalidraw.gn-portal`, and `Home.scss` neutralises the layout bits on the portal root with `display: contents`. Anything a host renders into `headerExtra` / `menuExtra` is styled by its own module's CSS only if that CSS reaches `document.body`.
+
+### Keyboard
+
+- `/` or `Cmd/Ctrl+F` anywhere on the home screen opens and focuses search; `Escape` in the field clears it and collapses it.
+- Tab order: Search → ⋯ → New → each rail chip in visual order → the document container (one stop, roving tabindex inside) → each card's ⋯.
+- Popovers: `Escape` closes from anywhere and returns focus to the trigger; card menus take Up/Down/Home/End; outside click and focus leaving the panel both close it.
+- The drawer is a real modal: focus moves in, Tab cycles inside it, `Escape` and the backdrop close it, focus returns to the opener.
+- The roving-tabindex row step is now read from the grid's computed track count rather than counted from the first row, so the double-width "Continue" card cannot throw it off.

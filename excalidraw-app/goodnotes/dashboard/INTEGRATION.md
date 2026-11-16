@@ -1,5 +1,7 @@
 # goodnotes/dashboard — integration
 
+> **Updated for the home-screen redesign.** The required `App.tsx` change is _unchanged_ — if you already render `<Dashboard />` at `/`, there is nothing to do. §3 and the new §4 describe what moved.
+
 The dashboard **replaces the `<Shelf />` call site** at `/`. It renders `Shelf` itself, so do not render both.
 
 ## The change to `excalidraw-app/App.tsx`
@@ -99,3 +101,64 @@ When Canvas is not connected the dashboard shows one quiet, dismissible sentence
 - **"Canvas files" on a course card** are counted as the course's dated Canvas _assignments_, and labelled as such. Only four functions of `goodnotes/canvas` are pinned as stable and none lists files.
 - **Scope of the Canvas calls.** The dashboard calls `listUpcomingWork()` on mount (connected only) and `refreshLinkedDueDates()` only when the user presses **Sync Canvas**. It re-checks `isCanvasConnected()` on window focus, so connecting in another tab fills the screen in without a reload.
 - **Dismissal** of the invitation is permanent and local (`goodnotes:dashboard:connect-invite-dismissed`). `resetConnectInvite()` is exported for a Settings "show it again" control.
+
+---
+
+## 4. The home-screen redesign
+
+### The `App.tsx` change (unchanged, copy-pasteable)
+
+This is already in `App.tsx` at the `/` route and needs **no edit**:
+
+```tsx
+if (!docId && !isTransientScene) {
+  return (
+    <>
+      <Dashboard
+        theme={editorTheme}
+        onOpenDocument={openDocument}
+        headerExtra={<PdfDropZone variant="inline" />}
+        onConnectCanvas={canvasConnect.open}
+      />
+      <GlobalPdfDropOverlay mode="library" />
+      {canvasConnect.dialog}
+    </>
+  );
+}
+```
+
+### Public API (`DashboardProps`), unchanged
+
+| prop | type | meaning |
+| --- | --- | --- |
+| `onOpenDocument` | `(doc: DocMeta) => void` | required; open or create |
+| `theme` | `"light" \| "dark"` | default `"light"` |
+| `headerExtra` | `ReactNode` | **now rendered inside the home screen's ⋯ popover** (see below) |
+| `className` | `string` | on the root |
+| `defaultView` | `"grid" \| "list"` | initial view only |
+| `onConnectCanvas` | `() => void` | opens the host's Canvas flow; omit and the invitation points at Settings in words |
+
+### What moved, from the dashboard's side
+
+**The Canvas invitation is no longer a resident strip.** It used to be two controls and a sentence across the top of the screen — on a first run, above a library with one untitled notebook, explaining a feature most students will never connect. It is now the last item of the home screen's **⋯** popover, passed down through `Shelf`'s new `menuExtra` slot:
+
+```tsx
+<Shelf
+  …
+  menuExtra={
+    !connected && !inviteDismissed ? (
+      <ConnectInvite onConnect={onConnectCanvas} onDismiss={handleDismiss} />
+    ) : null
+  }
+/>
+```
+
+Same `ConnectInvite` component, same copy, same permanent dismissal (`goodnotes:dashboard:connect-invite-dismissed`, resettable with `resetConnectInvite()`), same `onConnectCanvas` contract — zero resident pixels. If you would rather it were resident again, render `<ConnectInvite />` yourself above `<Dashboard />`; it is still exported.
+
+`Dashboard.scss` gained a `.excalidraw.gn-portal` block, because the popover is portalled to `document.body` and leaves the `.gn-dash` scope. That block only re-states the invitation's own rules.
+
+**When Canvas _is_ connected, nothing changed**: `DueSoonStrip` and `CourseCards` still render above the library, with the same placeholders, the same error notice and the same `Sync Canvas` action. They are untouched by this redesign.
+
+### Caveat the integrator should know
+
+The connected-Canvas path (`DueSoonStrip` + `CourseCards` above a now much lighter home screen) was **not re-reviewed visually** as part of this redesign — no Canvas account was available in this environment. The code path is unchanged and still typechecks, but the two surfaces were designed to sit above a dense screen and may now want to be lighter themselves. That is the first thing to look at once a connected account exists.

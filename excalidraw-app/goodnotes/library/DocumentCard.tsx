@@ -46,6 +46,7 @@ export const DocumentCard = React.memo((props: DocumentItemProps) => {
     isPinned,
     isArchived,
     selectionActive,
+    isHero,
     courseStyle,
     onFocusCard,
     onToggleSelect,
@@ -61,17 +62,28 @@ export const DocumentCard = React.memo((props: DocumentItemProps) => {
 
   return (
     <li
-      className={`gn-card-wrapper${isSelected ? " gn-selected" : ""}`}
+      className={`gn-card-wrapper${isSelected ? " gn-selected" : ""}${
+        isHero ? " gn-card-wrapper--hero" : ""
+      }`}
       role="row"
       aria-selected={onToggleSelect ? !!isSelected : undefined}
     >
       <div
-        className={`gn-card${isEditing ? " gn-card--editing" : ""}${
-          isSelected ? " gn-card--selected" : ""
-        }${selectionActive ? " gn-card--selecting" : ""}`}
+        className={`gn-card${isHero ? " gn-card--hero" : ""}${
+          isEditing ? " gn-card--editing" : ""
+        }${isSelected ? " gn-card--selected" : ""}${
+          selectionActive ? " gn-card--selecting" : ""
+        }`}
         role="gridcell"
       >
-        {onToggleSelect && (
+        {/*
+          The checkbox is only resident once a selection exists. At rest it
+          was one more control on every card for a gesture almost nobody uses
+          on a home screen; it is still reachable without it — Space on the
+          focused card, Cmd/Ctrl-click, or "Select" in the card's own menu —
+          and the moment any of those fires, every checkbox appears.
+        */}
+        {onToggleSelect && selectionActive && (
           <SelectionCheckbox
             doc={doc}
             isSelected={isSelected}
@@ -85,7 +97,11 @@ export const DocumentCard = React.memo((props: DocumentItemProps) => {
           className="gn-card__open"
           ref={(node) => registerRef(doc.id, node)}
           tabIndex={tabIndex}
-          aria-label={describeDocument(doc, now, isFavourite, tags)}
+          aria-label={`${
+            isHero && doc.lastOpenedAt != null
+              ? "Continue where you left off. "
+              : ""
+          }${describeDocument(doc, now, isFavourite, tags)}`}
           aria-keyshortcuts={onToggleSelect ? "Space" : undefined}
           onFocus={() => onFocusCard(doc.id)}
           onClick={activation.onClick}
@@ -111,6 +127,9 @@ export const DocumentCard = React.memo((props: DocumentItemProps) => {
                 </span>
               </span>
             )}
+            {isHero && doc.lastOpenedAt != null && (
+              <span className="gn-card__continue">Continue</span>
+            )}
             {isFavourite && <span className="gn-card__star">★</span>}
             <span className="gn-card__pages">
               {doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}
@@ -131,38 +150,45 @@ export const DocumentCard = React.memo((props: DocumentItemProps) => {
               )}
               {doc.title}
             </span>
-            <span className="gn-card__course">
-              {doc.course ? (
-                <>
-                  <span
-                    className="gn-course-dot"
-                    aria-hidden="true"
-                    style={
-                      {
-                        "--gn-course-rgb": hexToRgbChannels(
-                          courseStyle?.color ?? "#6b7280",
-                        ),
-                      } as React.CSSProperties
-                    }
-                  />
-                  {courseStyle?.emoji ? `${courseStyle.emoji} ` : ""}
-                  {formatCoursePath(doc.course)}
-                </>
-              ) : (
-                "No course"
+            {/*
+              A badge that says a field is empty is noise: "No course" and
+              "No due date" were on most cards on most screens and told the
+              student nothing. Both are simply absent now — and both are
+              still spelled out in the card's accessible name, which has not
+              changed, so nothing is lost to a screen reader.
+            */}
+            {doc.course && (
+              <span className="gn-card__course">
+                <span
+                  className="gn-course-dot"
+                  aria-hidden="true"
+                  style={
+                    {
+                      "--gn-course-rgb": hexToRgbChannels(
+                        courseStyle?.color ?? "#6b7280",
+                      ),
+                    } as React.CSSProperties
+                  }
+                />
+                {courseStyle?.emoji ? `${courseStyle.emoji} ` : ""}
+                {formatCoursePath(doc.course)}
+              </span>
+            )}
+            <span className="gn-card__meta">
+              {doc.dueDate != null && (
+                <span className={`gn-due gn-due--${urgency}`}>
+                  <span className="gn-due__dot" aria-hidden="true" />
+                  {dueLabel}
+                </span>
               )}
+              <span className="gn-card__updated">{updatedLabel}</span>
             </span>
-            <span className={`gn-due gn-due--${urgency}`}>
-              <span className="gn-due__dot" aria-hidden="true" />
-              {dueLabel}
-            </span>
-            <span className="gn-card__updated">{updatedLabel}</span>
           </span>
         </button>
 
         {tags.length > 0 && (
           <ul className="gn-card__tags" aria-label={`Tags on ${doc.title}`}>
-            {tags.slice(0, 4).map((tag) => (
+            {tags.slice(0, 2).map((tag) => (
               <li key={tag}>
                 {onSelectTag ? (
                   <button
@@ -179,10 +205,10 @@ export const DocumentCard = React.memo((props: DocumentItemProps) => {
                 )}
               </li>
             ))}
-            {tags.length > 4 && (
+            {tags.length > 2 && (
               <li>
                 <span className="gn-chip gn-chip--more">
-                  +{tags.length - 4}
+                  +{tags.length - 2}
                   <span className="gn-sr-only"> more tags</span>
                 </span>
               </li>

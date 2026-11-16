@@ -23,7 +23,7 @@
 
 /** Full-screen home screen (sidebar + folders + grid/list). */
 export { Shelf } from "./Shelf";
-export type { ShelfProps, LibraryView } from "./Shelf";
+export type { ShelfProps, LibraryView, ShelfSortKey } from "./Shelf";
 
 /** Due-state helpers and the relative-time formatters the cards use. */
 export {
@@ -210,3 +210,34 @@ export {
   SCENE_SAVE_DEBOUNCE_MS,
 } from "./store";
 export type { DocPatch } from "./store";
+
+// ---------------------------------------------------------------------------
+// home screen (see INTEGRATION.md §11)
+// ---------------------------------------------------------------------------
+
+/** The horizontal chip rail that replaced the resident sidebar. */
+export { FilterRail } from "./FilterRail";
+export type { FilterRailProps, RailCourse } from "./FilterRail";
+
+/** The modal drawer the sidebar and the course folders moved into. */
+export { BrowseDrawer } from "./BrowseDrawer";
+export type { BrowseDrawerProps } from "./BrowseDrawer";
+
+/** The one popup primitive: anchored, portalled, Escape-closable. */
+export { Popover, MenuButton, MenuItem, MenuGroup } from "./Popover";
+export type { PopoverProps } from "./Popover";
+
+/** The theme a portalled surface re-declares, since it leaves the subtree. */
+export { ShelfThemeContext, useShelfTheme } from "./theme";
+export type { ShelfTheme } from "./theme";
+
+/**
+ * Cover generation. Nothing in the app produced a `DocMeta.thumbnail` before
+ * this; `Shelf` queues these for what is on screen. See thumbnails.ts.
+ */
+export {
+  renderThumbnail,
+  queueThumbnails,
+  needsThumbnail,
+  THUMBNAIL_MAX_PX,
+} from "./thumbnails";

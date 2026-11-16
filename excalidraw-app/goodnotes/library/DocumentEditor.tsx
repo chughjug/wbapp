@@ -10,7 +10,19 @@ import React, { useId, useState } from "react";
 
 import { visibleTags } from "./filters";
 import { formatCoursePath } from "./coursePath";
-import { Icon, ICON_ARCHIVE, ICON_CHECK, ICON_CLOSE, ICON_PIN } from "./icons";
+import {
+  Icon,
+  ICON_ARCHIVE,
+  ICON_CHECK,
+  ICON_CLOSE,
+  ICON_COPY,
+  ICON_MORE,
+  ICON_PENCIL,
+  ICON_PIN,
+  ICON_STAR,
+  ICON_TRASH,
+} from "./icons";
+import { MenuButton, MenuItem } from "./Popover";
 
 import type { CourseStyle } from "./courses";
 import type { DocMeta } from "../types";
@@ -59,6 +71,11 @@ export interface DocumentItemProps {
   onToggleArchived?: (doc: DocMeta) => void;
   /** Clicking a tag chip filters the library by it. */
   onSelectTag?: (tag: string) => void;
+  /**
+   * The one notebook to get back into: rendered larger, first, and badged
+   * "Continue". Only ever set on the first item of the default view.
+   */
+  isHero?: boolean;
   /** Autocomplete sources for the inline editor. */
   tagSuggestions?: readonly string[];
   courseSuggestions?: readonly string[];
@@ -308,7 +325,6 @@ export const DocumentActions = ({
   isFavourite,
   isPinned,
   isArchived,
-  tabIndex,
   onStartEdit,
   onStopEdit,
   onDuplicate,
@@ -316,6 +332,7 @@ export const DocumentActions = ({
   onToggleFavourite,
   onTogglePinned,
   onToggleArchived,
+  onToggleSelect,
   className,
 }: Pick<
   DocumentItemProps,
@@ -332,92 +349,86 @@ export const DocumentActions = ({
   | "onToggleFavourite"
   | "onTogglePinned"
   | "onToggleArchived"
+  | "onToggleSelect"
 > & { className?: string }) => (
   <div className={`gn-card__actions${className ? ` ${className}` : ""}`}>
-    <button
-      type="button"
-      className={`gn-icon-button${
-        isFavourite ? " gn-icon-button--star-on" : ""
-      }`}
-      tabIndex={tabIndex}
-      aria-pressed={isFavourite}
-      aria-label={
-        isFavourite
-          ? `Remove ${doc.title} from favourites`
-          : `Add ${doc.title} to favourites`
-      }
-      onClick={() => onToggleFavourite(doc)}
+    <MenuButton
+      label={`More actions for ${doc.title}`}
+      buttonClassName="gn-icon-button gn-card__more"
+      icon={<Icon path={ICON_MORE} />}
     >
-      <Icon
-        path="M12 3.5l2.6 5.3 5.9.9-4.25 4.15 1 5.85L12 16.95 6.75 19.7l1-5.85L3.5 9.7l5.9-.9L12 3.5z"
-        filled={isFavourite}
-      />
-    </button>
-    {onTogglePinned && (
-      <button
-        type="button"
-        className={`gn-icon-button${isPinned ? " gn-icon-button--on" : ""}`}
-        tabIndex={tabIndex}
-        aria-pressed={!!isPinned}
-        aria-label={
-          isPinned ? `Unpin ${doc.title}` : `Pin ${doc.title} to the top`
-        }
-        onClick={() => onTogglePinned(doc)}
-      >
-        <Icon path={ICON_PIN} filled={!!isPinned} />
-      </button>
-    )}
-    {onToggleArchived && (
-      <button
-        type="button"
-        className={`gn-icon-button${isArchived ? " gn-icon-button--on" : ""}`}
-        tabIndex={tabIndex}
-        aria-pressed={!!isArchived}
-        aria-label={
-          isArchived ? `Unarchive ${doc.title}` : `Archive ${doc.title}`
-        }
-        onClick={() => onToggleArchived(doc)}
-      >
-        <Icon path={ICON_ARCHIVE} />
-      </button>
-    )}
-    <button
-      type="button"
-      className="gn-icon-button"
-      tabIndex={tabIndex}
-      aria-expanded={isEditing}
-      aria-label={
-        isEditing
-          ? `Close details for ${doc.title}`
-          : `Edit details for ${doc.title}`
-      }
-      onClick={() => (isEditing ? onStopEdit() : onStartEdit(doc.id))}
-    >
-      <Icon
-        path={
-          isEditing
-            ? "M6 6l12 12M18 6L6 18"
-            : "M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"
-        }
-      />
-    </button>
-    <button
-      type="button"
-      className="gn-icon-button"
-      tabIndex={tabIndex}
-      aria-label={`Duplicate ${doc.title}`}
-      onClick={() => onDuplicate(doc)}
-    >
-      <Icon path="M9 9h10v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V9zM5 15V5a2 2 0 0 1 2-2h10" />
-    </button>
-    <button
-      type="button"
-      className="gn-icon-button gn-icon-button--danger"
-      tabIndex={tabIndex}
-      aria-label={`Delete ${doc.title}`}
-      onClick={() => onDelete(doc)}
-    >
-      <Icon path="M4 7h16M10 7V5h4v2m-7 0 1 13h8l1-13" />
-    </button>
+      {(close) => (
+        <>
+          <MenuItem
+            label={isFavourite ? "Remove from favourites" : "Add to favourites"}
+            icon={<Icon path={ICON_STAR} filled={isFavourite} />}
+            onClick={() => {
+              onToggleFavourite(doc);
+              close();
+            }}
+          />
+          {onTogglePinned && (
+            <MenuItem
+              label={isPinned ? "Unpin from the top" : "Pin to the top"}
+              icon={<Icon path={ICON_PIN} filled={!!isPinned} />}
+              onClick={() => {
+                onTogglePinned(doc);
+                close();
+              }}
+            />
+          )}
+          {onToggleArchived && (
+            <MenuItem
+              label={isArchived ? "Unarchive" : "Archive"}
+              icon={<Icon path={ICON_ARCHIVE} />}
+              onClick={() => {
+                onToggleArchived(doc);
+                close();
+              }}
+            />
+          )}
+          {onToggleSelect && (
+            <MenuItem
+              label="Select"
+              description="then pick more to act on several at once"
+              icon={<Icon path={ICON_CHECK} />}
+              onClick={() => {
+                onToggleSelect(doc.id, { shift: false, meta: true });
+                close();
+              }}
+            />
+          )}
+          <MenuItem
+            label={isEditing ? "Close details" : "Edit details…"}
+            icon={<Icon path={ICON_PENCIL} />}
+            onClick={() => {
+              if (isEditing) {
+                onStopEdit();
+              } else {
+                onStartEdit(doc.id);
+              }
+              close();
+            }}
+          />
+          <MenuItem
+            label="Duplicate"
+            icon={<Icon path={ICON_COPY} />}
+            onClick={() => {
+              onDuplicate(doc);
+              close();
+            }}
+          />
+          <MenuItem
+            label="Delete…"
+            danger
+            icon={<Icon path={ICON_TRASH} />}
+            onClick={() => {
+              onDelete(doc);
+              close();
+            }}
+          />
+        </>
+      )}
+    </MenuButton>
   </div>
 );

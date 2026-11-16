@@ -5,7 +5,7 @@
  * Layout
  *   [ Due soon        — deadline cards, soonest first ]   <- Canvas only
  *   [ Your courses    — notebooks + Canvas work       ]   <- Canvas only
- *   [ <Shelf/>        — the library, untouched        ]   <- always
+ *   [ <Shelf/>        — the home screen               ]   <- always
  *
  * DEGRADING GRACEFULLY IS THE DESIGN, NOT A FALLBACK.
  * With no Canvas connection the top region is not rendered at all: no strip,
@@ -126,16 +126,20 @@ export const Dashboard = ({
         </div>
       )}
 
-      {!connected && !inviteDismissed && (
-        <ConnectInvite onConnect={onConnectCanvas} onDismiss={handleDismiss} />
-      )}
-
       <div className="gn-dash__shelf">
         <Shelf
           theme={theme}
           onOpenDocument={onOpenDocument}
           headerExtra={headerExtra}
           defaultView={defaultView}
+          menuExtra={
+            !connected && !inviteDismissed ? (
+              <ConnectInvite
+                onConnect={onConnectCanvas}
+                onDismiss={handleDismiss}
+              />
+            ) : null
+          }
         />
       </div>
     </div>

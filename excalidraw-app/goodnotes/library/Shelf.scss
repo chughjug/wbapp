@@ -10,7 +10,12 @@
  *  - translucent scrims (rgb(0 0 0 / x)) layered over an existing token
  */
 
-.excalidraw.gn-shelf {
+// `.gn-portal` is the same design system rendered into `document.body`: the
+// browse drawer and every popover escape the shelf's subtree, so the shelf's
+// rules have to reach them too. The portal root neutralises the layout bits
+// in Home.scss (`display: contents`); everything else applies identically.
+.excalidraw.gn-shelf,
+.excalidraw.gn-portal {
   // the base `.excalidraw` rule is a flex row with overflow hidden; the shelf
   // keeps the row (sidebar + main column) and owns the scrolling itself.
   display: flex;
@@ -28,6 +33,14 @@
   // contrast correctly when foreground and background come from the matching
   // `-color` / `-background` pair — hence these aliases.
   --gn-text-muted: var(--color-gray-70);
+  // Text and glyphs that sit on a fixed dark or saturated fill (the cover
+  // scrims, the primary button, an active chip). Excalidraw's
+  // `--color-icon-white` is NOT this: it resolves to #1e1e1e in dark theme,
+  // which made the page-count badge and the favourite star invisible there.
+  // Likewise `--color-warning-color` is #3d3d3d in dark, so the star gets a
+  // real amber of its own.
+  --gn-on-fill: #fff;
+  --gn-star: #f0a52a;
 
   &.theme--dark {
     --gn-text-muted: var(--color-gray-40);
@@ -371,7 +384,7 @@
     }
 
     &--primary {
-      color: var(--color-icon-white, #fff);
+      color: var(--gn-on-fill);
       background-color: var(--color-primary);
       border-color: var(--color-primary);
 
@@ -541,7 +554,7 @@
     font-weight: 600;
     padding: 0.125rem 0.4rem;
     border-radius: 999px;
-    color: var(--color-icon-white, #fff);
+    color: var(--gn-on-fill);
     background-color: rgb(0 0 0 / 55%);
   }
 
@@ -1018,7 +1031,7 @@
 
   .gn-icon-button--on {
     background-color: var(--color-primary);
-    color: var(--color-icon-white, #fff);
+    color: var(--gn-on-fill);
 
     &:hover:not(:disabled) {
       background-color: var(--color-primary-darker);
@@ -1026,7 +1039,7 @@
   }
 
   .gn-icon-button--star-on {
-    color: var(--color-warning-color);
+    color: var(--gn-star);
   }
 
   // ------------------------------------------------------------ course dot
@@ -1046,8 +1059,8 @@
     inset-inline-start: 0.5rem;
     font-size: 0.875rem;
     line-height: 1;
-    color: var(--color-warning-color);
-    text-shadow: 0 0 2px rgb(0 0 0 / 35%);
+    color: var(--gn-star);
+    text-shadow: 0 0 2px rgb(0 0 0 / 55%);
   }
 
   // ------------------------------------------------------------- list view
@@ -1150,7 +1163,7 @@
   }
 
   .gn-row__star {
-    color: var(--color-warning-color);
+    color: var(--gn-star);
     margin-inline-end: 0.25rem;
   }
 
@@ -1562,52 +1575,8 @@
     }
   }
 
-  // sidebar collapses to a horizontal filter strip on narrow screens
-  @media (max-width: 860px) {
-    flex-direction: column;
-
-    .gn-sidebar {
-      flex: 0 0 auto;
-      width: 100%;
-      flex-direction: row;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.5rem;
-      overflow-x: auto;
-      padding: 0.625rem 0.75rem;
-      border-inline-end: 0;
-      border-block-end: 1px solid var(--default-border-color);
-    }
-
-    .gn-sidebar__list {
-      flex-direction: row;
-      margin: 0;
-      flex-wrap: wrap;
-    }
-
-    .gn-sidebar__item--active::before {
-      inset-inline-start: 0.3rem;
-      inset-block: auto;
-      inset-block-end: 0;
-      width: auto;
-      height: 2px;
-      inset-inline-end: 0.3rem;
-      border-radius: 2px;
-    }
-
-    .gn-sidebar__section {
-      margin: 0;
-    }
-
-    .gn-sidebar__storage {
-      margin: 0;
-      padding: 0;
-      border-top: 0;
-      min-width: 9rem;
-    }
-
-    .gn-sidebar__storage-head {
-      display: none;
-    }
-  }
+  // (The narrow-screen rules that used to flatten the sidebar into a
+  // horizontal strip are gone: the sidebar is never a column of the page
+  // now, it is the body of the Browse drawer, which is the same ~21rem
+  // panel at every width and wants its vertical layout everywhere.)
 }
