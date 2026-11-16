@@ -169,7 +169,9 @@ export const DarkModeToggle = ({
               }
               event.preventDefault();
               const delta =
-                event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
+                event.key === "ArrowRight" || event.key === "ArrowDown"
+                  ? 1
+                  : -1;
               const index = OPTIONS.findIndex((o) => o.value === current);
               const nextOption =
                 OPTIONS[(index + delta + OPTIONS.length) % OPTIONS.length];

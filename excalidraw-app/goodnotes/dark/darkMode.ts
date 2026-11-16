@@ -130,7 +130,8 @@ export const subscribeToSystemTheme = (
  *     #000 on #000 → #fff is a 21:1 glare bomb, which is the eye-strain we
  *     are trying to remove. ~0.88 lightness lands around 12-14:1 on OLED
  *     black: far above WCAG AAA (7:1) and much kinder at 2am.
- *   - light ink (L >= 0.5): do NOT invert — desaturate and dim it.
+ *   - light ink (relative luminance >= 0.42): do NOT invert — desaturate
+ *     and dim it.
  *     L' = L * 0.66, S' = S * 0.75. A yellow highlighter stays yellow, just
  *     muted, instead of either glaring or disappearing.
  *
@@ -202,9 +203,7 @@ export const parseColor = (color: string): RGBA | null => {
 
 export const toHex = ({ r, g, b, a }: RGBA): string => {
   const channel = (n: number) =>
-    Math.round(clamp(n, 0, 255))
-      .toString(16)
-      .padStart(2, "0");
+    Math.round(clamp(n, 0, 255)).toString(16).padStart(2, "0");
   const base = `#${channel(r)}${channel(g)}${channel(b)}`;
   return a >= 1 ? base : `${base}${channel(a * 255)}`;
 };
@@ -267,14 +266,20 @@ export const hslToRgb = ({ h, s, l }: HSL, a = 1): RGBA => {
 
 /** Tunables for {@link invertInkForDarkMode}. */
 export const INK_TRANSFORM = {
-  /** Below this lightness, ink is "dark ink" and gets lightness-inverted. */
-  darkInkThreshold: 0.5,
+  /**
+   * Branch on WCAG *relative luminance*, not HSL lightness: a saturated red
+   * (#e03131) sits at HSL L 0.53 but relative luminance 0.19 — it is dark
+   * ink to the eye and must be lifted, not dimmed.
+   */
+  lightInkLuminanceThreshold: 0.42,
   /** Inverted dark ink is clamped here — never pure white (glare). */
   minInvertedLightness: 0.55,
   maxInvertedLightness: 0.9,
   /** Light ink keeps its hue; lightness and saturation are scaled down. */
   lightInkLightnessScale: 0.66,
   lightInkSaturationScale: 0.75,
+  /** ...but never below this, or it drops off a dark page. */
+  minLightInkLightness: 0.38,
 } as const;
 
 /**
@@ -288,23 +293,27 @@ export const invertInkForDarkMode = (color: string): string => {
   }
 
   const { h, s, l } = rgbToHsl(rgba);
+  const isLightInk =
+    relativeLuminance(rgba) >= INK_TRANSFORM.lightInkLuminanceThreshold;
 
-  const next =
-    l < INK_TRANSFORM.darkInkThreshold
-      ? {
-          h,
-          s,
-          l: clamp(
-            1 - l,
-            INK_TRANSFORM.minInvertedLightness,
-            INK_TRANSFORM.maxInvertedLightness,
-          ),
-        }
-      : {
-          h,
-          s: s * INK_TRANSFORM.lightInkSaturationScale,
-          l: l * INK_TRANSFORM.lightInkLightnessScale,
-        };
+  const next = isLightInk
+    ? {
+        h,
+        s: s * INK_TRANSFORM.lightInkSaturationScale,
+        l: Math.max(
+          l * INK_TRANSFORM.lightInkLightnessScale,
+          INK_TRANSFORM.minLightInkLightness,
+        ),
+      }
+    : {
+        h,
+        s,
+        l: clamp(
+          1 - l,
+          INK_TRANSFORM.minInvertedLightness,
+          INK_TRANSFORM.maxInvertedLightness,
+        ),
+      };
 
   return toHex(hslToRgb(next, rgba.a));
 };
@@ -335,10 +344,15 @@ const srgbToLinear = (channel: number) => {
 
 /** WCAG relative luminance. */
 export const relativeLuminance = ({ r, g, b }: RGBA): number =>
-  0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
+  0.2126 * srgbToLinear(r) +
+  0.7152 * srgbToLinear(g) +
+  0.0722 * srgbToLinear(b);
 
 /** WCAG 2.x contrast ratio between two opaque colours (1..21). */
-export const contrastRatio = (foreground: string, background: string): number => {
+export const contrastRatio = (
+  foreground: string,
+  background: string,
+): number => {
   const fg = parseColor(foreground);
   const bg = parseColor(background);
   if (!fg || !bg) {

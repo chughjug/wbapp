@@ -54,11 +54,7 @@ export {
   DARK_MODE_PALETTE,
 } from "./darkMode";
 
-export type {
-  DarkModePreference,
-  ResolvedTheme,
-  RGBA,
-} from "./darkMode";
+export type { DarkModePreference, ResolvedTheme, RGBA } from "./darkMode";
 
 export {
   /** Force an appState onto white paper / black ink for an export. */
