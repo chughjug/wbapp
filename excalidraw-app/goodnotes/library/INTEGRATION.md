@@ -2,38 +2,14 @@
 
 Everything below is a change the **integrator** makes. Nothing in `goodnotes/library/` needs to be edited to wire this up.
 
-The module exports:
-
-```ts
-import {
-  Shelf, // full-screen home screen component
-  useDocuments, // React hook over the store
-  listDocs,
-  getDoc,
-  getScene,
-  createDoc,
-  updateDocMeta,
-  saveScene,
-  saveSceneDebounced,
-  flushSceneSaves,
-  setThumbnail,
-  touchDoc,
-  duplicateDoc,
-  deleteDoc,
-  subscribe,
-} from "./goodnotes/library";
-import type {
-  ShelfProps,
-  DocumentActions,
-  UseDocumentsResult,
-} from "./goodnotes/library";
-```
+> **If you already integrated the previous version of this module: there is nothing to change.**
+> `<Shelf theme={editorTheme} onOpenDocument={openDocument} />` is still the entry point, with the same props and the same behaviour. The restructure (sidebar, course folders, grid/list, favourites, in-app delete confirmation) is entirely internal. The only removed export is the internal `ShelfCard` type helper, which was never exported. Skip to §9 for the new optional props and exports.
 
 ---
 
 ## 1. Where the shelf-vs-editor routing decision belongs
 
-**In `ExcalidrawApp` (bottom of `App.tsx`, currently ~line 1313), _not_ inside `ExcalidrawWrapper`.**
+**In `ExcalidrawApp` (bottom of `App.tsx`), _not_ inside `ExcalidrawWrapper`.**
 
 Reasons:
 
@@ -48,7 +24,6 @@ import {
   getScene,
   saveSceneDebounced,
   flushSceneSaves,
-  touchDoc,
 } from "./goodnotes/library";
 import type { DocMeta } from "./goodnotes/types";
 ```
@@ -123,7 +98,7 @@ const GoodNotesRoot = () => {
 };
 ```
 
-> `Shelf` already stamps `lastOpenedAt` via `touchDoc` when a card is activated, so `openDocument` does not need to.
+> `Shelf` stamps `lastOpenedAt` via `touchDoc` when a card is activated, so `openDocument` does not need to. That stamp is what populates the sidebar's **Recent** filter.
 
 ## 4. `ExcalidrawWrapper` props
 
@@ -141,7 +116,7 @@ const ExcalidrawWrapper = ({
 
 ## 5. Load the document's scene instead of `LocalData`
 
-Inside `ExcalidrawWrapper`'s `initializeScene` effect, the line that currently resolves the initial data (~line 567):
+Inside `ExcalidrawWrapper`'s `initializeScene` effect, where the initial data is resolved:
 
 ```tsx
 initialStatePromiseRef.current.promise.resolve(data.scene);
@@ -162,17 +137,15 @@ initialStatePromiseRef.current.promise.resolve(
 );
 ```
 
-(Keeping the `data.scene` fallback means a brand-new document still gets the usual defaults / `#json=` import path.)
-
 ## 6. Save into the document, not the global key
 
-In `onChange` (~line 715), alongside (or instead of) the `LocalData.save` call:
+In `onChange`, alongside (or instead of) the `LocalData.save` call:
 
 ```tsx
 saveSceneDebounced(docId, { elements, appState, files });
 ```
 
-`saveSceneDebounced` coalesces writes per document (750 ms), strips deleted elements and non-serialisable `appState` keys, bumps `updatedAt`, and derives `pageCount` from `page:`-prefixed frames. Call `flushSceneSaves()` on unload:
+and flush on unload:
 
 ```tsx
 useEffect(() => {
@@ -185,11 +158,7 @@ useEffect(() => {
 }, []);
 ```
 
-If you keep upstream `LocalData.save` as well, scope it off for GoodNotes docs or the two will fight over the same `excalidraw` localStorage key.
-
 ## 7. A way back to the shelf
-
-Add a menu item to `AppMainMenu` (or any toolbar you own):
 
 ```tsx
 <MainMenu.Item onSelect={onCloseDocument} icon={...}>
@@ -197,9 +166,7 @@ Add a menu item to `AppMainMenu` (or any toolbar you own):
 </MainMenu.Item>
 ```
 
-## 8. Thumbnails (optional, owned by whoever renders the export)
-
-When page 1 has been exported to a PNG data URL:
+## 8. Thumbnails (optional)
 
 ```tsx
 await setThumbnail(docId, dataUrl);
@@ -209,9 +176,183 @@ await setThumbnail(docId, dataUrl);
 
 ---
 
+## 9. What the restructured shelf adds
+
+### New optional prop
+
+```tsx
+<Shelf
+  theme={editorTheme}
+  onOpenDocument={openDocument}
+  defaultView="list"   // NEW, optional: "grid" (default) | "list"
+  headerExtra={<MyMenu />}  // unchanged
+/>
+```
+
+`defaultView` is only the *initial* value. The user's last choice is remembered in `localStorage` under `goodnotes-library-view` and wins on subsequent loads.
+
+### Screen anatomy
+
+```
+┌───────────────┬──────────────────────────────────────────────┐
+│ All documents │ <filter name>      [grid|list]  [New document]│
+│ Favourites    │ [search ........]  [Sort by ▾]  [Course ▾]    │
+│ Recent        ├──────────────────────────────────────────────┤
+│ Due this week │ COURSES                                       │
+│               │ ┌─🧪 Biology 201─┐ ┌─📐 Math 310─┐  …  each ▾ │
+│ COURSES       │ └ 2 documents  ▾┘ └ 2 documents ▾┘            │
+│ ● Biology 201 ├──────────────────────────────────────────────┤
+│ ● Math 310    │ grid of cover cards  —or—  dense list rows    │
+│ ● History 110 │                                               │
+│ ─────────────  │                                              │
+│ Storage 4.2 MB│                                               │
+└───────────────┴──────────────────────────────────────────────┘
+```
+
+### Favourites are a reserved tag
+
+Starring a document appends the reserved tag **`"favourite"`** to `DocMeta.tags`. The shared contract is untouched; `FAVOURITE_TAG`, `isFavourite(doc)` and `visibleTags(doc)` are exported.
+
+**If you consume `DocMeta.tags` anywhere else** (tabs, export, search), filter the reserved tag out for display:
+
+```ts
+import { visibleTags, isFavourite } from "./goodnotes/library";
+
+const chips = visibleTags(doc);       // user tags only
+const starred = isFavourite(doc);     // the flag
+```
+
+Rationale: a star is a one-bit label, and `tags` is the contract's label field. One source of truth means the flag can never drift from the document, `duplicateDoc` carries it for free, and `deleteDoc` (which this module must not change) needs no extra bookkeeping. The cost is that the literal tag name `favourite` is reserved.
+
+### Course colour + emoji live in their own IndexedDB database
+
+A course is identified only by the free-text `DocMeta.course` string and has no row of its own, so its presentation is stored separately — same `idb-keyval` pattern as `store.ts`:
+
+```
+db "goodnotes-courses" / store "styles"  ->  { color: "#rrggbb", emoji: string | null }
+                                             keyed by course name
+```
+
+Nothing has to be migrated or seeded: a course with no stored row gets a stable colour derived from its name (`defaultCourseColor`). Renaming a course in a document's details creates a new key; the old row is harmless and `resetCourseStyle(name)` removes it.
+
+API: `useCourseStyles()`, `listCourseStyles()`, `setCourseStyle()`, `resetCourseStyle()`, `subscribeCourseStyles()`.
+
+**Deleting all documents of a course does not delete its style row** — reopen the course later and its colour is still there. If you add a "clean up unused courses" action, call `resetCourseStyle` yourself.
+
+### Delete confirmation
+
+`window.confirm` is gone. Delete now opens `ConfirmDialog` — a modal `role="dialog"` with focus trapping, Escape/backdrop cancel, and focus restoration. It is exported if you want it elsewhere.
+
+### Three new storage keys to know about
+
+| key | where | what |
+| --- | --- | --- |
+| `goodnotes` → `docs` | IndexedDB | document metadata (unchanged) |
+| `goodnotes-scenes` → `scenes` | IndexedDB | scene payloads (unchanged) |
+| `goodnotes-courses` → `styles` | IndexedDB | **new** — course colour/emoji |
+| `goodnotes-library-view` | localStorage | **new** — last grid/list choice |
+
+---
+
+## 10. Public API
+
+```ts
+import {
+  // screen
+  Shelf,
+  // composable pieces, if you build your own home screen
+  Sidebar,
+  CourseFolders,
+  DocumentCard,
+  DocumentRow,
+  ConfirmDialog,
+
+  // filter model
+  FAVOURITE_TAG,
+  RECENT_WINDOW_MS,
+  FILTER_ALL,
+  isFavourite,
+  visibleTags,
+  isDueThisWeek,
+  isRecent,
+  endOfDueWeek,
+  matchesFilter,
+  matchesQuery,
+  filterId,
+  filterLabel,
+  filtersEqual,
+
+  // formatting
+  getDueUrgency,
+  formatDueDate,
+  formatUpdatedAt,
+  formatShortDate,
+  formatBytes,
+
+  // react state
+  useDocuments,
+  useCourseStyles,
+
+  // course styles
+  listCourseStyles,
+  setCourseStyle,
+  resetCourseStyle,
+  subscribeCourseStyles,
+  resolveCourseStyle,
+  defaultCourseColor,
+  normalizeHex,
+  hexToRgbChannels,
+  describeColor,
+  COURSE_COLOR_PRESETS,
+  COURSE_EMOJI_PRESETS,
+
+  // persistence — UNCHANGED, same signatures as before
+  listDocs,
+  getDoc,
+  getScene,
+  createDoc,
+  updateDocMeta,
+  saveScene,
+  saveSceneDebounced,
+  flushSceneSaves,
+  setThumbnail,
+  touchDoc,
+  duplicateDoc,
+  deleteDoc,
+  subscribe,
+  DEFAULT_DOC_TITLE,
+  SCENE_SAVE_DEBOUNCE_MS,
+} from "./goodnotes/library";
+
+import type {
+  ShelfProps,
+  LibraryView,
+  LibraryFilter,
+  DueUrgency,
+  SidebarProps,
+  SidebarCourse,
+  CourseFoldersProps,
+  CourseFolder,
+  DocumentItemProps,
+  ConfirmDialogProps,
+  CourseStyle,
+  CourseStyleMap,
+  UseCourseStylesResult,
+  UseDocumentsResult,
+  DocumentActions,
+} from "./goodnotes/library";
+```
+
+`DocumentActions` gained two members: `setFavourite(id, boolean)` and `toggleFavourite(id)`. Everything else is as it was.
+
+---
+
 ## Notes / gotchas
 
-- **Theme.** `Shelf` renders a root element with `className="excalidraw theme--dark? gn-shelf"` so it inherits Excalidraw's CSS custom properties. Pass `theme="dark"` (the `editorTheme` value) or the dark palette will not apply. The stylesheet is imported by the component; no extra CSS import.
-- **Storage.** Two IndexedDB databases: `goodnotes` → `docs` (metadata) and `goodnotes-scenes` → `scenes` (elements/appState/files). Separate databases, not two stores in one, because `idb-keyval`'s `createStore` only ever creates the single object store it is given.
-- **No migration** from the legacy `excalidraw` localStorage scene is included. If you want one, call `createDoc({ title: "My notes" })` once on first run and `saveScene(doc.id, legacyScene)`.
-- `Shelf` uses `window.confirm` for delete confirmation; swap it for a dialog component if you have one.
+- **Theme.** `Shelf` renders a root element with `className="excalidraw theme--dark? gn-shelf"` so it inherits Excalidraw's CSS custom properties. Pass `theme="dark"` (the `editorTheme` value) or the dark palette will not apply. The stylesheet is imported by the component.
+- **Colour tokens.** The stylesheet uses `--color-danger-color` / `--color-warning-color` with their matching `-background`, never `--color-danger-text` (identical to `--color-danger-background` in dark theme), and never `--color-muted` for text (it is a background grey). Course colours are injected as `--gn-course-rgb: "r g b"` and only ever used for fills and borders — text stays on `--text-primary-color`, so a user-chosen hex can never destroy contrast.
+- **Keyboard.** The document container keeps a roving tabindex; Arrow keys/Home/End move the anchor. The row step is measured from the live layout (`offsetTop` run length), so it is correct for the responsive `auto-fill` grid and degrades to 1 in list view automatically.
+- **"Due this week" includes overdue** documents on purpose.
+- **"Recent"** means `lastOpenedAt` within 30 days (`RECENT_WINDOW_MS`), which is populated by `touchDoc` — so it only fills up once documents are actually opened through the shelf or your router.
+- **Storage line** uses `navigator.storage.estimate()`; where that is unavailable it degrades to a plain "stored on this device" sentence.
+- **No migration** from the legacy `excalidraw` localStorage scene is included.

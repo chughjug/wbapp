@@ -1,5 +1,5 @@
 import { Excalidraw } from "@excalidraw/excalidraw";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
@@ -19,13 +19,7 @@ const Harness = () => {
   const [query, setQuery] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [log, setLog] = useState<string[]>([]);
-  const { pages, activePageIndex, addPage, seedFirstPage } = usePages(api);
-
-  useEffect(() => {
-    if (api) {
-      seedFirstPage();
-    }
-  }, [api, seedFirstPage]);
+  const { pages, activePageIndex, addPage } = usePages(api);
 
   const note = (what: string) => setLog((l) => [...l, what]);
   (window as unknown as Record<string, unknown>).__gn = {

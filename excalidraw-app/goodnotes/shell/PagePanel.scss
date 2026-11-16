@@ -18,6 +18,11 @@
   right: auto;
   z-index: 124; /* just under the nav bar, above Excalidraw's UI layers */
 
+  /* `.excalidraw` (worn for its theme tokens) is a full-size box; with an
+     explicit height, `bottom` would be ignored and the panel would hang off
+     the bottom of the viewport by the height of the bar. */
+  height: auto;
+
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -29,7 +34,10 @@
 
   font-family: var(--ui-font, system-ui, sans-serif);
   color: var(--text-primary-color, #1b1b1f);
+}
 
+/* children & re-skin: plain class, so `&__x` concatenation is correct */
+.gn-page-panel {
   &__header {
     flex: 0 0 auto;
     display: flex;

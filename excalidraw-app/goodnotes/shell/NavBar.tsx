@@ -265,6 +265,21 @@ export interface NavBarProps {
   className?: string;
 }
 
+/** Width of a flex row's children plus its gaps — its *content* width. */
+const contentWidth = (zone: HTMLElement | null): number => {
+  if (!zone) {
+    return 0;
+  }
+  const gap = parseFloat(getComputedStyle(zone).columnGap || "0") || 0;
+  let total = 0;
+  let count = 0;
+  for (const child of Array.from(zone.children)) {
+    total += (child as HTMLElement).getBoundingClientRect().width;
+    count += 1;
+  }
+  return total + gap * Math.max(0, count - 1);
+};
+
 const useLatest = <T,>(value: T) => {
   const ref = useRef(value);
   ref.current = value;
@@ -512,6 +527,12 @@ export const NavBar = ({
     setWidths(next);
   }, [toolControls]);
 
+  // The centre's budget is "what the two side zones leave over", NOT the
+  // centre's own box: the centre column is content-sized, so measuring it
+  // would let the tools squeeze the side zones instead of overflowing into
+  // their own menu. The side zones are measured by summing their children
+  // (their *content* width) rather than by their box, which is stretched by
+  // the 1fr columns and would feed the budget back into itself.
   useLayoutEffect(() => {
     const node = rootRef.current;
     if (!node) {
@@ -520,8 +541,15 @@ export const NavBar = ({
     const read = () => {
       const total = node.getBoundingClientRect().width;
       setBarWidth(total);
-      const centre = node.querySelector<HTMLElement>("[data-gn-centre]");
-      setCentreWidth(centre?.getBoundingClientRect().width ?? total / 3);
+      const left = node.querySelector<HTMLElement>("[data-gn-left]");
+      const right = node.querySelector<HTMLElement>("[data-gn-right]");
+      const style = getComputedStyle(node);
+      const chrome =
+        parseFloat(style.paddingLeft || "0") +
+        parseFloat(style.paddingRight || "0") +
+        2 * parseFloat(style.columnGap || "0");
+      const sides = contentWidth(left) + contentWidth(right);
+      setCentreWidth(Math.max(0, total - sides - chrome));
     };
     read();
     if (typeof ResizeObserver === "undefined") {
@@ -529,9 +557,11 @@ export const NavBar = ({
     }
     const observer = new ResizeObserver(read);
     observer.observe(node);
-    const centre = node.querySelector<HTMLElement>("[data-gn-centre]");
-    if (centre) {
-      observer.observe(centre);
+    for (const selector of ["[data-gn-left]", "[data-gn-right]"]) {
+      const zone = node.querySelector<HTMLElement>(selector);
+      if (zone) {
+        observer.observe(zone);
+      }
     }
     return () => observer.disconnect();
   }, []);
@@ -972,7 +1002,7 @@ export const NavBar = ({
         aria-label={ariaLabel}
       >
         {/* ---- LEFT ---------------------------------------------------- */}
-        <div className="gn-nav__zone gn-nav__zone--left">
+        <div className="gn-nav__zone gn-nav__zone--left" data-gn-left="">
           {onTogglePagePanel && (
             <button
               type="button"
@@ -1071,7 +1101,6 @@ export const NavBar = ({
         {/* ---- CENTRE (tools only) -------------------------------------- */}
         <div
           className="gn-nav__zone gn-nav__zone--centre"
-          data-gn-centre=""
           role="toolbar"
           aria-label="Drawing tools"
           aria-orientation="horizontal"
@@ -1122,6 +1151,7 @@ export const NavBar = ({
         {/* ---- RIGHT ----------------------------------------------------- */}
         <div
           className="gn-nav__zone gn-nav__zone--right"
+          data-gn-right=""
           role="group"
           aria-label="Document actions"
         >

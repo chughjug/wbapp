@@ -1061,7 +1061,7 @@ export const isDarkViewing = (
  * near-black page is the brightest compositing we do, and an unattenuated
  * marker glares. Purely cosmetic, view-only.
  */
-const DARK_MODE_HIGHLIGHTER_ALPHA_SCALE = 0.8;
+const DARK_MODE_HIGHLIGHTER_ALPHA_SCALE = 0.55;
 
 export const renderElement = (
   element: NonDeletedExcalidrawElement,

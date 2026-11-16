@@ -61,6 +61,15 @@ export type {
 } from "./darkMode";
 
 export {
+  /** Force an appState onto white paper / black ink for an export. */
+  toLightExportAppState,
+  /** Same, for callers that pass an export config instead. */
+  toLightExportConfig,
+  EXPORT_PAPER_COLOR,
+} from "./exportSafety";
+export type { ExportThemeFields } from "./exportSafety";
+
+export {
   /** Hook owning the preference; drop-in for `useHandleAppTheme()`. */
   useDarkMode,
 } from "./useDarkMode";

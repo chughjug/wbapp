@@ -47,7 +47,7 @@
   display: grid;
   /* 1fr | auto | 1fr keeps the tool cluster optically centred regardless of
      how wide the two side zones get */
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
   align-items: center;
   gap: 0.5rem;
 
@@ -67,6 +67,9 @@
     align-items: center;
     gap: 4px; /* keep in sync with LAYOUT.gap in ../taskbar/model.ts */
     min-width: 0;
+    /* a zone never paints outside its column, so the three zones cannot
+       visually collide however narrow the window gets */
+    overflow: hidden;
 
     &--left {
       justify-content: flex-start;
