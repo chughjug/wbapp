@@ -1,9 +1,13 @@
 /**
  * Where the panel sits, and how that survives a reload.
  *
- * Two placements. `"docked"` (the default) is a band in normal document flow
- * under the nav bar and has no geometry to model at all — the layout does it.
- * Everything else in this file is the `"floating"` placement's edge model.
+ * Three placements. `"anchored"` (the default) is a small popover pinned to
+ * the tool button that opened it — it costs nothing when closed and never
+ * covers the page panel, because it is only up while you are choosing a
+ * colour. `"docked"` is a band in normal document flow under the nav bar and
+ * has no geometry to model at all — the layout does it. Everything else in
+ * this file is the `"floating"` placement's edge model, plus the small
+ * anchored-popover solver at the bottom.
  *
  * Design note (this is the second GoodNotes failure the panel exists to fix):
  * GoodNotes' floating tool menu snaps to the exact *centre* of a screen edge,
@@ -17,37 +21,44 @@
  */
 
 /* -------------------------------------------------------------------------- */
-/*  Placement: docked band vs floating panel                                    */
+/*  Placement: anchored popover vs docked band vs floating panel                */
 /* -------------------------------------------------------------------------- */
 
 /**
  * Where the panel lives.
  *
- * - `"docked"` (**default**) — a horizontal band in normal document flow,
- *   directly under the nav bar and above `.gn-shell-body`. It spans the
- *   content width, pushes nothing, and overlaps neither the page panel nor the
- *   canvas. This is what the app ships, because a panel that floats over the
- *   canvas covers the thing you are writing on.
+ * - `"anchored"` (**default**) — a compact popover pinned under (or over) the
+ *   nav bar button that opened it. Colours and widths in two rows, nothing
+ *   nested. It is mounted only while open, so the chrome costs **zero** screen
+ *   space at rest; it dismisses on an outside click, on Escape, and as soon as
+ *   a mark is made.
+ * - `"docked"` — a horizontal band in normal document flow, directly under the
+ *   nav bar and above `.gn-shell-body`. It spans the content width and shows
+ *   every control for the tool at once, but it is permanent chrome: 1194×53 px
+ *   of an iPad Pro 11" screen that is never drawing surface.
  * - `"floating"` — the original edge-snapped overlay, draggable and remembered
- *   per edge (everything below in this file). Kept as a non-default option.
+ *   per edge (everything below in this file).
  */
-export type ToolMenuPlacement = "docked" | "floating";
+export type ToolMenuPlacement = "anchored" | "docked" | "floating";
 
 export const TOOL_MENU_PLACEMENTS: readonly ToolMenuPlacement[] = [
+  "anchored",
   "docked",
   "floating",
 ];
 
 /** The shipped default. */
-export const DEFAULT_TOOL_MENU_PLACEMENT: ToolMenuPlacement = "docked";
+export const DEFAULT_TOOL_MENU_PLACEMENT: ToolMenuPlacement = "anchored";
 
 /** localStorage key holding the user's {@link ToolMenuPlacement} choice. */
 export const TOOL_MENU_PLACEMENT_STORAGE_KEY = "goodnotes-tool-menu-placement";
 
 const isPlacement = (value: unknown): value is ToolMenuPlacement =>
-  value === "docked" || value === "floating";
+  value === "anchored" || value === "docked" || value === "floating";
 
-/** Read the saved placement. Never throws; falls back to `"docked"`. */
+const placementListeners = new Set<(placement: ToolMenuPlacement) => void>();
+
+/** Read the saved placement. Never throws; falls back to `"anchored"`. */
 export const loadToolMenuPlacement = (): ToolMenuPlacement => {
   try {
     const raw = localStorage.getItem(TOOL_MENU_PLACEMENT_STORAGE_KEY);
@@ -61,12 +72,41 @@ export const loadToolMenuPlacement = (): ToolMenuPlacement => {
 export const saveToolMenuPlacement = (
   placement: ToolMenuPlacement,
 ): boolean => {
+  let stored = true;
   try {
     localStorage.setItem(TOOL_MENU_PLACEMENT_STORAGE_KEY, placement);
-    return true;
   } catch {
-    return false;
+    stored = false;
   }
+  // notify either way: the session still honours the change
+  placementListeners.forEach((listener) => listener(placement));
+  return stored;
+};
+
+/**
+ * Subscribe to placement changes — this tab's writes and another tab's (via
+ * the `storage` event). Returns an unsubscribe function. The hook that owns
+ * the panel's open state uses this so flipping placement from inside the
+ * panel is picked up without the host having to wire a callback.
+ */
+export const subscribeToolMenuPlacement = (
+  listener: (placement: ToolMenuPlacement) => void,
+): (() => void) => {
+  placementListeners.add(listener);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === TOOL_MENU_PLACEMENT_STORAGE_KEY) {
+      listener(loadToolMenuPlacement());
+    }
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", onStorage);
+  }
+  return () => {
+    placementListeners.delete(listener);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("storage", onStorage);
+    }
+  };
 };
 
 /* -------------------------------------------------------------------------- */
@@ -337,4 +377,75 @@ export const moveByKeyboard = (
   }
 
   return { position: next, announcement: describe(next) };
+};
+
+/* -------------------------------------------------------------------------- */
+/*  Anchored placement: a popover pinned to the button that opened it           */
+/* -------------------------------------------------------------------------- */
+
+/** Gap between the anchor button and the popover, in px. */
+export const ANCHOR_GAP = 8;
+
+/** Smallest gap kept between the popover and the viewport edge, in px. */
+export const ANCHOR_VIEWPORT_MARGIN = 8;
+
+export interface AnchoredPlacement {
+  left: number;
+  top: number;
+  /** Which way it opened — drives the little arrow and the slide direction. */
+  side: "below" | "above";
+  /**
+   * Horizontal distance from the popover's left edge to the anchor's centre,
+   * so the arrow can point at the button even when the popover was clamped.
+   */
+  arrowLeft: number;
+}
+
+/**
+ * Solve the popover's viewport position from its anchor.
+ *
+ * Below the anchor by default (the nav bar is at the top); flipped above when
+ * there is no room below and more room above; always clamped into the
+ * viewport, which is why the arrow offset is returned separately.
+ */
+export const anchoredPlacement = (
+  anchor: { left: number; top: number; width: number; height: number },
+  panel: { width: number; height: number },
+  viewport: { width: number; height: number },
+): AnchoredPlacement => {
+  const spaceBelow = viewport.height - (anchor.top + anchor.height);
+  const spaceAbove = anchor.top;
+  const needed = panel.height + ANCHOR_GAP + ANCHOR_VIEWPORT_MARGIN;
+  const side: "below" | "above" =
+    spaceBelow >= needed || spaceBelow >= spaceAbove ? "below" : "above";
+
+  const top =
+    side === "below"
+      ? Math.min(
+          anchor.top + anchor.height + ANCHOR_GAP,
+          Math.max(
+            ANCHOR_VIEWPORT_MARGIN,
+            viewport.height - panel.height - ANCHOR_VIEWPORT_MARGIN,
+          ),
+        )
+      : Math.max(ANCHOR_VIEWPORT_MARGIN, anchor.top - ANCHOR_GAP - panel.height);
+
+  const centred = anchor.left + anchor.width / 2 - panel.width / 2;
+  const left = Math.min(
+    Math.max(ANCHOR_VIEWPORT_MARGIN, centred),
+    Math.max(
+      ANCHOR_VIEWPORT_MARGIN,
+      viewport.width - panel.width - ANCHOR_VIEWPORT_MARGIN,
+    ),
+  );
+
+  return {
+    left,
+    top,
+    side,
+    arrowLeft: Math.min(
+      Math.max(12, anchor.left + anchor.width / 2 - left),
+      Math.max(12, panel.width - 12),
+    ),
+  };
 };

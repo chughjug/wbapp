@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 
 import type { StrokeVariability } from "@excalidraw/element/types";
 import type {
@@ -34,6 +35,7 @@ import {
 } from "./editor";
 import {
   EDGE_MARGIN,
+  anchoredPlacement,
   describePosition,
   loadToolMenuPlacement,
   loadToolMenuPosition,
@@ -136,6 +138,19 @@ const FONT_FAMILY_OPTIONS: readonly {
     label: "Code",
   },
 ];
+
+/**
+ * What the compact popover shows without being expanded: at most two rows,
+ * nothing nested. Everything else for the tool is one "More" press away in
+ * the same popover (not a submenu — the popover just gets taller).
+ */
+const COMPACT_GROUPS: Record<ToolMenuToolId, readonly string[]> = {
+  pen: ["color", "width"],
+  highlighter: ["color", "width"],
+  eraser: ["presets"],
+  shape: ["shape", "stroke"],
+  text: ["color", "size"],
+};
 
 const TOOL_TITLES: Record<ToolMenuToolId, string> = {
   pen: "Pen",
@@ -289,21 +304,37 @@ export interface ToolMenuProps {
   open: boolean;
   /** Which tool's settings to show. Nothing renders when `null`. */
   tool: ToolMenuToolId | null;
-  /** Called on Escape, on the close button, and when the tool loses support. */
-  onClose: () => void;
+  /**
+   * The element the `"anchored"` popover is pinned to — the nav bar button
+   * the user tapped, as handed over by `NavBar`'s
+   * `onActiveToolMenu(tool, anchorElement)`. Ignored by the other placements.
+   * With no anchor the popover falls back to the top centre of the viewport.
+   */
+  anchor?: HTMLElement | null;
+  /**
+   * Called on Escape, on the close button, and when the tool loses support.
+   *
+   * `restoreFocus: false` means "do not pull focus back to the anchor": the
+   * popover passes it when it dismissed itself because the user went back to
+   * the page (an outside click, or a mark being made), where moving focus
+   * onto a toolbar button would be both surprising and wrong.
+   */
+  onClose: (options?: { restoreFocus?: boolean }) => void;
   /**
    * Fired when the panel itself switches the editor's tool (a preset chip, or
    * a shape-kind radio). Lets a nav bar keep its own highlight in sync.
    */
   onToolChange?: (tool: ToolMenuToolId) => void;
   /**
-   * `"docked"` (the default) renders the panel as a horizontal band in normal
-   * document flow — put it between the nav bar and `.gn-shell-body` and it
-   * sits under the bar, spanning the content width, overlapping nothing.
-   * `"floating"` is the original edge-snapped, draggable overlay.
+   * `"anchored"` (the default) renders a compact popover pinned to
+   * {@link ToolMenuProps.anchor}, in a portal on `document.body`, mounted
+   * only while open. `"docked"` renders the panel as a horizontal band in
+   * normal document flow — put it between the nav bar and `.gn-shell-body`
+   * and it sits under the bar, spanning the content width. `"floating"` is
+   * the original edge-snapped, draggable overlay.
    *
    * Omit it and the panel uses the user's persisted choice (default
-   * `"docked"`); pass it to force one placement.
+   * `"anchored"`); pass it to force one placement.
    */
   placement?: ToolMenuPlacement;
   /** Fired when the user flips placement with the dock / undock button. */
@@ -330,6 +361,7 @@ export const ToolMenu = ({
   excalidrawAPI,
   open,
   tool,
+  anchor,
   onClose,
   onToolChange,
   placement: placementProp,
@@ -543,14 +575,29 @@ export const ToolMenu = ({
   );
   const menuPlacement = placementProp ?? storedPlacement;
   const isDocked = menuPlacement === "docked";
+  const isAnchored = menuPlacement === "anchored";
+
+  const choosePlacement = useCallback(
+    (next: ToolMenuPlacement) => {
+      setStoredPlacement(next);
+      saveToolMenuPlacement(next);
+      onPlacementChange?.(next);
+    },
+    [onPlacementChange],
+  );
 
   const togglePlacement = useCallback(() => {
-    const next: ToolMenuPlacement =
-      menuPlacement === "docked" ? "floating" : "docked";
-    setStoredPlacement(next);
-    saveToolMenuPlacement(next);
-    onPlacementChange?.(next);
-  }, [menuPlacement, onPlacementChange]);
+    // anchored → docked → floating → anchored. One button, because the
+    // choice is rare and a three-way control in the panel header would cost
+    // more pixels than the thing it configures.
+    choosePlacement(
+      menuPlacement === "anchored"
+        ? "docked"
+        : menuPlacement === "docked"
+        ? "floating"
+        : "anchored",
+    );
+  }, [choosePlacement, menuPlacement]);
 
   /* --------------------------- band overflow ------------------------------ */
 
@@ -593,6 +640,162 @@ export const ToolMenu = ({
     observer.observe(node);
     return () => observer.disconnect();
   }, [isDocked, open, tool, expanded]);
+
+  /* --------------------- anchored: popover geometry ----------------------- */
+
+  const [anchorRect, setAnchorRect] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!isAnchored || !open || !anchor) {
+      return;
+    }
+    const measure = () => {
+      const rect = anchor.getBoundingClientRect();
+      setAnchorRect((current) =>
+        current &&
+        Math.abs(current.left - rect.left) < 0.5 &&
+        Math.abs(current.top - rect.top) < 0.5 &&
+        Math.abs(current.width - rect.width) < 0.5 &&
+        Math.abs(current.height - rect.height) < 0.5
+          ? current
+          : {
+              left: rect.left,
+              top: rect.top,
+              width: rect.width,
+              height: rect.height,
+            },
+      );
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    // capture: the anchor can sit in any scroller (the nav bar is one)
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [isAnchored, open, anchor]);
+
+  const popover = useMemo(() => {
+    if (!isAnchored) {
+      return null;
+    }
+    const rect = anchorRect ?? {
+      // no anchor (a keyboard tool switch, or a host that passes none):
+      // hang it off the top centre rather than guessing a button
+      left: viewport.width / 2,
+      top: 0,
+      width: 0,
+      height: 56,
+    };
+    return anchoredPlacement(rect, panelSize, viewport);
+  }, [anchorRect, isAnchored, panelSize, viewport]);
+
+  /* ------------------ anchored: outside click + mark made ----------------- */
+
+  useEffect(() => {
+    if (!isAnchored || !open) {
+      return;
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      if (panelRef.current?.contains(target)) {
+        return;
+      }
+      // the anchor itself is the nav bar's own toggle — let it toggle
+      if (anchor?.contains(target)) {
+        return;
+      }
+      // the user is going back to the page: do not drag focus with us
+      onClose({ restoreFocus: false });
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () =>
+      document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [anchor, isAnchored, onClose, open]);
+
+  useEffect(() => {
+    if (!isAnchored || !open || !excalidrawAPI || excalidrawAPI.isDestroyed) {
+      return;
+    }
+    // "dismiss once a mark is made": the popover is a choice, not a mode, so
+    // the first stroke (or shape, or text) ends it. Counting elements catches
+    // every route into the scene, including ones that never touch a pointer.
+    let count = excalidrawAPI.getSceneElements().length;
+    return excalidrawAPI.onChange((elements) => {
+      if (elements.length > count) {
+        count = elements.length;
+        onClose({ restoreFocus: false });
+      } else {
+        count = elements.length;
+      }
+    });
+  }, [excalidrawAPI, isAnchored, onClose, open]);
+
+  /* ----------------------- anchored: focus trap --------------------------- */
+
+  const focusablesIn = (node: HTMLElement): HTMLElement[] =>
+    [
+      ...node.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ),
+    ].filter(
+      (el) =>
+        !el.hasAttribute("disabled") &&
+        el.getAttribute("aria-hidden") !== "true" &&
+        (el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement),
+    );
+
+  useEffect(() => {
+    if (!isAnchored || !open) {
+      return;
+    }
+    const node = panelRef.current;
+    if (!node) {
+      return;
+    }
+    // focus the popover itself, not its first radio: landing on a radio in a
+    // group would announce "Black ink, selected" before the dialog's name,
+    // and on a touch device it can scroll the row.
+    node.focus({ preventScroll: true });
+  }, [isAnchored, open, tool]);
+
+  const onPopoverKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Tab") {
+        return;
+      }
+      const node = panelRef.current;
+      if (!node) {
+        return;
+      }
+      const focusables = focusablesIn(node);
+      if (focusables.length === 0) {
+        event.preventDefault();
+        node.focus({ preventScroll: true });
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (event.shiftKey && (active === first || active === node)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    },
+    [],
+  );
 
   /* ---------------------------- escape ----------------------------------- */
 
@@ -772,11 +975,11 @@ export const ToolMenu = ({
    * separators and puts the note in the disclosure. Nothing is placement-only,
    * so no control is reachable in one placement and not the other.
    */
-  const groups: ReactNode[] = [];
+  const groupList: { key: string; node: ReactNode }[] = [];
   let note: ReactNode = null;
 
   const push = (key: string, node: ReactNode) => {
-    groups.push(<Fragment key={key}>{node}</Fragment>);
+    groupList.push({ key, node });
   };
 
   if (tool === "pen" || tool === "highlighter") {
@@ -1011,6 +1214,10 @@ export const ToolMenu = ({
 
   /* ---------------------------- render ----------------------------------- */
 
+  const groups = groupList.map((group) => (
+    <Fragment key={group.key}>{group.node}</Fragment>
+  ));
+
   const resolvedTheme = scopeTheme === undefined ? style.theme : scopeTheme;
   const scopeClass =
     scopeTheme === false
@@ -1038,13 +1245,15 @@ export const ToolMenu = ({
       className="gn-tool-menu__text-button"
       data-testid="gn-tool-menu-placement"
       aria-label={
-        isDocked
+        isAnchored
+          ? `Dock ${toolTitle.toLowerCase()} settings as a band under the nav bar`
+          : isDocked
           ? `Undock ${toolTitle.toLowerCase()} settings into a floating panel`
-          : `Dock ${toolTitle.toLowerCase()} settings under the nav bar`
+          : `Pin ${toolTitle.toLowerCase()} settings to the tool button`
       }
       onClick={togglePlacement}
     >
-      {isDocked ? "Undock" : "Dock"}
+      {isAnchored ? "Dock" : isDocked ? "Undock" : "Pin"}
     </button>
   );
 
@@ -1058,6 +1267,94 @@ export const ToolMenu = ({
       <span aria-hidden="true">&times;</span>
     </button>
   );
+
+  /* ------------------ anchored: a popover on the button ------------------- */
+
+  if (isAnchored) {
+    const compactKeys = COMPACT_GROUPS[tool];
+    const compact = groupList.filter((group) =>
+      compactKeys.includes(group.key),
+    );
+    const rest = groupList.filter((group) => !compactKeys.includes(group.key));
+    const hasMore = rest.length > 0 || note !== null;
+    const restId = "gn-tool-menu-rest";
+
+    const node = (
+      <div
+        className={`gn-tool-menu-scope gn-tool-menu-scope--anchored${scopeClass}`}
+        data-testid="gn-tool-menu-scope"
+        data-placement="anchored"
+      >
+        <div
+          ref={panelRef}
+          className={`gn-tool-menu gn-tool-menu--anchored ${
+            className ?? ""
+          }`.trim()}
+          data-testid="gn-tool-menu"
+          data-placement="anchored"
+          data-side={popover?.side ?? "below"}
+          data-expanded={expanded ? "true" : undefined}
+          role="dialog"
+          aria-labelledby={titleId}
+          tabIndex={-1}
+          onKeyDown={onPopoverKeyDown}
+          style={{
+            left: `${Math.round(popover?.left ?? 0)}px`,
+            top: `${Math.round(popover?.top ?? 0)}px`,
+            ["--gn-tool-menu-arrow" as string]: `${Math.round(
+              popover?.arrowLeft ?? 24,
+            )}px`,
+            visibility: anchorRect || !anchor ? undefined : "hidden",
+          }}
+        >
+          <h2 className="gn-tool-menu__sr-only" id={titleId}>
+            {toolTitle} settings
+          </h2>
+
+          <div className="gn-tool-menu__compact">
+            {compact.map((group) => (
+              <Fragment key={group.key}>{group.node}</Fragment>
+            ))}
+          </div>
+
+          <div className="gn-tool-menu__compact-actions">
+            {hasMore ? (
+              <button
+                type="button"
+                className="gn-tool-menu__text-button"
+                data-testid="gn-tool-menu-more"
+                aria-expanded={expanded}
+                aria-controls={restId}
+                onClick={() => setExpanded((value) => !value)}
+              >
+                {expanded
+                  ? "Less"
+                  : `More ${toolTitle.toLowerCase()} settings`}
+              </button>
+            ) : null}
+            {lockToggle}
+            {placementButton}
+            {closeButton}
+          </div>
+
+          {expanded && hasMore ? (
+            <div className="gn-tool-menu__compact-rest" id={restId}>
+              {rest.map((group) => (
+                <Fragment key={group.key}>{group.node}</Fragment>
+              ))}
+              {note}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+
+    // a portal, so the popover is never clipped by (or sized into) the
+    // shell's flow layout: closed, it contributes exactly nothing to the DOM
+    return typeof document === "undefined"
+      ? node
+      : createPortal(node, document.body);
+  }
 
   /* ------------------------- docked: a band ------------------------------ */
 

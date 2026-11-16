@@ -1,0 +1,348 @@
+/**
+ * Floating-bar styling.
+ *
+ * Colour comes exclusively from Excalidraw's own custom properties (defined in
+ * `packages/excalidraw/css/theme.scss`), which is why the root carries the
+ * `excalidraw` / `theme--dark` classes — those properties are scoped to
+ * `.excalidraw`. Every token is funnelled through a local `--gn-bar-*`
+ * property that is redeclared under `.theme--dark`, so even the literal
+ * `var()` fallbacks (reached only outside the token scope) are theme-correct.
+ *
+ * Deliberately NOT used: `--color-muted` (a *background* grey with no contrast
+ * guarantee as text) and `--keybinding-color` (#b8b8b8, ~1.9:1 on white).
+ * De-emphasised text — the "2/12" counter — uses `--input-label-color`
+ * (#495057 light / #e9ecef dark), a real text token that measures >7:1
+ * against the bar in both themes even at its most translucent.
+ */
+
+:root {
+  /* the one bar's height; consumed by PagePanel.scss and by the host */
+  --gn-bar-height: 2.875rem; /* 46px */
+  /* gap between the top of the stage and the bar */
+  --gn-bar-inset: 0.625rem;
+
+  /* back-compat: the old band height, now the floating bar's total reach */
+  --gn-nav-height: calc(var(--gn-bar-height) + 2 * var(--gn-bar-inset));
+}
+
+/* ---------------------------------------------------------------------------
+   Layout helpers for the host.
+
+   The shell is no longer a stack of bands. There is ONE stacking context —
+   the stage — and the bar and the page overlay float inside it over the
+   canvas:
+
+     .gn-shell-layout        column: [tab strip, only with >1 document] / stage
+       .gn-shell-stage       position: relative; the canvas fills it
+         .gn-shell-canvas    the <Excalidraw> wrapper (optional, fills stage)
+         <FloatingBar>       absolutely positioned, centred near the top
+         <PagePanel>         scrim + slide-over, or nothing at all
+
+   `.gn-shell-body` is kept as an exact alias of `.gn-shell-stage` so a host
+   that has not yet renamed it keeps working.
+   --------------------------------------------------------------------------- */
+
+.gn-shell-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gn-shell-stage,
+.gn-shell-body {
+  /* the positioning context the bar and the page overlay anchor to */
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.gn-shell-canvas {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   The bar
+   --------------------------------------------------------------------------- */
+
+/* The scope both carries the theme tokens and places the bar. It spans the
+   stage so the pill can be centred, and is `pointer-events: none` throughout —
+   only the pill itself takes pointer events, so a stroke that starts one pixel
+   outside the pill lands on the canvas. `.excalidraw`'s own base rule is a
+   full-size flex container; the parts of it we do not want are undone here. */
+.gn-bar-scope.gn-bar-scope {
+  --gn-bar-bg: var(--island-bg-color, #ffffff);
+  --gn-bar-border: var(--color-border-outline-variant, #c5c5d0);
+  --gn-bar-text: var(--text-primary-color, #1b1b1f);
+  --gn-bar-text-dim: var(--input-label-color, #495057);
+  --gn-bar-hover: var(--button-hover-bg, rgba(0, 0, 0, 0.07));
+  --gn-bar-active-bg: var(--color-surface-primary-container, #e0dfff);
+  --gn-bar-active-text: var(--color-on-primary-container, #030064);
+  --gn-bar-focus: var(--focus-highlight-color, #4dabf7);
+  --gn-bar-shadow: 0 6px 24px rgb(0 0 0 / 14%), 0 1px 3px rgb(0 0 0 / 10%);
+
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+
+  width: auto;
+  height: auto;
+  overflow: visible;
+  /* the wrapper must never swallow a stroke aimed at the page beneath */
+  pointer-events: none;
+
+  font-family: var(--ui-font, system-ui, sans-serif);
+  color: var(--gn-bar-text);
+
+  /* above the canvas and Excalidraw's in-canvas UI layers, below its modal
+     layer (1000), so the bar's menus overlay the drawing but dialogs still
+     cover the bar */
+  z-index: 125;
+
+  &.theme--dark {
+    --gn-bar-bg: var(--island-bg-color, #232329);
+    --gn-bar-border: var(--color-border-outline-variant, #46464f);
+    --gn-bar-text: var(--text-primary-color, #e3e3e8);
+    --gn-bar-text-dim: var(--input-label-color, #e9ecef);
+    --gn-bar-hover: var(--button-hover-bg, rgba(255, 255, 255, 0.1));
+    --gn-bar-active-bg: var(--color-surface-primary-container, #4a47b1);
+    --gn-bar-active-text: var(--color-on-primary-container, #e0dfff);
+    --gn-bar-shadow: 0 6px 24px rgb(0 0 0 / 45%), 0 1px 3px rgb(0 0 0 / 35%);
+  }
+
+  /* DEFAULT: absolutely positioned inside the stage, floating OVER the canvas
+     rather than displacing it. The page therefore gets the full height. */
+  &.gn-bar-scope--floating {
+    position: absolute;
+    top: var(--gn-bar-inset);
+    left: 0;
+    right: 0;
+    bottom: auto;
+  }
+
+  /* anchored to the viewport instead — for hosts that mount the bar outside
+     the stage */
+  &.gn-bar-scope--fixed {
+    position: fixed;
+    top: var(--gn-bar-inset);
+    left: 0;
+    right: 0;
+    bottom: auto;
+  }
+}
+
+.gn-bar {
+  pointer-events: auto;
+  box-sizing: border-box;
+
+  display: flex;
+  align-items: center;
+  gap: 2px;
+
+  max-width: calc(100% - 1.5rem);
+  height: var(--gn-bar-height);
+  padding: 0 0.375rem;
+
+  border: 1px solid var(--gn-bar-border);
+  border-radius: calc(var(--gn-bar-height) / 2);
+  background-color: var(--gn-bar-bg);
+  box-shadow: var(--gn-bar-shadow);
+
+  font-size: 0.75rem;
+  line-height: 1.2;
+
+  /* translucent + blurred, so the page reads through the bar — but only
+     where the browser can actually blur, otherwise the bar stays opaque and
+     legible rather than washed out */
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    background-color: color-mix(in srgb, var(--gn-bar-bg) 78%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.7);
+    backdrop-filter: blur(18px) saturate(1.7);
+  }
+
+  &__slot {
+    position: relative;
+    display: flex;
+    flex: 0 0 auto;
+  }
+
+  &__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    flex: 0 0 auto;
+
+    box-sizing: border-box;
+    min-width: 2.125rem;
+    height: 2.125rem;
+    margin: 0;
+    padding: 0 0.375rem;
+
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background-color: transparent;
+    color: var(--gn-bar-text);
+    font: inherit;
+    cursor: pointer;
+
+    transition: background-color 120ms ease, color 120ms ease;
+
+    &:hover:not(:disabled):not([aria-disabled="true"]) {
+      background-color: var(--gn-bar-hover);
+    }
+
+    /* a ring that survives both themes, the translucency and the pressed
+       background */
+    &:focus-visible {
+      outline: 2px solid var(--gn-bar-focus);
+      outline-offset: 1px;
+    }
+
+    &[aria-pressed="true"],
+    &[aria-expanded="true"] {
+      background-color: var(--gn-bar-active-bg);
+      color: var(--gn-bar-active-text);
+    }
+
+    &:disabled,
+    &[aria-disabled="true"] {
+      color: var(--color-disabled, #adb5bd);
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    &--wide {
+      padding: 0 0.5rem;
+    }
+  }
+
+  &__count {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--gn-bar-text-dim);
+  }
+
+  /* the pressed Pages control recolours its own counter */
+  &__button[aria-expanded="true"] &__count,
+  &__button[aria-pressed="true"] &__count {
+    color: inherit;
+  }
+
+  &__separator {
+    flex: 0 0 auto;
+    width: 1px;
+    height: 1.25rem;
+    margin: 0 0.25rem;
+    background-color: var(--gn-bar-border);
+    opacity: 0.9;
+    border: 0;
+  }
+
+  .gn-icon {
+    flex: 0 0 auto;
+  }
+
+  /* `HomeIcon` / `NewDocumentIcon` in `goodnotes/taskbar/icons` ship without
+     paint attributes; without this they render as filled blobs. */
+  svg.gn-icon:not([fill]):not([stroke]) {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* visually hidden, still announced */
+  &__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-bar,
+  .gn-bar * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .gn-bar {
+    border: 1px solid CanvasText;
+    background-color: Canvas;
+    backdrop-filter: none;
+  }
+
+  .gn-bar__button[aria-pressed="true"],
+  .gn-bar__button[aria-expanded="true"] {
+    border-color: Highlight;
+  }
+}
+
+/**
+ * Opt-in suppression of the Excalidraw chrome the bar replaces, toggled by the
+ * `suppressDefaultChrome` prop (which adds this class to <body>) and removed
+ * again on unmount — nothing here is permanent.
+ *
+ * There is no `UIOptions` switch for these islands: `LayerUI` renders them
+ * whenever `defaultUIEnabled` is true, and the props that remove them
+ * (`viewModeEnabled`, `zenModeEnabled`) change editor behaviour too. CSS is
+ * therefore the correct lever; see INTEGRATION.md.
+ *
+ * NOT hidden: the bottom-left footer. The small zoom / undo pill stays where
+ * muscle memory expects it — and it is a second route to undo/redo.
+ */
+body.gn-shell-suppress-default-ui {
+  /* desktop: the top shapes island — replaced by the bar's five tools + "+" */
+  .excalidraw .App-menu_top .shapes-section {
+    display: none;
+  }
+
+  /* desktop: the top-left island (hamburger + selected-shape actions) —
+     replaced by the "…" menu and, for tool settings, by the floating Active
+     Tool Menu */
+  .excalidraw .App-menu_top__left {
+    display: none;
+  }
+
+  /* desktop: the top-right island (Share / collaborators / sidebar triggers)
+     — replaced by the "…" menu */
+  .excalidraw .layer-ui__wrapper__top-right {
+    display: none;
+  }
+
+  /* mobile form factor: the same tools, rendered as a bottom bar by
+     `MobileMenu`. Hidden too, otherwise every tool appears twice. */
+  .excalidraw--mobile .App-toolbar-content,
+  .excalidraw--mobile .App-bottom-bar .App-toolbar {
+    display: none;
+  }
+
+  /* the (now empty) top row must not eat canvas clicks */
+  .excalidraw .App-menu_top {
+    pointer-events: none;
+
+    > * {
+      pointer-events: auto;
+    }
+  }
+}

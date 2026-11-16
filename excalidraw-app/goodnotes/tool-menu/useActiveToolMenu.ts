@@ -14,18 +14,34 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import { activateTool, toolFromAppState } from "./editor";
+import {
+  loadToolMenuPlacement,
+  subscribeToolMenuPlacement,
+} from "./position";
 
 import type { ToolMenuShapeId, ToolMenuToolId } from "./editor";
+import type { ToolMenuPlacement } from "./position";
 import type { ToolMenuProps } from "./ToolMenu";
 
 export interface UseActiveToolMenuOptions {
   excalidrawAPI: ExcalidrawImperativeAPI | null;
   /**
    * Open the panel by itself whenever the editor's tool changes to one the
-   * panel supports (including keyboard switches). Defaults to `true` — that is
-   * the whole "selecting a tool opens its settings" concept.
+   * panel supports (including keyboard switches).
+   *
+   * Defaults to `false` in the `"anchored"` placement (the shipped default):
+   * a popover has to be pinned to the button the user touched, and a tool
+   * change from the keyboard has no such button — so the popover opens only
+   * when the user taps the tool that is already active, the way a GoodNotes
+   * tool button behaves. In `"docked"` / `"floating"` it defaults to `true`,
+   * which is the original "selecting a tool reveals its settings" concept.
    */
   openOnToolChange?: boolean;
+  /**
+   * Force a placement instead of reading the user's persisted choice. Only
+   * affects the defaults this hook derives (and what it hands to the panel).
+   */
+  placement?: ToolMenuPlacement;
   /** Never open. Useful while a modal dialog is up. */
   disabled?: boolean;
 }
@@ -33,6 +49,8 @@ export interface UseActiveToolMenuOptions {
 export interface ActiveToolMenuController {
   /** The editor's current tool, mapped to a panel identity (`null` = unsupported). */
   tool: ToolMenuToolId | null;
+  /** The placement in force — the user's persisted choice unless overridden. */
+  placement: ToolMenuPlacement;
   /** Whether the panel is currently shown. */
   isOpen: boolean;
   /**
@@ -44,8 +62,13 @@ export interface ActiveToolMenuController {
     tool?: ToolMenuToolId,
     options?: { trigger?: HTMLElement | null; shape?: ToolMenuShapeId },
   ) => void;
-  /** Imperative close. Returns focus to the trigger that opened the panel. */
-  close: () => void;
+  /**
+   * Imperative close. Returns focus to the trigger that opened the panel,
+   * unless `restoreFocus: false` — which is what the popover passes when it
+   * closed itself because the user went back to drawing, where yanking focus
+   * onto a toolbar button would be wrong.
+   */
+  close: (options?: { restoreFocus?: boolean }) => void;
   /** Open if closed, close if open on the same tool. */
   toggle: (
     tool?: ToolMenuToolId,
@@ -64,7 +87,12 @@ export interface ActiveToolMenuController {
   /** Spread straight onto `<ToolMenu {...menuProps} />`. */
   menuProps: Pick<
     ToolMenuProps,
-    "excalidrawAPI" | "open" | "tool" | "onClose" | "onToolChange"
+    | "excalidrawAPI"
+    | "open"
+    | "tool"
+    | "anchor"
+    | "onClose"
+    | "onToolChange"
   >;
 }
 
@@ -82,14 +110,29 @@ const triggerFrom = (
 
 export const useActiveToolMenu = ({
   excalidrawAPI,
-  openOnToolChange = true,
+  openOnToolChange,
+  placement: placementProp,
   disabled = false,
 }: UseActiveToolMenuOptions): ActiveToolMenuController => {
   const [tool, setTool] = useState<ToolMenuToolId | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [storedPlacement, setStoredPlacement] = useState<ToolMenuPlacement>(
+    loadToolMenuPlacement,
+  );
+  // the panel can flip its own placement; `position.ts` is the shared store
+  useEffect(() => subscribeToolMenuPlacement(setStoredPlacement), []);
+  const placement = placementProp ?? storedPlacement;
+
+  /**
+   * The element the popover is pinned to (and focus returns to). State, not
+   * a ref, because the anchored placement has to re-render when it changes.
+   */
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
-  const openOnToolChangeRef = useRef(openOnToolChange);
-  openOnToolChangeRef.current = openOnToolChange;
+  const resolvedOpenOnToolChange =
+    openOnToolChange ?? placement !== "anchored";
+  const openOnToolChangeRef = useRef(resolvedOpenOnToolChange);
+  openOnToolChangeRef.current = resolvedOpenOnToolChange;
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
 
@@ -122,9 +165,10 @@ export const useActiveToolMenu = ({
     }
   }, [disabled]);
 
-  const close = useCallback(() => {
+  const close = useCallback<ActiveToolMenuController["close"]>((options) => {
+    const restoreFocus = options?.restoreFocus !== false;
     setIsOpen((wasOpen) => {
-      if (wasOpen) {
+      if (wasOpen && restoreFocus) {
         const trigger = triggerRef.current;
         if (trigger && trigger.isConnected) {
           // focus must not be left on a node that is about to unmount
@@ -142,6 +186,7 @@ export const useActiveToolMenu = ({
       }
       if (options?.trigger !== undefined) {
         triggerRef.current = options.trigger;
+        setAnchor(options.trigger);
       }
       if (nextTool) {
         activateTool(excalidrawAPI, nextTool, { shape: options?.shape });
@@ -181,6 +226,7 @@ export const useActiveToolMenu = ({
 
   return {
     tool,
+    placement,
     isOpen: isOpen && tool !== null && !disabled,
     open,
     close,
@@ -190,6 +236,7 @@ export const useActiveToolMenu = ({
       excalidrawAPI,
       open: isOpen && tool !== null && !disabled,
       tool,
+      anchor,
       onClose: close,
       onToolChange,
     },

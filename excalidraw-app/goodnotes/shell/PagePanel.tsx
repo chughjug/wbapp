@@ -1,22 +1,26 @@
 /**
- * The left page panel — the GoodNotes page rail, moved from the right-hand
- * Excalidraw sidebar to a fixed ~188px column on the left, under the nav bar.
+ * The page overlay — the GoodNotes page rail, as a slide-over dialog.
  *
- * This is a WRAPPER, not a fork. All of the hard parts — composited paper +
- * ink thumbnails, the debounce/cache, roving-tabindex keyboard navigation,
- * reorder and delete, "scroll the active page into view", the `+ Add page`
- * footer — come from `goodnotes/pages`'s `PageSidebar`, which this module only
- * reads from. Everything here is chrome: the panel frame, the "PAGES" header,
- * the re-skin (scoped in `PagePanel.scss`) and the body class that keeps
- * Excalidraw's bottom-left zoom pill clear of the panel.
+ * It used to be a 189x656 column (123,954 px², the single biggest consumer of
+ * permanent chrome) that held its place in the layout whether or not anyone
+ * was looking at it. It is now an overlay: **closed, it renders nothing and
+ * occupies no space**; open, it slides in over the canvas with a scrim.
  *
- * Accessibility: the panel is a labelled `<aside>`; the heading is a real
- * `<h2>`; the close control has a text accessible name; focus rings and
- * reduced-motion handling come from the sidebar and are re-stated here for the
- * chrome this file adds.
+ * This is still a WRAPPER, not a fork. All of the hard parts — composited
+ * paper + ink thumbnails, the debounce/cache, roving-tabindex keyboard
+ * navigation, reorder and delete, "scroll the active page into view", the
+ * `+ Add page` footer — come from `goodnotes/pages`'s `PageSidebar`, which
+ * this module only reads from. Everything here is chrome: the dialog frame,
+ * the scrim, the focus trap and the re-skin (scoped in `PagePanel.scss`).
+ *
+ * Accessibility: a labelled `role="dialog" aria-modal="true"` with the heading
+ * as its accessible name; Escape and a scrim click both dismiss; Tab and
+ * Shift+Tab are trapped inside while it is open; focus moves into the dialog
+ * on open and returns to whatever opened it (the bar's Pages control) on
+ * close; `prefers-reduced-motion: reduce` removes the slide.
  */
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
@@ -24,22 +28,42 @@ import { PageSidebar } from "../pages";
 
 import { CloseIcon } from "../taskbar/icons";
 
-import { PAGE_PANEL_OPEN_CLASS } from "./NavBar";
+import { PAGE_PANEL_OPEN_CLASS } from "./FloatingBar";
 
 import "./PagePanel.scss";
 
-import type { ShellPlacement } from "./NavBar";
+import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
+
+import type { ShellPlacement } from "./FloatingBar";
 
 /** Default panel width, in px. Matches the GoodNotes study's rail. */
-export const PAGE_PANEL_WIDTH = 188;
+export const PAGE_PANEL_WIDTH = 248;
+
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 export interface PagePanelProps {
   /** The editor whose pages are listed. `null` renders an empty panel. */
   excalidrawAPI: ExcalidrawImperativeAPI | null;
-  /** Whether the panel is shown. Default `true`; `false` renders nothing. */
+  /**
+   * Whether the overlay is shown. Default `false` — the overlay is a dialog,
+   * and a dialog's resting state is closed.
+   *
+   * When `false` this component renders `null`: no scrim, no panel, no column,
+   * no reserved width. That is the point of the change.
+   */
   open?: boolean;
-  /** Close control. Hidden when absent — pair it with the nav bar's toggle. */
+  /**
+   * Dismiss. Called by the close control, a scrim click and Escape. Required
+   * in practice: an overlay you cannot dismiss is a trap.
+   */
   onClose?: () => void;
+  /**
+   * Where focus goes when the overlay closes. Pass the bar's Pages button.
+   * Without it, focus returns to whatever was focused when the overlay opened,
+   * which is the same element in every normal flow.
+   */
+  returnFocusTo?: RefObject<HTMLElement | null>;
   /** Panel theme. Defaults to light; pass the editor's theme. */
   theme?: "light" | "dark";
   /** Forwarded to `PageSidebar`: render page bitmaps. Default `true`. */
@@ -47,46 +71,60 @@ export interface PagePanelProps {
   /**
    * Forwarded to `PageSidebar`. Without these the sidebar spins up its own
    * new-page dialog instead of sharing the host's, so the panel's "+ Add
-   * page" and the nav bar's would be two separate instances.
+   * page" and the bar's would be two separate instances.
    */
   onAddPage?: () => void;
   addPageMode?: "picker" | "repeat";
   docId?: string;
   /** Panel width in px. Default {@link PAGE_PANEL_WIDTH}. */
   width?: number;
+  /** Which edge the panel slides in from. Default `"left"`. */
+  side?: "left" | "right";
   /**
-   * `flow` (default): the panel is the first column of the shell's body row,
-   * so the canvas simply starts to its right and Excalidraw's own bottom-left
-   * zoom pill moves with the canvas. `fixed`: the panel is pinned to the left
-   * edge, overlaying the canvas, and the pill is nudged clear of it with a
-   * body class. Use the same placement as the nav bar.
+   * `overlay` (default) — a scrim + slide-over inside the stage, costing
+   * nothing when closed. `inline` — the legacy docked column, kept only for
+   * hosts that have not migrated; it holds a column in the layout and is the
+   * thing this redesign removed.
+   */
+  variant?: "overlay" | "inline";
+  /**
+   * @deprecated Positioning is the overlay's own business now. `"flow"` maps
+   * to `variant="inline"`; everything else is ignored.
    */
   placement?: ShellPlacement;
-  /** Header text. Default `"Pages"` (rendered in small caps). */
+  /** Header text, and the dialog's accessible name. Default `"Pages"`. */
   title?: string;
   className?: string;
 }
 
 export const PagePanel = ({
   excalidrawAPI,
-  open = true,
+  open = false,
   onClose,
+  returnFocusTo,
   theme = "light",
   thumbnails = true,
   onAddPage,
   addPageMode,
   docId,
   width = PAGE_PANEL_WIDTH,
-  placement = "flow",
+  side = "left",
+  variant,
+  placement,
   title = "Pages",
   className,
 }: PagePanelProps) => {
-  // While a FIXED panel is open, Excalidraw's own bottom-left footer (the
-  // zoom / undo pill, which we deliberately do NOT absorb) is pushed clear of
-  // it. In flow placement the canvas itself starts to the right of the panel,
-  // so the pill is already clear and no body class is needed.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+
+  const resolvedVariant =
+    variant ?? (placement === "flow" ? "inline" : "overlay");
+  const isOverlay = resolvedVariant === "overlay";
+
+  // A body class for hosts that want to react to the overlay (pause an
+  // animation, say). The overlay itself needs nothing from it.
   useEffect(() => {
-    if (!open || placement !== "fixed" || typeof document === "undefined") {
+    if (!open || typeof document === "undefined") {
       return;
     }
     const { body } = document;
@@ -96,19 +134,85 @@ export const PagePanel = ({
       body.classList.remove(PAGE_PANEL_OPEN_CLASS);
       body.style.removeProperty("--gn-page-panel-width");
     };
-  }, [open, width, placement]);
+  }, [open, width]);
+
+  // Remember what opened us, move focus in, and put it back on close. Both
+  // halves run from one effect so the restore cannot be skipped.
+  useEffect(() => {
+    if (!open || !isOverlay || typeof document === "undefined") {
+      return;
+    }
+    openerRef.current = document.activeElement as HTMLElement | null;
+    const node = dialogRef.current;
+    const first = node?.querySelector<HTMLElement>(FOCUSABLE);
+    (first ?? node)?.focus();
+    return () => {
+      const target = returnFocusTo?.current ?? openerRef.current;
+      // the opener may have unmounted (document switch); never throw for it
+      if (target && document.contains(target)) {
+        target.focus();
+      }
+    };
+  }, [open, isOverlay, returnFocusTo]);
+
+  const onKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose?.();
+        return;
+      }
+      if (event.key !== "Tab") {
+        return;
+      }
+      const node = dialogRef.current;
+      if (!node) {
+        return;
+      }
+      const items = Array.from(
+        node.querySelectorAll<HTMLElement>(FOCUSABLE),
+      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+      if (!items.length) {
+        event.preventDefault();
+        node.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const current = document.activeElement as HTMLElement | null;
+      // wrap at both ends: focus never escapes the dialog while it is open
+      if (event.shiftKey && (current === first || current === node)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && current === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    },
+    [onClose],
+  );
 
   if (!open) {
+    // zero cost when closed: no scrim, no panel, no column, no width
     return null;
   }
 
-  return (
-    <aside
-      className={`gn-page-panel gn-page-panel--${placement} excalidraw${
-        theme === "dark" ? " theme--dark" : ""
-      }${className ? ` ${className}` : ""}`}
+  const themeClass = `excalidraw${theme === "dark" ? " theme--dark" : ""}`;
+
+  const panel = (
+    <div
+      ref={dialogRef}
+      className={`gn-page-panel gn-page-panel--${resolvedVariant} gn-page-panel--${side} ${themeClass}${
+        className ? ` ${className}` : ""
+      }`}
       style={{ width: `${width}px` }}
-      aria-label={`${title} panel`}
+      style-width={undefined}
+      role={isOverlay ? "dialog" : undefined}
+      aria-modal={isOverlay ? true : undefined}
+      aria-label={isOverlay ? `${title} panel` : undefined}
+      tabIndex={isOverlay ? -1 : undefined}
+      onKeyDown={isOverlay ? onKeyDown : undefined}
       data-testid="goodnotes-page-panel"
     >
       <div className="gn-page-panel__header">
@@ -135,7 +239,33 @@ export const PagePanel = ({
           docId={docId}
         />
       </div>
-    </aside>
+    </div>
+  );
+
+  if (!isOverlay) {
+    return (
+      <aside
+        className="gn-page-panel-inline"
+        aria-label={`${title} panel`}
+        style={{ width: `${width}px` }}
+      >
+        {panel}
+      </aside>
+    );
+  }
+
+  return (
+    <div className={`gn-page-overlay ${themeClass}`} data-side={side}>
+      {/* the scrim: dismisses on click, and is not in the tab order — Escape
+          and the close button are the keyboard routes */}
+      <div
+        className="gn-page-overlay__scrim"
+        onPointerDown={onClose}
+        aria-hidden="true"
+        data-testid="goodnotes-page-overlay-scrim"
+      />
+      {panel}
+    </div>
   );
 };
 
