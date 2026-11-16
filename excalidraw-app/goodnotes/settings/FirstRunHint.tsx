@@ -63,9 +63,14 @@ export const GesturesFirstRunHint = ({
 
   return (
     <div
-      className={`excalidraw gn-settings-hint${
-        theme === "dark" ? " theme--dark" : ""
-      }${className ? ` ${className}` : ""}`}
+      // NB: no `excalidraw` class on the positioned root. That class is a
+      // full-size flex container, and it overrode this toast's fixed
+      // positioning — it rendered as an opaque full-height panel over the
+      // left third of the canvas, swallowing pen strokes. The editor's
+      // colour tokens are pulled in by the stylesheet instead.
+      className={`gn-settings-hint${theme === "dark" ? " theme--dark" : ""}${
+        className ? ` ${className}` : ""
+      }`}
       role="status"
       aria-live="polite"
     >

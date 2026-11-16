@@ -436,7 +436,7 @@ const ExcalidrawWrapper = ({
   const graph = useGraphDialog(excalidrawAPI);
   // one page at a time, fitted to the workspace; swipe/arrows move between
   const paged = usePagedView(excalidrawAPI);
-  const [isPagePanelOpen, setIsPagePanelOpen] = useState(true);
+  const [isPagePanelOpen, setIsPagePanelOpen] = useState(false);
   const openDocs = useOpenDocs(docId ?? undefined);
 
   const onActivateTab = useCallback(
@@ -1116,69 +1116,68 @@ const ExcalidrawWrapper = ({
         onCloseOthers={openDocs.actions.closeOthers}
         onNewTab={onNewDocument}
       />
-      {/* band 2 — the one nav bar */}
-      <NavBar
-        excalidrawAPI={excalidrawAPI}
-        suppressDefaultChrome
-        theme={editorTheme}
-        onHome={onCloseDocument}
-        onNewDocument={onNewDocument}
-        pagePanelOpen={isPagePanelOpen}
-        onTogglePagePanel={() => setIsPagePanelOpen((v) => !v)}
-        // the bar knows more tools than the menu has panels for
-        onActiveToolMenu={(tool, anchor) => {
-          if (
-            tool === "pen" ||
-            tool === "highlighter" ||
-            tool === "eraser" ||
-            tool === "shape" ||
-            tool === "text"
-          ) {
-            toolMenu.onToolSelect(tool, anchor);
-          }
-        }}
-        onFuzzySelect={() => {
-          backdrops.close();
-          toggleFuzzySelect();
-        }}
-        fuzzySelectActive={isFuzzySelectActive}
-        onImportPdf={() => {
-          deactivateFuzzySelect();
-          setIsPdfImportOpen(true);
-        }}
-        onExportPdf={() => {
-          deactivateFuzzySelect();
-          setIsPdfExportOpen(true);
-        }}
-        onOpenBackdrops={() => {
-          // the lasso overlay is modal and covers the window
-          deactivateFuzzySelect();
-          backdrops.open();
-        }}
-        backdropsActive={backdrops.isOpen}
-        backdropsDisabled={!backdrops.hasImageSelection}
-        onUndo={input.undo}
-        onRedo={input.redo}
-        onAddPage={newPage.open}
-        pageCount={pages.length}
-        currentPage={currentPageNumber ?? undefined}
-        moreItems={[
-          {
-            id: "insert-graph",
-            label: "Insert graph…",
-            onSelect: () => graph.open(),
-          },
-          {
-            id: "settings",
-            label: "Settings…",
-            onSelect: () => settings.open(),
-          },
-        ]}
-      />
       {/* band 3 — page panel + canvas */}
       {/* the active tool's settings, docked as a band under the bar */}
       <ToolMenu {...toolMenu.menuProps} />
       <div className="gn-shell-body">
+        <NavBar
+          excalidrawAPI={excalidrawAPI}
+          suppressDefaultChrome
+          theme={editorTheme}
+          onHome={onCloseDocument}
+          onToggleTheme={() =>
+            setAppTheme(editorTheme === "dark" ? "light" : "dark")
+          }
+          onInsertGraph={() => graph.open()}
+          documentTitle={excalidrawAPI?.getName()}
+          onNewDocument={onNewDocument}
+          pagePanelOpen={isPagePanelOpen}
+          onTogglePagePanel={() => setIsPagePanelOpen((v) => !v)}
+          // the bar knows more tools than the menu has panels for
+          onActiveToolMenu={(tool, anchor) => {
+            if (
+              tool === "pen" ||
+              tool === "highlighter" ||
+              tool === "eraser" ||
+              tool === "shape" ||
+              tool === "text"
+            ) {
+              toolMenu.onToolSelect(tool, anchor);
+            }
+          }}
+          onFuzzySelect={() => {
+            backdrops.close();
+            toggleFuzzySelect();
+          }}
+          fuzzySelectActive={isFuzzySelectActive}
+          onImportPdf={() => {
+            deactivateFuzzySelect();
+            setIsPdfImportOpen(true);
+          }}
+          onExportPdf={() => {
+            deactivateFuzzySelect();
+            setIsPdfExportOpen(true);
+          }}
+          onOpenBackdrops={() => {
+            // the lasso overlay is modal and covers the window
+            deactivateFuzzySelect();
+            backdrops.open();
+          }}
+          backdropsActive={backdrops.isOpen}
+          backdropsDisabled={!backdrops.hasImageSelection}
+          onUndo={input.undo}
+          onRedo={input.redo}
+          onAddPage={newPage.open}
+          pageCount={pages.length}
+          currentPage={currentPageNumber ?? undefined}
+          moreItems={[
+            {
+              id: "settings",
+              label: "Settings…",
+              onSelect: () => settings.open(),
+            },
+          ]}
+        />
         <PagePanel
           open={isPagePanelOpen}
           onClose={() => setIsPagePanelOpen(false)}
