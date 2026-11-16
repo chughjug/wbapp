@@ -75,7 +75,8 @@ import { NavBar, PagePanel } from "./goodnotes/shell";
 import { TabBar, useOpenDocs } from "./goodnotes/tabs";
 import { ToolMenu, useActiveToolMenu } from "./goodnotes/tool-menu";
 import { ObjectMenu } from "./goodnotes/object-menu";
-import { InputSettingsPanel, useInputGestures } from "./goodnotes/input";
+import { useInputGestures } from "./goodnotes/input";
+import { useSettingsScreen } from "./goodnotes/settings";
 import {
   GlobalPdfDropOverlay,
   PdfDropZone,
@@ -412,7 +413,6 @@ const ExcalidrawWrapper = ({
 
   const [isPdfExportOpen, setIsPdfExportOpen] = useState(false);
   const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
-  const [isInputSettingsOpen, setIsInputSettingsOpen] = useState(false);
   const isFuzzySelectActive = useFuzzySelectActive();
   const backdrops = useBackdropPanel(excalidrawAPI);
   // view transform mirrored out of AppState so the paper layer, which lives
@@ -435,8 +435,6 @@ const ExcalidrawWrapper = ({
   const paged = usePagedView(excalidrawAPI);
   const [isPagePanelOpen, setIsPagePanelOpen] = useState(true);
   const openDocs = useOpenDocs(docId ?? undefined);
-  const { preference: themePreference, setPreference: setThemePreference } =
-    useDarkMode();
 
   const onActivateTab = useCallback(
     (id: string) => {
@@ -498,6 +496,12 @@ const ExcalidrawWrapper = ({
   }, []);
 
   const { editorTheme, appTheme, setAppTheme } = useDarkMode();
+  const settings = useSettingsScreen({
+    theme: editorTheme,
+    // a restore writes straight to IndexedDB, which the library's in-process
+    // listeners never see, so re-reading the whole app is the honest answer
+    onRestored: () => window.location.reload(),
+  });
   // one shared new-page dialog, used by both the nav bar and the page panel
   const newPage = useNewPage(excalidrawAPI, {
     docId: docId ?? undefined,
@@ -1157,26 +1161,9 @@ const ExcalidrawWrapper = ({
         currentPage={currentPageNumber ?? undefined}
         moreItems={[
           {
-            id: "input-settings",
-            label: "Pen & touch…",
-            onSelect: () => setIsInputSettingsOpen(true),
-          },
-          {
-            id: "theme",
-            label:
-              themePreference === "dark"
-                ? "Theme: Dark"
-                : themePreference === "light"
-                ? "Theme: Light"
-                : "Theme: Auto",
-            onSelect: () =>
-              setThemePreference(
-                themePreference === "light"
-                  ? "dark"
-                  : themePreference === "dark"
-                  ? "system"
-                  : "light",
-              ),
+            id: "settings",
+            label: "Settings…",
+            onSelect: () => settings.open(),
           },
         ]}
       />
@@ -1436,43 +1423,8 @@ const ExcalidrawWrapper = ({
           lasso overlay is active; it does not need hiding for the tool menu,
           because selecting an object switches to the selection tool, which
           the tool menu has no panel for and closes on. */}
-      {isInputSettingsOpen && (
-        // the panel ships as a plain block, so it needs a host: without one
-        // it rendered inline in the app root and landed wherever the layout
-        // happened to put it
-        <div
-          className="gn-settings-backdrop"
-          onPointerDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setIsInputSettingsOpen(false);
-            }
-          }}
-        >
-          <div
-            className="gn-settings-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Pen and touch settings"
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                setIsInputSettingsOpen(false);
-              }
-            }}
-          >
-            <InputSettingsPanel
-              {...input.settingsPanelProps}
-              theme={editorTheme}
-            />
-            <button
-              type="button"
-              className="gn-settings-dialog__close"
-              onClick={() => setIsInputSettingsOpen(false)}
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
+      {settings.screen}
+      {settings.firstRunHint}
       <PagedViewControls {...paged.controlsProps} />
       {newPage.dialog}
       <GlobalPdfDropOverlay mode="document" />
