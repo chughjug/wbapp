@@ -42,8 +42,19 @@ export const DueSoonStrip = ({
 }: DueSoonStripProps) => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /**
+   * Notebooks created from this screen, keyed by assignment id. Canvas is
+   * not re-polled after a create (that would be a network round trip to
+   * learn something we already know), so the card flips to "Open notes"
+   * from here until the next sync folds it into `row.existing`.
+   */
+  const [created, setCreated] = useState<Record<string, DocMeta>>({});
 
-  const deadlines = buildDeadlines(state.rows, now);
+  const deadlines = buildDeadlines(state.rows, now).map((item) =>
+    item.existing || !created[item.id]
+      ? item
+      : { ...item, existing: created[item.id] },
+  );
 
   const handleActivate = useCallback(
     (item: DeadlineItem) => {
@@ -54,7 +65,10 @@ export const DueSoonStrip = ({
       }
       setBusyId(item.id);
       void createDocumentForAssignment(item.row)
-        .then((doc) => onOpenDocument(doc))
+        .then((doc) => {
+          setCreated((current) => ({ ...current, [item.id]: doc }));
+          onOpenDocument(doc);
+        })
         .catch((error: unknown) => {
           setActionError(
             `Could not create notes for “${item.title}”. ${

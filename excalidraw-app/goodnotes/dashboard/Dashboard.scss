@@ -146,15 +146,17 @@
 
   // ------------------------------------------------------------- strip
   .gn-dash__strip {
-    // reserved from the first paint: skeletons, cards, the failure notice
-    // and the empty line all live in a box of this height, so the document
-    // grid below never moves when deadlines arrive.
-    min-height: var(--gn-dash-card-height);
     display: flex;
     align-items: stretch;
   }
 
   .gn-dash__row {
+    // the height is reserved on the *row*, from the first paint: the
+    // skeletons and the real cards occupy exactly the same box, so the
+    // document grid below does not move when the deadlines arrive. The
+    // failure notice and the "nothing due" line are terminal states with no
+    // cards coming, so they are allowed to be compact instead.
+    min-height: var(--gn-dash-card-height);
     list-style: none;
     margin: 0;
     padding: 0 0 0.25rem;
