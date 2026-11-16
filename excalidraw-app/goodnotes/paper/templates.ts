@@ -11,6 +11,14 @@
  * them reusable for the mini previews in the picker.
  */
 
+import type { ExcalidrawElement } from "@excalidraw/element/types";
+
+import {
+  drawPageImageBackground,
+  getPageImageBackground,
+  type PageImageBackground,
+} from "./pageImages";
+
 import type { PaperTemplate, PaperTemplateId } from "../types";
 
 export type PaperTheme = "light" | "dark";
@@ -315,17 +323,35 @@ export const getPaperTemplate = (
 ): PaperTemplate =>
   (id && PAPER_TEMPLATES[id as PaperTemplateId]) || PAPER_TEMPLATES.blank;
 
+/** Options accepted by {@link renderPaper}. */
+export interface RenderPaperOptions {
+  theme: PaperTheme;
+  /** Fill the page with the paper colour first. Default `true`. */
+  sheet?: boolean;
+  /**
+   * Optional image background, drawn between the sheet and the rulings.
+   *
+   * ADDITIVE and OPTIONAL: every existing `renderPaper(ctx, id, w, h, {
+   * theme, sheet })` call site keeps working unchanged. Drawing is
+   * synchronous — see `./pageImages`: a decoded bitmap is used when the
+   * cache has it, otherwise a neutral placeholder is painted and
+   * `onPageImageReady` fires once the decode lands.
+   */
+  image?: PageImageBackground;
+}
+
 /**
- * Draw one complete page: sheet fill + border + the template's rulings.
- * `ctx` must already be translated to the page origin and scaled.
- * Used by both the background layer and the picker previews.
+ * Draw one complete page: sheet fill + (optional image) + the template's
+ * rulings + border. `ctx` must already be translated to the page origin and
+ * scaled. Used by the background layer, the picker previews, the page
+ * thumbnails and the PDF export.
  */
 export const renderPaper = (
   ctx: CanvasRenderingContext2D,
   templateId: PaperTemplateId,
   width: number,
   height: number,
-  opts: { theme: PaperTheme; sheet?: boolean },
+  opts: RenderPaperOptions,
 ) => {
   const p = getPaperPalette(opts.theme);
 
@@ -334,6 +360,10 @@ export const renderPaper = (
     ctx.fillStyle = p.paper;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
+  }
+
+  if (opts.image) {
+    drawPageImageBackground(ctx, opts.image, width, height, opts.theme);
   }
 
   ctx.save();
@@ -355,4 +385,42 @@ export const renderPaper = (
     height - halfPixelOffset(ctx, "y") * 2,
   );
   ctx.restore();
+};
+
+/**
+ * `renderPaper` for a page FRAME: reads both the ruling (from the pages
+ * module's `customData.goodnotesPage.template`, falling back to
+ * `defaultTemplate`) and the image background (from
+ * `customData.goodnotesPageImage`) off the element itself.
+ *
+ * This is the call every page-background renderer should prefer, because it
+ * cannot forget the image. Still fully synchronous.
+ */
+export const renderPaperForFrame = (
+  ctx: CanvasRenderingContext2D,
+  frame: Pick<ExcalidrawElement, "customData" | "width" | "height">,
+  opts: {
+    theme: PaperTheme;
+    sheet?: boolean;
+    /** Used when the frame records no template. Default `"blank"`. */
+    defaultTemplate?: PaperTemplateId;
+    /** Override the frame's own geometry (e.g. when drawing a preview). */
+    width?: number;
+    height?: number;
+  },
+) => {
+  const stored = (frame.customData as Record<string, unknown> | undefined)
+    ?.goodnotesPage as { template?: PaperTemplateId } | undefined;
+
+  renderPaper(
+    ctx,
+    stored?.template ?? opts.defaultTemplate ?? "blank",
+    opts.width ?? frame.width,
+    opts.height ?? frame.height,
+    {
+      theme: opts.theme,
+      sheet: opts.sheet,
+      image: getPageImageBackground(frame),
+    },
+  );
 };

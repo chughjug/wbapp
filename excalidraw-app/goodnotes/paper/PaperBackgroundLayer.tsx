@@ -16,10 +16,12 @@ import type { ExcalidrawElement } from "@excalidraw/element/types";
 
 import { PAGE_FRAME_PREFIX } from "../types";
 
+import { getPageImageBackground, onPageImageReady } from "./pageImages";
 import { PAPER_TEMPLATES, renderPaper } from "./templates";
 
 import "./PaperBackgroundLayer.scss";
 
+import type { PageImageBackground } from "./pageImages";
 import type { PaperTheme } from "./templates";
 import type { PaperTemplateId } from "../types";
 
@@ -35,6 +37,11 @@ export interface PaperPageRect {
   index: number;
   /** Template parsed from the frame name, if it encoded one. */
   template?: PaperTemplateId;
+  /**
+   * Image background recorded on the frame's `customData`
+   * (`goodnotesPageImage`). Drawn between the sheet and the rulings.
+   */
+  image?: PageImageBackground;
 }
 
 const isPaperTemplateId = (value: string): value is PaperTemplateId =>
@@ -82,7 +89,18 @@ export const getPaperPageRects = (
       }
     }
 
+    if (!template) {
+      // the pages module stores the ruling in `customData`, not in the name
+      const stored = (
+        element.customData as Record<string, unknown> | undefined
+      )?.goodnotesPage as { template?: PaperTemplateId } | undefined;
+      if (stored?.template && isPaperTemplateId(stored.template)) {
+        template = stored.template;
+      }
+    }
+
     pages.push({
+      image: getPageImageBackground(element),
       id: element.id,
       x: element.x,
       y: element.y,
@@ -119,6 +137,13 @@ export interface PaperBackgroundLayerProps {
   defaultTemplate?: PaperTemplateId;
   /** Per-page override; wins over the frame name and `defaultTemplate`. */
   templateForPage?: (page: PaperPageRect) => PaperTemplateId | undefined;
+  /**
+   * Per-page image-background override; wins over the frame's own
+   * `customData`. Pass `null` from the callback to suppress the image.
+   */
+  imageForPage?: (
+    page: PaperPageRect,
+  ) => PageImageBackground | null | undefined;
   /** Extra class on the wrapper canvas. */
   className?: string;
 }
@@ -168,6 +193,7 @@ export const PaperBackgroundLayer = (props: PaperBackgroundLayerProps) => {
       offsetTop: oy = 0,
       defaultTemplate: fallbackTemplate = "blank",
       templateForPage: pick,
+      imageForPage: pickImage,
     } = stateRef.current;
 
     const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -214,6 +240,8 @@ export const PaperBackgroundLayer = (props: PaperBackgroundLayerProps) => {
 
       const templateId =
         pick?.(page) ?? page.template ?? fallbackTemplate ?? "blank";
+      const override = pickImage?.(page);
+      const image = override === null ? undefined : override ?? page.image;
 
       ctx.save();
       // device pixels -> CSS px -> page-local scene px
@@ -222,6 +250,7 @@ export const PaperBackgroundLayer = (props: PaperBackgroundLayerProps) => {
       ctx.scale(z, z);
       renderPaper(ctx, templateId, page.width, page.height, {
         theme: currentTheme,
+        image,
       });
       ctx.restore();
     }
@@ -288,7 +317,12 @@ export const PaperBackgroundLayer = (props: PaperBackgroundLayerProps) => {
     offsetTop,
     defaultTemplate,
     templateForPage,
+    imageForPage,
   ]);
+
+  // A page image decodes asynchronously; the first paint shows a placeholder.
+  // Repaint as soon as any decode lands.
+  useEffect(() => onPageImageReady(() => schedule()), [schedule]);
 
   // repaint when the display's pixel ratio changes (monitor switch / browser zoom)
   useEffect(() => {

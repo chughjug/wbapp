@@ -34,7 +34,11 @@ export {
   /** A single mini-preview swatch, drawn from the real template functions. */
   PaperPreview,
 } from "./PaperPicker";
-export type { PaperPickerProps, PaperPreviewProps } from "./PaperPicker";
+export type {
+  PaperPickerProps,
+  PaperPickerOption,
+  PaperPreviewProps,
+} from "./PaperPicker";
 
 export {
   /** All templates keyed by id. */
@@ -47,8 +51,10 @@ export {
   getPaperTemplate,
   /** Theme-aware palette (paper, rule, accent, border). */
   getPaperPalette,
-  /** Draw sheet + rulings + border for one page into an already-placed ctx. */
+  /** Draw sheet + (image) + rulings + border into an already-placed ctx. */
   renderPaper,
+  /** `renderPaper` that reads ruling AND image background off a page frame. */
+  renderPaperForFrame,
   /** Geometry constants, exported for callers that need to align to them. */
   LINE_SPACING,
   GRID_SPACING,
@@ -56,4 +62,37 @@ export {
   DOT_RADIUS,
   PAGE_PADDING,
 } from "./templates";
-export type { PaperTheme } from "./templates";
+export type { PaperTheme, RenderPaperOptions } from "./templates";
+
+// ---------------------------------------------------------------------------
+// image-backed pages
+// ---------------------------------------------------------------------------
+
+export {
+  /** `customData` key holding a page's image background. */
+  PAGE_IMAGE_CUSTOM_DATA_KEY,
+  /** Read a frame's image background, if it has one. */
+  getPageImageBackground,
+  /** Pure helper: `customData` with the image background set / removed. */
+  withPageImageBackground,
+  /** Every image background referenced by a scene, de-duplicated. */
+  collectPageImageBackgrounds,
+  /** Fire-and-forget decode of every page image a scene references. */
+  syncPageImageCache,
+  /** Await every page image — call before a synchronous render. */
+  preloadPageImages,
+  /** Decode one data URL into the shared cache (coalesced, idempotent). */
+  decodePageImage,
+  /** Synchronous cache lookup used by `renderPaper`. */
+  getDecodedPageImage,
+  /** True when a decode has already been attempted and failed. */
+  isPageImageBroken,
+  /** Subscribe to "a page image finished decoding" (repaint hook). */
+  onPageImageReady,
+  /** Draw a page image into an already-placed ctx (sync; placeholder-safe). */
+  drawPageImageBackground,
+  /** Cache eviction / test seams. */
+  forgetPageImage,
+  clearPageImageCache,
+} from "./pageImages";
+export type { PageImageBackground, PageImageFit } from "./pageImages";

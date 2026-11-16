@@ -11,6 +11,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { ReactNode } from "react";
+
 import { PAPER_TEMPLATE_LIST, renderPaper } from "./templates";
 
 import "./PaperPicker.scss";
@@ -84,36 +86,67 @@ export const PaperPreview = ({
   );
 };
 
-export interface PaperPickerProps {
-  value: PaperTemplateId;
-  onChange: (template: PaperTemplateId) => void;
+/**
+ * One option in the picker. Defaults to the six built-in paper templates;
+ * a host can append its own (the new-page flow adds an `"image"` option this
+ * way, so the radiogroup stays ONE group with real radio semantics).
+ */
+export interface PaperPickerOption<Id extends string = PaperTemplateId> {
+  id: Id;
+  label: string;
+  /** Accessible name; defaults to `label`. */
+  ariaLabel?: string;
+  /** Custom swatch. Defaults to a live `PaperPreview` of `id`. */
+  preview?: ReactNode;
+}
+
+export interface PaperPickerProps<Id extends string = PaperTemplateId> {
+  value: Id;
+  onChange: (template: Id) => void;
   theme: PaperTheme;
+  /**
+   * Options to show. Defaults to every built-in paper template. Generic in
+   * the id type, so `<PaperPicker<"blank" | "image"> …>` type-checks.
+   */
+  options?: readonly PaperPickerOption<Id>[];
   /** Accessible name for the group. */
   label?: string;
   /** Hide the visible group heading (the name is still exposed to AT). */
   hideLabel?: boolean;
   disabled?: boolean;
   className?: string;
+  /** Distinguishes multiple pickers on one page (for the label's id). */
+  idPrefix?: string;
 }
 
-export const PaperPicker = ({
+const DEFAULT_OPTIONS: readonly PaperPickerOption<PaperTemplateId>[] =
+  PAPER_TEMPLATE_LIST.map((template) => ({
+    id: template.id,
+    label: template.label,
+  }));
+
+export const PaperPicker = <Id extends string = PaperTemplateId>({
   value,
   onChange,
   theme,
+  options,
   label = "Paper template",
   hideLabel = false,
   disabled = false,
   className,
-}: PaperPickerProps) => {
-  const [focusedId, setFocusedId] = useState<PaperTemplateId>(value);
-  const refs = useRef(new Map<PaperTemplateId, HTMLButtonElement>());
+  idPrefix = "goodnotes-paper-picker",
+}: PaperPickerProps<Id>) => {
+  const items = (options ??
+    (DEFAULT_OPTIONS as readonly PaperPickerOption<Id>[])) as readonly PaperPickerOption<Id>[];
+  const [focusedId, setFocusedId] = useState<Id>(value);
+  const refs = useRef(new Map<Id, HTMLButtonElement>());
 
   useEffect(() => {
     setFocusedId(value);
   }, [value]);
 
   const select = useCallback(
-    (id: PaperTemplateId, moveFocus: boolean) => {
+    (id: Id, moveFocus: boolean) => {
       setFocusedId(id);
       if (moveFocus) {
         refs.current.get(id)?.focus();
@@ -126,8 +159,8 @@ export const PaperPicker = ({
   );
 
   const onKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLButtonElement>, id: PaperTemplateId) => {
-      const list = PAPER_TEMPLATE_LIST;
+    (event: React.KeyboardEvent<HTMLButtonElement>, id: Id) => {
+      const list = items;
       const index = list.findIndex((template) => template.id === id);
       let next = -1;
 
@@ -158,10 +191,10 @@ export const PaperPicker = ({
       event.preventDefault();
       select(list[next].id, true);
     },
-    [select],
+    [items, select],
   );
 
-  const groupId = `goodnotes-paper-picker-label`;
+  const groupId = `${idPrefix}-label`;
 
   return (
     <div
@@ -181,7 +214,7 @@ export const PaperPicker = ({
         role="radiogroup"
         aria-labelledby={groupId}
       >
-        {PAPER_TEMPLATE_LIST.map((template) => {
+        {items.map((template) => {
           const checked = template.id === value;
           return (
             <button
@@ -189,7 +222,7 @@ export const PaperPicker = ({
               type="button"
               role="radio"
               aria-checked={checked}
-              aria-label={template.label}
+              aria-label={template.ariaLabel ?? template.label}
               disabled={disabled}
               tabIndex={template.id === focusedId ? 0 : -1}
               className={`goodnotes-paper-picker__option${
@@ -205,7 +238,12 @@ export const PaperPicker = ({
               onClick={() => select(template.id, false)}
               onKeyDown={(event) => onKeyDown(event, template.id)}
             >
-              <PaperPreview template={template.id} theme={theme} />
+              {template.preview ?? (
+                <PaperPreview
+                  template={template.id as unknown as PaperTemplateId}
+                  theme={theme}
+                />
+              )}
               <span className="goodnotes-paper-picker__option-label">
                 {template.label}
               </span>
