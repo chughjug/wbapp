@@ -1,6 +1,12 @@
 # `goodnotes/paged` — integration
 
-One page at a time, filling the workspace, with swipe / arrow keys / controls to move between pages. Continuous (infinite canvas) stays available as the alternative mode.
+One page at a time, filling the workspace, with swipe / arrow keys / the shell's bar to move between pages. Continuous (infinite canvas) stays available as the alternative mode.
+
+> **Changed (chrome reduction):** the permanent bottom bar (prev / "Page N of M" / next, 1194×36 = 42,984 px²) is gone. It duplicated the page count the shell's bar already shows.
+>
+> - `<PagedViewControls {...paged.controlsProps} />` now renders **only the visually-hidden `aria-live` region** (1×1, absolutely positioned — zero layout area). Keep rendering it: it is what announces "Page 2 of 7" for *every* route to a page, including the flick and the arrow keys. Pass `controls` to get the old visible strip back.
+> - The capability moved, not away: `paged.prev()`, `paged.next()`, `paged.goToPage(i)` on the hook drive the same controller, and the keyboard routes (←/→/↑/↓, PageUp/PageDown, Home/End) are installed by the controller and untouched.
+> - The paged/continuous switch is **only** in Settings → View mode now; `controlsProps` no longer carries `mode` / `onToggleMode`. Both read and write the same `goodnotes:view-mode` store (`loadViewMode` / `saveViewMode` / `subscribeViewMode`), so the control and the controller stay in step.
 
 **Nothing in the scene data model changes.** Pages remain frames stacked vertically with `PAGE_GAP` between them, so the paper layer, PDF export, page thumbnails and PDF import keep working exactly as they do today. This module only drives the _viewport_.
 

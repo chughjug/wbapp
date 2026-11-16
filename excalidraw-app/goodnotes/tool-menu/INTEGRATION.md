@@ -1,6 +1,13 @@
 # Integration — Active Tool Menu (`goodnotes/tool-menu`)
 
-> **Changed:** the panel is now a **band docked under the nav bar** by default (`placement="docked"`), not a floating overlay. §1c below is the one-element move in `App.tsx` that puts it there. The old floating behaviour is still available as `placement="floating"`.
+> **Changed again (chrome reduction):** the default is now `placement="anchored"` — a **compact popover pinned to the tool button that opened it**, portalled onto `document.body` and mounted only while open. The docked band cost 1194×53 px (62,685 px²) of permanent chrome on an iPad Pro 11"; the popover costs **0 px² when closed**.
+>
+> - It opens when you tap the tool that is **already active** (`NavBar` / `FloatingBar` → `onActiveToolMenu(tool, anchorElement)` → `toolMenu.onToolSelect(tool, anchor)`). Selecting a *different* tool just switches tool, as on paper.
+> - It dismisses on an outside click, on <kbd>Esc</kbd>, and **as soon as a mark is made** (element count rises).
+> - It is a `role="dialog"` with a focus trap; <kbd>Esc</kbd> and the close button return focus to the anchor, while dismissal caused by going back to the page deliberately does **not** move focus (`onClose({ restoreFocus: false })`).
+> - Content is two rows — colours and widths, nothing nested. Everything else for the tool is behind **More**, which makes the *same* popover taller rather than opening a submenu.
+> - `placement="docked"` (the band) and `placement="floating"` (the edge-snapped overlay) are unchanged and still selectable; the header button cycles anchored → docked → floating, and the choice persists in `localStorage` and is subscribable (`subscribeToolMenuPlacement`).
+> - Because it portals itself, `<ToolMenu {...toolMenu.menuProps} />` may be rendered anywhere in the tree; it no longer has to sit between the bar and `.gn-shell-body`. `menuProps` now carries `anchor`.
 
 Self-contained app-level module. **No `packages/` patch is required** — it is built entirely on the documented `ExcalidrawImperativeAPI` surface (`setActiveTool`, `updateScene({ appState })`, `onChange`, `getAppState`).
 

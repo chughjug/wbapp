@@ -18,7 +18,15 @@
  * 4. **Two-finger horizontal flick = previous/next page**, via
  *    `goodnotes/pages`' `scrollToPage`. Claimed only when the flick is fast
  *    and decisively sideways, so ordinary two-finger panning is untouched.
- * 5. **Two-finger tap = undo, three-finger tap = redo**, plus
+ * 5. **Auto-hiding chrome.** A stroke begins → the editor chrome fades out;
+ *    a tap, a non-drawing pointer, a key press or focus brings it straight
+ *    back. Exposed as a subscribable store ({@link subscribeChromeVisibility})
+ *    plus one `data-gn-chrome` attribute on `<html>`, so the shell renders
+ *    from state and this module never touches the shell's DOM. Default on,
+ *    switchable in {@link InputSettingsPanel}, and it refuses to hide while a
+ *    menu or dialog is open, while a text field has focus, or while the user
+ *    is navigating by keyboard.
+ * 6. **Two-finger tap = undo, three-finger tap = redo**, plus
  *    {@link requestUndo} / {@link requestRedo} for buttons — the imperative
  *    API exposes only `history.clear`, so these dispatch the editor's own
  *    Cmd/Ctrl+Z shortcut (see `history.ts` for why that is the supported

@@ -14,10 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import { activateTool, toolFromAppState } from "./editor";
-import {
-  loadToolMenuPlacement,
-  subscribeToolMenuPlacement,
-} from "./position";
+import { loadToolMenuPlacement, subscribeToolMenuPlacement } from "./position";
 
 import type { ToolMenuShapeId, ToolMenuToolId } from "./editor";
 import type { ToolMenuPlacement } from "./position";
@@ -87,12 +84,7 @@ export interface ActiveToolMenuController {
   /** Spread straight onto `<ToolMenu {...menuProps} />`. */
   menuProps: Pick<
     ToolMenuProps,
-    | "excalidrawAPI"
-    | "open"
-    | "tool"
-    | "anchor"
-    | "onClose"
-    | "onToolChange"
+    "excalidrawAPI" | "open" | "tool" | "anchor" | "onClose" | "onToolChange"
   >;
 }
 
@@ -129,8 +121,7 @@ export const useActiveToolMenu = ({
    */
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
-  const resolvedOpenOnToolChange =
-    openOnToolChange ?? placement !== "anchored";
+  const resolvedOpenOnToolChange = openOnToolChange ?? placement !== "anchored";
   const openOnToolChangeRef = useRef(resolvedOpenOnToolChange);
   openOnToolChangeRef.current = resolvedOpenOnToolChange;
   const disabledRef = useRef(disabled);

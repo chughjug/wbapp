@@ -428,7 +428,10 @@ export const anchoredPlacement = (
             viewport.height - panel.height - ANCHOR_VIEWPORT_MARGIN,
           ),
         )
-      : Math.max(ANCHOR_VIEWPORT_MARGIN, anchor.top - ANCHOR_GAP - panel.height);
+      : Math.max(
+          ANCHOR_VIEWPORT_MARGIN,
+          anchor.top - ANCHOR_GAP - panel.height,
+        );
 
   const centred = anchor.left + anchor.width / 2 - panel.width / 2;
   const left = Math.min(

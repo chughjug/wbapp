@@ -1,13 +1,28 @@
 /**
- * <PagedViewControls /> — the keyboard-reachable route to every page, and
- * the switch between paged and continuous view.
+ * <PagedViewControls /> — page changes, announced.
  *
- * Deliberately not the only route (the page panel, the arrow keys and the
- * two-finger flick all work too), but it is the route that is always there:
- * NO GESTURE IS REQUIRED to reach any page.
+ * **This is no longer a permanent bar.** It used to render prev / "Page N of
+ * M" / next as a 1194×36 strip across the bottom of an iPad screen, which
+ * duplicated the page count the shell's bar already carries and cost 42,984
+ * px² that is never drawing surface. By default it now renders ONLY the
+ * visually-hidden `aria-live` region that announces page changes — zero
+ * layout area, and the announcement survives, which matters because it is the
+ * only thing that tells a screen reader user that the arrow keys, the flick or
+ * the page panel moved them.
  *
- * It also owns the `aria-live` region that announces page changes, whichever
- * route caused them — pass `announcement` from `usePagedView()`.
+ * The capability did not go anywhere:
+ *
+ * - `usePagedView()` exposes `prev` / `next` / `goToPage`, so the shell's bar
+ *   and the page overlay drive the same controller;
+ * - the keyboard routes (arrows, PageUp/PageDown, Home/End) are installed by
+ *   the controller, not by this component, and are untouched;
+ * - a host that genuinely wants the visible strip back can pass
+ *   `controls` — it is opt-in now rather than always-on.
+ *
+ * The paged / continuous switch is gone from here entirely: Settings → View
+ * mode owns it (one control, one place), and two switches for one
+ * `localStorage` key is exactly the kind of duplication this change exists to
+ * remove.
  */
 
 import clsx from "clsx";
@@ -15,10 +30,13 @@ import { useEffect, useId, useState } from "react";
 
 import "./PagedViewControls.scss";
 
-import type { ViewMode } from "./mode";
-
 export interface PagedViewControlsProps {
-  mode: ViewMode;
+  /**
+   * Render the visible prev / page / next strip. **Off by default**: the live
+   * region alone is what the app mounts. Opt in only if your shell has no
+   * other page affordance.
+   */
+  controls?: boolean;
   /** 1-based; `0` when the document has no pages. */
   pageNumber: number;
   pageCount: number;
@@ -30,14 +48,26 @@ export interface PagedViewControlsProps {
   onNext: () => void;
   /** Called with a 1-based page number. */
   onGoToPage: (pageNumber: number) => void;
-  onToggleMode: () => void;
-  /** Hide the paged/continuous switch (if the host puts it in a menu). */
-  hideModeToggle?: boolean;
   className?: string;
 }
 
+/**
+ * The live region, on its own. Visually hidden (not `display: none`, which
+ * screen readers skip), `role="status"` + polite so a page change never
+ * interrupts what is being read.
+ */
+const LiveRegion = ({ announcement }: { announcement: string }) => (
+  <span
+    className="goodnotes-paged-controls__live"
+    role="status"
+    aria-live="polite"
+  >
+    {announcement}
+  </span>
+);
+
 export const PagedViewControls = ({
-  mode,
+  controls = false,
   pageNumber,
   pageCount,
   canPrev,
@@ -46,8 +76,6 @@ export const PagedViewControls = ({
   onPrev,
   onNext,
   onGoToPage,
-  onToggleMode,
-  hideModeToggle,
   className,
 }: PagedViewControlsProps) => {
   const inputId = useId();
@@ -66,6 +94,11 @@ export const PagedViewControls = ({
       setDraft(String(pageNumber));
     }
   };
+
+  if (!controls) {
+    // zero layout area: the announcement, and nothing else
+    return <LiveRegion announcement={announcement} />;
+  }
 
   return (
     <div className={clsx("goodnotes-paged-controls", className)}>
@@ -118,37 +151,7 @@ export const PagedViewControls = ({
         </svg>
       </button>
 
-      {!hideModeToggle && (
-        <button
-          type="button"
-          className={clsx("goodnotes-paged-controls__mode", {
-            "is-paged": mode === "paged",
-          })}
-          onClick={onToggleMode}
-          aria-pressed={mode === "paged"}
-          title={
-            mode === "paged"
-              ? "One page at a time (click for the continuous canvas)"
-              : "Continuous canvas (click for one page at a time)"
-          }
-        >
-          {mode === "paged" ? "Paged" : "Scroll"}
-        </button>
-      )}
-
-      {/*
-        One live region for every route to a page: the flick, the arrow keys,
-        this control, the page panel. `role="status"` + polite so it never
-        interrupts, and it is visually hidden rather than display:none (which
-        screen readers skip).
-      */}
-      <span
-        className="goodnotes-paged-controls__live"
-        role="status"
-        aria-live="polite"
-      >
-        {announcement}
-      </span>
+      <LiveRegion announcement={announcement} />
     </div>
   );
 };

@@ -15,8 +15,12 @@
  *  - once the user zooms in past the fit, panning *within* the page is free;
  *  - changing page animates and re-fits;
  *  - every route changes the page: the two-finger flick, the arrow keys /
- *    PageUp / PageDown / Home / End, {@link PagedViewControls}, the page
- *    panel, and any host code calling `goToPage`.
+ *    PageUp / PageDown / Home / End, the page panel, the shell's bar, and any
+ *    host code calling `goToPage` / `next` / `prev`.
+ *
+ * THERE IS NO LONGER A PERMANENT PAGE BAR. {@link PagedViewControls} renders
+ * only the `aria-live` region by default (pass `controls` for the old visible
+ * strip), and the paged/continuous switch lives in Settings → View mode.
  *
  * HOW THE CLAMP IS ENFORCED: not by correcting the viewport from `onChange`,
  * but by this fork's native scroll lock —
@@ -29,8 +33,10 @@
  *
  * ```tsx
  * const paged = usePagedView(excalidrawAPI);
- * // …in the nav bar:
+ * // page changes, announced — no visible bar unless you ask for one
  * <PagedViewControls {...paged.controlsProps} />
+ * // the shell's bar / the page overlay drive the same controller:
+ * <button onClick={() => paged.next()}>Next page</button>
  * ```
  *
  * See `INTEGRATION.md` for copy-pasteable `App.tsx` changes.
@@ -65,7 +71,10 @@ export {
   CORRECTION_BACKOFF_MS,
 } from "./controller";
 
-/** Page controls + the `aria-live` region that announces page changes. */
+/**
+ * The `aria-live` region that announces page changes (and, behind the opt-in
+ * `controls` prop, the old visible prev / page / next strip).
+ */
 export { PagedViewControls } from "./PagedViewControls";
 export type { PagedViewControlsProps } from "./PagedViewControls";
 

@@ -6,6 +6,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
+import {
+  getChromeVisibility,
+  subscribeChromeVisibility,
+} from "./chromeVisibility";
 import { attachInputGestures } from "./gestures";
 import { requestRedo, requestUndo } from "./history";
 import {
@@ -14,6 +18,7 @@ import {
   subscribeInputSettings,
 } from "./settings";
 
+import type { ChromeVisibilityState } from "./chromeVisibility";
 import type { InputCapabilities, InputGestureEvent } from "./gestures";
 import type { InputSettings } from "./settings";
 
@@ -37,6 +42,13 @@ export interface UseInputGesturesResult {
   /** Undo/redo that actually work from app code — see `history.ts`. */
   undo: () => boolean;
   redo: () => boolean;
+  /**
+   * Whether the editor chrome should currently be shown. `false` while a
+   * stroke is in progress and auto-hide is on. Render the shell's bars from
+   * this — do not read the DOM. `reducedMotion` says whether to swap
+   * instantly instead of fading.
+   */
+  chromeVisibility: ChromeVisibilityState;
   /** Spread onto {@link InputSettingsPanel}. */
   settingsPanelProps: {
     settings: InputSettings;
@@ -70,6 +82,10 @@ export const useInputGestures = (
     useState<InputSettings>(loadInputSettings);
   const [capabilities, setCapabilities] =
     useState<InputCapabilities>(INITIAL_CAPABILITIES);
+  const [chromeVisibility, setChromeVisibility] =
+    useState<ChromeVisibilityState>(getChromeVisibility);
+
+  useEffect(() => subscribeChromeVisibility(setChromeVisibility), []);
 
   // refs so the recogniser never has to be re-attached
   const settingsRef = useRef(settings);
@@ -124,12 +140,21 @@ export const useInputGestures = (
       capabilities,
       undo,
       redo,
+      chromeVisibility,
       settingsPanelProps: {
         settings,
         capabilities,
         onChange: setSetting,
       },
     }),
-    [settings, setSetting, setSettings, capabilities, undo, redo],
+    [
+      settings,
+      setSetting,
+      setSettings,
+      capabilities,
+      undo,
+      redo,
+      chromeVisibility,
+    ],
   );
 };

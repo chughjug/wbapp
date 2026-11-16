@@ -751,7 +751,9 @@ export const ToolMenu = ({
       (el) =>
         !el.hasAttribute("disabled") &&
         el.getAttribute("aria-hidden") !== "true" &&
-        (el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement),
+        (el.offsetWidth > 0 ||
+          el.offsetHeight > 0 ||
+          el === document.activeElement),
     );
 
   useEffect(() => {
@@ -762,10 +764,25 @@ export const ToolMenu = ({
     if (!node) {
       return;
     }
-    // focus the popover itself, not its first radio: landing on a radio in a
-    // group would announce "Black ink, selected" before the dialog's name,
-    // and on a touch device it can scroll the row.
-    node.focus({ preventScroll: true });
+    // Deferred by two frames on purpose: the nav bar is a roving-tabindex
+    // toolbar and puts focus back on the button it just activated *after*
+    // the click handler that opened us. Focusing synchronously here would be
+    // silently undone, leaving the trap with nothing to trap.
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => {
+        if (panelRef.current) {
+          // focus the popover itself, not its first radio: landing on a radio
+          // would announce "Black ink, selected" before the dialog's name,
+          // and on a touch device it can scroll the row.
+          panelRef.current.focus({ preventScroll: true });
+        }
+      });
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
   }, [isAnchored, open, tool]);
 
   const onPopoverKeyDown = useCallback(
@@ -1325,11 +1342,14 @@ export const ToolMenu = ({
                 data-testid="gn-tool-menu-more"
                 aria-expanded={expanded}
                 aria-controls={restId}
+                aria-label={
+                  expanded
+                    ? `Hide the rest of the ${toolTitle.toLowerCase()} settings`
+                    : `Show all ${toolTitle.toLowerCase()} settings`
+                }
                 onClick={() => setExpanded((value) => !value)}
               >
-                {expanded
-                  ? "Less"
-                  : `More ${toolTitle.toLowerCase()} settings`}
+                {expanded ? "Less" : "More"}
               </button>
             ) : null}
             {lockToggle}

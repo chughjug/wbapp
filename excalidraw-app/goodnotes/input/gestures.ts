@@ -63,6 +63,7 @@ import {
   TAP_POINTER_JOIN_WINDOW_MS,
   UNDO_TAP_POINTERS,
 } from "./constants";
+import { createChromeAutoHide } from "./chromeVisibility";
 import { requestRedo, requestUndo } from "./history";
 import { createHoverPreview } from "./hoverPreview";
 import { canOneFingerPan, createOneFingerPan } from "./pan";
@@ -128,6 +129,25 @@ const isOnCanvas = (target: EventTarget | null): boolean =>
   target instanceof Element && !!target.closest(".excalidraw__canvas");
 
 /**
+ * Tools whose pointer-down starts a MARK — the thing auto-hide reacts to.
+ *
+ * `selection`, `hand`, `frame`, `laser` and friends are navigation, not
+ * writing, so a drag with one of those leaves the chrome alone. `text` is
+ * excluded on purpose: it opens a textarea, and a focused text field is one
+ * of the states where hiding the chrome is forbidden.
+ */
+const MARK_TOOLS = new Set([
+  "freedraw",
+  "line",
+  "arrow",
+  "rectangle",
+  "ellipse",
+  "diamond",
+  "eraser",
+  "image",
+]);
+
+/**
  * Attaches the input layer to a live editor.
  *
  * @returns a handle: `detach()` on unmount, `notifySettingsChanged()` when
@@ -149,6 +169,12 @@ export const attachInputGestures = (
   const win = doc.defaultView ?? window;
   const getSettings = options.getSettings ?? (() => DEFAULT_INPUT_SETTINGS);
   const hover = createHoverPreview(doc);
+  // the chrome recedes while a mark is being made; this module is where the
+  // facts it needs (stylus down, palm rejected, gesture in flight) already are
+  const chrome = createChromeAutoHide({
+    document: doc,
+    isEnabled: () => getSettings().autoHideChrome,
+  });
   const pan = createOneFingerPan(api, {
     window: win,
     onEngage: () => options.onGesture?.({ type: "one-finger-pan" }),
@@ -203,6 +229,27 @@ export const attachInputGestures = (
       maxTravel: 0,
       samples: [],
     };
+  };
+
+  /**
+   * Would this pointer-down actually put ink on the page? That is the whole
+   * test for "a stroke began": the active tool has to be a mark-making one,
+   * the pointer has to be on the canvas, and — for a finger — palm rejection
+   * must not already be holding it off (`appState.penMode`, the editor's own
+   * flag, which `syncPenMode` below drives).
+   */
+  const isMarkPointer = (event: PointerEvent): boolean => {
+    if (api.isDestroyed || !isOnCanvas(event.target)) {
+      return false;
+    }
+    const appState = api.getAppState();
+    if (!MARK_TOOLS.has(appState.activeTool.type)) {
+      return false;
+    }
+    if (event.pointerType === "touch" && appState.penMode) {
+      return false;
+    }
+    return true;
   };
 
   // --- palm rejection ------------------------------------------------------
@@ -473,11 +520,22 @@ export const attachInputGestures = (
       if (session) {
         session.sawPen = true;
       }
+      if (isMarkPointer(event)) {
+        chrome.strokeStart(event.pointerId, event.clientX, event.clientY);
+      } else {
+        chrome.reveal("pointer");
+      }
       return;
     }
     if (event.pointerType !== "touch") {
       // mouse / trackpad: never a tablet gesture, and must not arm palm
-      // rejection
+      // rejection. It can still be drawing, though, and auto-hide is not a
+      // tablet-only feature.
+      if (isMarkPointer(event)) {
+        chrome.strokeStart(event.pointerId, event.clientX, event.clientY);
+      } else {
+        chrome.reveal("pointer");
+      }
       return;
     }
     if (!capabilities.touchSeen) {
@@ -508,10 +566,18 @@ export const attachInputGestures = (
       ) {
         pan.start(event.clientX, event.clientY);
       }
+      // a finger only marks the page when palm rejection is NOT holding it
+      // off; otherwise it is panning or resting, and the chrome stays
+      if (isMarkPointer(event)) {
+        chrome.strokeStart(event.pointerId, event.clientX, event.clientY);
+      } else {
+        chrome.reveal("pointer");
+      }
     } else {
       // a second finger: this is a pinch / two-finger pan / page flick, all
       // of which belong to the editor and to the recognisers below
       pan.cancel();
+      chrome.gesture();
     }
 
     if (session) {
@@ -614,6 +680,7 @@ export const attachInputGestures = (
   };
 
   const onPointerUp = (event: PointerEvent) => {
+    chrome.strokeEnd(event.pointerId, event.clientX, event.clientY);
     if (event.pointerType === "pen") {
       notePenActivity();
       return;
@@ -632,6 +699,8 @@ export const attachInputGestures = (
     session = null;
     pan.cancel();
     hover.hide();
+    // the window lost focus mid-stroke: never leave the chrome hidden
+    chrome.reveal("host");
   };
 
   const unsubscribeChange = api.onChange(onEditorChange);
@@ -649,7 +718,10 @@ export const attachInputGestures = (
   syncPenMode();
 
   return {
-    notifySettingsChanged: syncPenMode,
+    notifySettingsChanged: () => {
+      syncPenMode();
+      chrome.notifySettingsChanged();
+    },
     detach: () => {
       doc.removeEventListener("pointerdown", onPointerDown, capture);
       doc.removeEventListener("pointermove", onPointerMove, capture);
@@ -662,6 +734,7 @@ export const attachInputGestures = (
       win.clearTimeout(penReleaseTimer);
       pan.destroy();
       hover.destroy();
+      chrome.detach();
     },
   };
 };

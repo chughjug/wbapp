@@ -1,6 +1,50 @@
 # Integration — Pen & touch input (`goodnotes/input`)
 
-Palm rejection, pencil-only drawing, two-finger page flicks, two/three-finger tap for undo/redo, and a stylus hover preview.
+Palm rejection, pencil-only drawing, two-finger page flicks, two/three-finger tap for undo/redo, a stylus hover preview — and **auto-hiding chrome**.
+
+## Auto-hiding chrome (`chromeVisibility`)
+
+The chrome fades out the moment a stroke begins and comes straight back when you stop. It lives here because this module already knows whether a stylus is down, whether palm rejection is suppressing a finger, and whether a gesture is in flight.
+
+**It never touches the shell's DOM.** Two contracts:
+
+```ts
+import { subscribeChromeVisibility } from "./goodnotes/input";
+
+const stop = subscribeChromeVisibility(({ visible, reducedMotion }) => {
+  // render your bar from this
+});
+```
+
+…and one attribute on `<html>`: `data-gn-chrome="visible" | "hidden"` (plus `data-gn-chrome-instant` when the user asked for reduced motion). Mark any surface with `data-gn-chrome-surface` and the stylesheet shipped here fades it; the current shell classes (`.gn-bar-scope`, `.gn-nav-scope`, `.gn-tabbar`, the docked tool band) and Excalidraw's own bottom-left zoom/undo island are matched as a bridge until the shell opts in. `useInputGestures()` also returns `chromeVisibility` for React hosts.
+
+### How it decides
+
+| Event | Result |
+| --- | --- |
+| Pointer-down on the canvas with a mark-making tool, and that pointer is allowed to draw (a finger is not, while palm rejection holds `appState.penMode`) | **hide** |
+| That pointer lifts having moved ≤ 8 px — a tap, including a tap on empty canvas | **reveal** |
+| Any pointer that is not drawing: a finger pan, a second finger (gesture), a pointer off-canvas, a non-drawing tool | reveal |
+| Any `keydown` | reveal, and block hiding for 2.5 s (`KEYBOARD_GRACE_MS`) |
+| `focusin` anywhere outside the canvas (Tab, screen reader, a click on a button) | reveal |
+| A menu, popover or dialog is open (`BLOCKING_SELECTORS`) | refuses to hide |
+| A text field has focus, including Excalidraw's canvas text editor | refuses to hide |
+| Window blur, or the switch turned off | reveal |
+
+Default **on**, with a labelled checkbox ("Hide the toolbars while writing") in `InputSettingsPanel`, which already renders inside the Settings screen.
+
+### The accessibility decision, and why
+
+Hidden chrome is **faded (`opacity: 0`), not unmounted and not `display: none`**. It therefore stays in the accessibility tree, keeps its place in the tab order, and is still reachable by screen-reader review. Verified with CDP `Accessibility.getFullAXTree`: with `data-gn-chrome="hidden"`, the Pen button is still present as `role=button`, `ignored: false`.
+
+The alternative — genuinely removing it and restoring it on focus — was rejected because it makes the tab order depend on whether a pen happens to be touching the glass: a keyboard user who presses Tab mid-document would land somewhere different every time, and a screen-reader user's model of the page would silently change under them. Fading keeps one stable structure and only changes its paint.
+
+Two rails come with that choice:
+
+- while hidden the surfaces take `pointer-events: none`, so an invisible button cannot be tapped by accident;
+- focus reveals the chrome immediately — in JS (`focusin`) and again as a `:focus-within` CSS rule, so it works even if the JS listener is late or the rule is overridden.
+
+`prefers-reduced-motion: reduce` removes the transition entirely (instant swap), both from the media query and from the `data-gn-chrome-instant` attribute the store sets.
 
 This module **does** depend on a small editor patch (3 hunks in one file) — see § 4. The app-level part below is all you need in `App.tsx`.
 

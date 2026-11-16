@@ -35,7 +35,11 @@ export interface UsePagedViewOptions
 }
 
 export interface UsePagedViewResult {
-  /** `"paged"` (one page fills the workspace) or `"continuous"` (free canvas). */
+  /**
+   * `"paged"` (one page fills the workspace) or `"continuous"` (free canvas).
+   * The user-facing switch for this is Settings → View mode; `setPaged` /
+   * `togglePaged` are here for hosts and tests.
+   */
   mode: ViewMode;
   isPaged: boolean;
   setPaged: (paged: boolean) => void;
@@ -64,9 +68,13 @@ export interface UsePagedViewResult {
    */
   announcement: string;
 
-  /** Spread onto `<PagedViewControls />`. */
+  /**
+   * Spread onto `<PagedViewControls />`, which by default renders only the
+   * `aria-live` region. No `mode` / `onToggleMode` here any more: the
+   * paged-vs-continuous switch lives in Settings → View mode, which writes
+   * the same `saveViewMode` store this hook reads.
+   */
   controlsProps: {
-    mode: ViewMode;
     pageNumber: number;
     pageCount: number;
     canPrev: boolean;
@@ -75,7 +83,6 @@ export interface UsePagedViewResult {
     onPrev: () => void;
     onNext: () => void;
     onGoToPage: (pageNumber: number) => void;
-    onToggleMode: () => void;
   };
 }
 
@@ -186,7 +193,6 @@ export const usePagedView = (
       refit,
       announcement,
       controlsProps: {
-        mode: state.mode,
         pageNumber,
         pageCount: state.pageCount,
         canPrev,
@@ -195,7 +201,6 @@ export const usePagedView = (
         onPrev: () => prev(),
         onNext: () => next(),
         onGoToPage: (value: number) => goToPage(value - 1),
-        onToggleMode: () => togglePaged(),
       },
     }),
     [

@@ -1,18 +1,20 @@
 /**
  * GoodNotes-style **Active Tool Menu**.
  *
- * Selecting a tool reveals that tool's settings — by default as a horizontal
- * band directly under the nav bar, not as a panel floating over the canvas.
+ * Tapping the tool that is already active reveals that tool's settings — by
+ * default as a compact popover pinned to the button that was tapped, which
+ * costs no screen space at all when it is closed.
  *
  * ```tsx
  * import { ToolMenu, useActiveToolMenu } from "./goodnotes/tool-menu";
  *
  * const toolMenu = useActiveToolMenu({ excalidrawAPI });
  *
- * // a nav bar button — callback-shaped entry point
- * <button onClick={(event) => toolMenu.onToolSelect("pen", event)}>Pen</button>
+ * // the nav bar's hook point: it passes the button element as the anchor
+ * <NavBar onActiveToolMenu={(tool, anchor) => toolMenu.onToolSelect(tool, anchor)} />
  *
- * // band 3 of the shell: BETWEEN <NavBar /> and <div className="gn-shell-body">
+ * // anywhere in the tree — the popover portals itself onto document.body,
+ * // and renders nothing at all while closed
  * <ToolMenu {...toolMenu.menuProps} />
  * ```
  *
@@ -22,13 +24,14 @@
  * 1. **No nesting.** Ink colours (five swatches plus a custom picker) and the
  *    three stroke widths are direct, one-tap controls. GoodNotes buries them
  *    in submenus; everything here is one interaction deep.
- * 2. **Out of the canvas' way.** GoodNotes floats its menu over the page.
- *    The default placement here is `"docked"`: a band in normal document flow
- *    under the nav bar, spanning the content width, overlapping neither the
- *    page panel nor the canvas. `placement="floating"` keeps the original
- *    edge-snapped, draggable overlay for anyone who prefers it (snapped to an
- *    edge, but the position *along* the edge is the user's, remembered per
- *    edge in `localStorage`). The choice itself is persisted.
+ * 2. **Zero cost at rest.** The default placement is `"anchored"`: a popover
+ *    pinned to the tool button that opened it, mounted only while open, so
+ *    the settings cost 0 px² of permanent chrome instead of a 1194×53 band.
+ *    It dismisses on an outside click, on Escape, and as soon as a mark is
+ *    made. `"docked"` (the band under the nav bar) and `"floating"` (the
+ *    edge-snapped draggable overlay, whose position along the edge is the
+ *    user's and is remembered per edge) are still available; the choice is
+ *    persisted in `localStorage` and subscribable.
  *
  * See `INTEGRATION.md` in this folder for the exact `App.tsx` changes, and for
  * the honest list of controls that are NOT shipped because Excalidraw has
@@ -91,8 +94,20 @@ export {
   TOOL_MENU_PLACEMENT_STORAGE_KEY,
   loadToolMenuPlacement,
   saveToolMenuPlacement,
+  subscribeToolMenuPlacement,
 } from "./position";
 export type { ToolMenuPlacement } from "./position";
+
+/**
+ * The anchored popover's geometry solver — which side of the button it opens
+ * on, how it is clamped to the viewport, and where its arrow points.
+ */
+export {
+  ANCHOR_GAP,
+  ANCHOR_VIEWPORT_MARGIN,
+  anchoredPlacement,
+} from "./position";
+export type { AnchoredPlacement } from "./position";
 
 /**
  * The edge-snapping model used by `placement="floating"`, and its
