@@ -778,6 +778,10 @@
 
   // ---------------------------------------------------------------- folders
   .gn-folders {
+    position: relative;
+    // above the document grid: an open customisation popover must not be
+    // painted under a card
+    z-index: 5;
     margin-bottom: 1.5rem;
   }
 
@@ -824,6 +828,14 @@
 
     &--active {
       box-shadow: 0 0 0 2px var(--color-primary);
+    }
+
+    // while the popover is open the card must not become a transformed
+    // stacking context, or its z-index:20 popover gets trapped below the grid
+    &--open,
+    &--open:hover {
+      z-index: 30;
+      transform: none;
     }
   }
 
@@ -948,22 +960,18 @@
       box-shadow: 0 0 0 2px var(--island-bg-color), 0 0 0 4px var(--color-primary);
     }
 
+    // a tick, so "selected" is not communicated by the ring colour alone
     &__tick {
       position: absolute;
-      inset: 0;
+      inset-inline-start: 50%;
+      inset-block-start: 50%;
       display: block;
-      // a tick, so "selected" is not communicated by the ring colour alone
-      background-image: linear-gradient(
-          45deg,
-          transparent 44%,
-          #fff 44%,
-          #fff 56%,
-          transparent 56%
-        ),
-        linear-gradient(-45deg, transparent 44%, #fff 44%, #fff 56%, transparent 56%);
-      background-size: 60% 60%;
-      background-position: center;
-      background-repeat: no-repeat;
+      width: 0.3rem;
+      height: 0.55rem;
+      margin: -0.36rem 0 0 -0.16rem;
+      border: solid #fff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
     }
   }
 

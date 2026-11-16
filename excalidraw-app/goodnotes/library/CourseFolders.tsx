@@ -281,7 +281,9 @@ const FolderCard = ({
   return (
     <li className="gn-folder-wrapper">
       <div
-        className={`gn-folder${isActive ? " gn-folder--active" : ""}`}
+        className={`gn-folder${isActive ? " gn-folder--active" : ""}${
+          open ? " gn-folder--open" : ""
+        }`}
         style={
           {
             "--gn-course-rgb": hexToRgbChannels(folder.style.color),

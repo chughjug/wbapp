@@ -199,6 +199,16 @@ export const Shelf = ({
   const sidebarCourses: SidebarCourse[] = courseRows;
   const folders: CourseFolder[] = courseRows;
 
+  /**
+   * Stable style object per course for this render pass — `styleOf` builds a
+   * fresh object on every call, which would defeat `React.memo` on the cards.
+   */
+  const styleFor = useMemo(() => {
+    const map = new Map(courseRows.map((row) => [row.name, row.style]));
+    return (course: string | null) =>
+      course ? map.get(course) ?? courseStyles.styleOf(course) : null;
+  }, [courseRows, courseStyles]);
+
   // a filter whose course disappeared (last document moved/deleted) resets
   useEffect(() => {
     if (filter.kind === "course" && !courses.includes(filter.course)) {
@@ -455,7 +465,7 @@ export const Shelf = ({
     tabIndex: doc.id === activeId ? 0 : -1,
     isEditing: editingId === doc.id,
     isFavourite: isFavourite(doc),
-    courseStyle: doc.course ? courseStyles.styleOf(doc.course) : null,
+    courseStyle: styleFor(doc.course),
     onOpen: handleOpen,
     onStartEdit: setEditingId,
     onStopEdit: handleStopEdit,
