@@ -27,3 +27,10 @@ dev-dist
 html
 meta*.json
 .claude
+
+# Agent scratch harnesses. These mount a module standalone for browser
+# testing and are not part of the app; committing one fails the
+# production typecheck and breaks the deploy.
+**/__harness.*
+**/__devmount.*
+**/__verify/
