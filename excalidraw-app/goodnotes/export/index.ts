@@ -199,6 +199,7 @@ export {
   estimateSeconds,
   formatFileSize,
   formatDuration,
-  SIZE_EXPONENT,
+  exponentFor,
+  CALIBRATION_SCALE,
 } from "./estimate";
 export type { PageSizeSample, EstimateOptions } from "./estimate";

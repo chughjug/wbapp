@@ -9,6 +9,7 @@ import "../excalidraw-app/sentry";
 
 import ExcalidrawApp from "./App";
 import { configurePdfjs } from "./goodnotes/import-pdf";
+import { initInkFeel } from "./goodnotes/ink";
 
 // the entry's JavaScript and CSS loaded and ran (`scripts/stats/perf.mjs`)
 performance.mark("excalidraw:app-start");
@@ -24,6 +25,11 @@ configurePdfjs({
   pdfjs: pdfjsLib as never,
   workerSrc: pdfjsWorkerUrl,
 });
+
+// Apply the saved ink-feel preference before the first stroke. The editor
+// reads it synchronously on pointerdown, so it has to be in place at
+// bootstrap rather than when a settings screen happens to mount.
+initInkFeel();
 const rootElement = document.getElementById("root")!;
 const root = createRoot(rootElement);
 registerSW();

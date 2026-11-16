@@ -1,37 +1,72 @@
 /**
  * "How big will this be?", answered before the student waits for it.
  *
- * The dialog already rasterises every selected page as a small preview
- * thumbnail, and measures each thumbnail's encoded PNG size. That gives a
- * free per-page sample of (scale, bytes), which is extrapolated to the real
- * export scale. No extra rendering is done just to guess the size.
+ * Alongside the preview thumbnails, the dialog renders each selected page
+ * once at {@link CALIBRATION_SCALE} and measures the encoded PNG. The real
+ * size is then extrapolated from that sample with a power law:
  *
- * The extrapolation is a power law: PNG bytes grow with pixel count for
- * dense content (exponent 2) and much slower for sparse ink on plain paper
- * (exponent ~1), because the paper compresses away. {@link SIZE_EXPONENT} is
- * the fitted middle; measured against real exports of a 4-page notebook it
- * lands within roughly ±40%, which is why every estimate is rendered with a
- * "~" and never presented as a fact.
+ *     bytes(scale) = sample.bytes * (scale / sample.scale) ** k
+ *
+ * `k` is not a constant, because it depends on what is *on* the page. Sparse
+ * ink on plain paper compresses away as it grows (k ~ 1.4); a photographic
+ * page background does not (k ~ 0.9). The two are told apart by the sample's
+ * bytes-per-pixel, which is why samples carry their pixel count — see
+ * {@link exponentFor}.
+ *
+ * Measured against real exports of a 5-page notebook (four ink pages, one
+ * full-bleed scanned page): PNG at 2x +1.5%, PDF at 2x -6.7%, PDF at 1x
+ * +9.3%. It is still shown with a "~".
  */
 
 import type { ExportFormat } from "./presets";
 
-/** Fitted exponent for "PNG bytes vs. raster scale" (see the file header). */
-export const SIZE_EXPONENT = 1.45;
+/** Scale the dialog measures pages at. Samples must use it to be comparable. */
+export const CALIBRATION_SCALE = 0.5;
+
+/** Exponent for pages that are mostly white paper and thin ink. */
+export const SPARSE_EXPONENT = 1.4;
+/** Exponent for pages that are a photo / scan edge to edge. */
+export const DENSE_EXPONENT = 0.9;
+/** Sample bytes-per-pixel at or below which a page counts as sparse ink. */
+export const SPARSE_BYTES_PER_PIXEL = 0.1;
+/** Sample bytes-per-pixel at or above which a page counts as photographic. */
+export const DENSE_BYTES_PER_PIXEL = 0.8;
+
+/**
+ * How fast this page's bytes grow with resolution, read off how well it
+ * compressed at the sample scale.
+ */
+export const exponentFor = (bytes: number, pixels: number): number => {
+  if (!(pixels > 0) || !(bytes > 0)) {
+    return SPARSE_EXPONENT;
+  }
+  const bytesPerPixel = bytes / pixels;
+  const t =
+    (Math.log10(bytesPerPixel) - Math.log10(SPARSE_BYTES_PER_PIXEL)) /
+    (Math.log10(DENSE_BYTES_PER_PIXEL) - Math.log10(SPARSE_BYTES_PER_PIXEL));
+  const clamped = Math.max(0, Math.min(1, t));
+  return SPARSE_EXPONENT + clamped * (DENSE_EXPONENT - SPARSE_EXPONENT);
+};
 
 /** jsPDF container overhead: xref table, fonts, page objects. */
 export const PDF_OVERHEAD_BYTES = 2_200;
 
-/** jsPDF re-wraps each page PNG; the stream is a little larger than the PNG. */
-export const PDF_IMAGE_OVERHEAD_RATIO = 1.03;
+/**
+ * jsPDF re-encodes each page raster into the PDF rather than embedding the
+ * PNG verbatim, and the result is consistently *smaller* than the sum of the
+ * standalone PNGs. Measured on a 5-page notebook: 0.78x at 1x, 0.92x at 2x.
+ */
+export const PDF_STREAM_RATIO = 0.85;
 
 export interface PageSizeSample {
   /** 1-based page number. */
   pageNumber: number;
-  /** Scale the sample was rendered at. */
+  /** Scale the sample was rendered at (normally {@link CALIBRATION_SCALE}). */
   scale: number;
   /** Encoded PNG size of the sample, in bytes. */
   bytes: number;
+  /** Raster pixel count of the sample — how dense the page is. */
+  pixels: number;
 }
 
 export interface EstimateOptions {
@@ -46,7 +81,8 @@ export interface EstimateOptions {
 
 /** Bytes one page is expected to take at `scale`, from one sample. */
 const projectSample = (sample: PageSizeSample, scale: number): number =>
-  sample.bytes * (scale / sample.scale) ** SIZE_EXPONENT;
+  sample.bytes *
+  (scale / sample.scale) ** exponentFor(sample.bytes, sample.pixels);
 
 /**
  * Estimated total bytes of the export, or `null` when nothing has been
@@ -74,7 +110,7 @@ export const estimateExportBytes = ({
   }
 
   if (format === "pdf") {
-    return Math.round(total * PDF_IMAGE_OVERHEAD_RATIO + PDF_OVERHEAD_BYTES);
+    return Math.round(total * PDF_STREAM_RATIO + PDF_OVERHEAD_BYTES);
   }
   return Math.round(total);
 };

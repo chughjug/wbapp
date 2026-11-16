@@ -12,6 +12,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ExcalidrawElement } from "@excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 
+import { CALIBRATION_SCALE } from "./estimate";
 import { canvasToBlob, createPageRenderer } from "./renderPage";
 import { yieldToUi } from "./exportPdf";
 
@@ -24,12 +25,12 @@ const THUMB_TARGET_PX = 232;
 /** How many thumbnails to actually render; the rest collapse into "+N more". */
 export const MAX_THUMBNAILS = 12;
 /**
- * Scale used for the file-size samples. Larger than a thumbnail so the
- * extrapolation to 1x–4x is short, small enough to be nearly free.
+ * Pages measured for the size estimate — every page that gets a thumbnail.
+ * The measurement render is at {@link CALIBRATION_SCALE} (1/16th of the
+ * pixels of a 2x export page), after the thumbnails, so the preview appears
+ * first and the estimate fills in behind it.
  */
-const CALIBRATION_SCALE = 0.5;
-/** Pages measured for the size estimate. */
-const CALIBRATION_PAGES = 2;
+const CALIBRATION_PAGES = MAX_THUMBNAILS;
 
 export interface PagePreviewItem {
   pageNumber: number;
@@ -165,7 +166,8 @@ export const usePagePreviews = ({
         scale,
         includeBackground,
       });
-      return canvasToBlob(canvas, "image/png");
+      const blob = await canvasToBlob(canvas, "image/png");
+      return { blob, pixels: canvas.width * canvas.height };
     };
 
     const run = async () => {
@@ -185,15 +187,15 @@ export const usePagePreviews = ({
           continue;
         }
         try {
-          const blob = await measure(
+          const rendered = await measure(
             pageNumber,
             THUMB_TARGET_PX / Math.max(frame.width, 1),
           );
           if (!stillCurrent()) {
             return;
           }
-          if (blob) {
-            cacheRef.current.set(key, URL.createObjectURL(blob));
+          if (rendered) {
+            cacheRef.current.set(key, URL.createObjectURL(rendered.blob));
           }
         } catch {
           failedRef.current.add(key);
@@ -212,15 +214,16 @@ export const usePagePreviews = ({
           continue;
         }
         try {
-          const blob = await measure(pageNumber, CALIBRATION_SCALE);
+          const rendered = await measure(pageNumber, CALIBRATION_SCALE);
           if (!stillCurrent()) {
             return;
           }
-          if (blob) {
+          if (rendered) {
             samplesRef.current.set(pageNumber, {
               pageNumber,
               scale: CALIBRATION_SCALE,
-              bytes: blob.size,
+              bytes: rendered.blob.size,
+              pixels: rendered.pixels,
             });
             forceRender((n) => n + 1);
           }
