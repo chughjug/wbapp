@@ -32,6 +32,9 @@
 .theme--dark .gn-canvas-browser,
 .gn-canvas-browser.theme--dark {
   --gn-canvas-text-secondary: var(--color-gray-40, #b8b8b8); // 7.8:1 on #232329
+  // dark theme's --color-primary is a pale lilac (#a8a5ff); white on it is
+  // ~2.3:1, so the primary button takes near-black text instead
+  --gn-canvas-accent-text: #1b1b1f;
   --gn-canvas-surface: var(--island-bg-color, var(--color-surface-low, #232329));
   --gn-canvas-surface-alt: var(--color-surface-high, #2e2d39);
   --gn-canvas-border: var(--dialog-border-color, var(--color-gray-80, #343a40));

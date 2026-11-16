@@ -23,8 +23,8 @@ export type CanvasErrorContext =
 const CONTEXT_NOUN: Record<CanvasErrorContext, string> = {
   connect: "check that token",
   courses: "load your courses",
-  assignments: "load this course's assignments",
-  files: "load this course's files",
+  assignments: "load this course\u2019s assignments",
+  files: "load this course\u2019s files",
 };
 
 /**
