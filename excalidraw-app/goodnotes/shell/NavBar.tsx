@@ -75,6 +75,8 @@ import {
   TextIcon,
   UndoIcon,
   WriteIcon,
+  HomeIcon,
+  NewDocumentIcon,
 } from "../taskbar/icons";
 import { TaskbarMenu } from "../taskbar/Menu";
 import { LAYOUT, planOverflow } from "../taskbar/model";
@@ -164,6 +166,10 @@ export interface NavBarProps {
 
   /** Toggle the left page panel. Control hidden when absent. */
   onTogglePagePanel?: () => void;
+  /** Back to the document library. Control hidden when absent. */
+  onHome?: () => void;
+  /** Create a brand-new document and open it. Control hidden when absent. */
+  onNewDocument?: () => void;
   /** Reflected as `aria-pressed` on the page-panel toggle. */
   pagePanelOpen?: boolean;
 
@@ -307,6 +313,8 @@ export const NavBar = ({
   excalidrawAPI,
   theme,
   onTogglePagePanel,
+  onHome,
+  onNewDocument,
   pagePanelOpen,
   onToggleSearch,
   searchQuery,
@@ -1041,6 +1049,33 @@ export const NavBar = ({
       >
         {/* ---- LEFT ---------------------------------------------------- */}
         <div className="gn-nav__zone gn-nav__zone--left" data-gn-left="">
+          {onHome && (
+            <button
+              type="button"
+              className="gn-nav__button"
+              data-control="home"
+              title="All documents"
+              onClick={onHome}
+            >
+              <HomeIcon />
+              <span className="gn-nav__sr">All documents</span>
+            </button>
+          )}
+          {onNewDocument && (
+            <button
+              type="button"
+              className="gn-nav__button"
+              data-control="new-document"
+              title="New document"
+              onClick={onNewDocument}
+            >
+              <NewDocumentIcon />
+              <span className="gn-nav__sr">New document</span>
+            </button>
+          )}
+          {(onHome || onNewDocument) && (
+            <span className="gn-nav__sep" aria-hidden="true" />
+          )}
           {onTogglePagePanel && (
             <button
               type="button"

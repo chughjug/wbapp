@@ -101,6 +101,7 @@ import { PaperBackgroundLayer } from "./goodnotes/paper";
 import { PagedViewControls, usePagedView } from "./goodnotes/paged";
 import {
   Shelf,
+  createDoc,
   getScene,
   saveSceneDebounced,
   flushSceneSaves,
@@ -397,10 +398,12 @@ const initializeScene = async (opts: {
 const ExcalidrawWrapper = ({
   docId,
   onCloseDocument,
+  onNewDocument,
 }: {
   /** null for a transient scene (shared `#room=` / `#json=` link). */
   docId: string | null;
   onCloseDocument: () => void;
+  onNewDocument: () => void;
 }) => {
   const excalidrawAPI = useExcalidrawAPI();
 
@@ -1104,13 +1107,15 @@ const ExcalidrawWrapper = ({
         onClose={onCloseTab}
         onReorder={openDocs.actions.reorder}
         onCloseOthers={openDocs.actions.closeOthers}
-        onNewTab={onCloseDocument}
+        onNewTab={onNewDocument}
       />
       {/* band 2 — the one nav bar */}
       <NavBar
         excalidrawAPI={excalidrawAPI}
         suppressDefaultChrome
         theme={editorTheme}
+        onHome={onCloseDocument}
+        onNewDocument={onNewDocument}
         pagePanelOpen={isPagePanelOpen}
         onTogglePagePanel={() => setIsPagePanelOpen((v) => !v)}
         // the bar knows more tools than the menu has panels for
@@ -1532,6 +1537,16 @@ const GoodNotesRoot = () => {
     setDocId(doc.id);
   }, []);
 
+  const createAndOpenDocument = useCallback(async () => {
+    // straight into a brand-new document. Going via the library made
+    // "new document" look like it reopened the last one, because the
+    // editor has no New button and the tab strip's "+" went home.
+    await flushSceneSaves();
+    const doc = await createDoc({});
+    window.history.pushState({}, "", `/d/${encodeURIComponent(doc.id)}`);
+    setDocId(doc.id);
+  }, []);
+
   const closeDocument = useCallback(() => {
     void flushSceneSaves();
     window.history.pushState({}, "", "/");
@@ -1572,6 +1587,7 @@ const GoodNotesRoot = () => {
       key={docId ?? "transient"}
       docId={docId}
       onCloseDocument={closeDocument}
+      onNewDocument={() => void createAndOpenDocument()}
     />
   );
 };

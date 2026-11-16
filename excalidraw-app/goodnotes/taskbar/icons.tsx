@@ -248,3 +248,21 @@ export const CloseIcon = () =>
       <path d="m6 6 12 12M18 6 6 18" />
     </>,
   );
+
+/** Back to the document library. */
+export const HomeIcon = () => (
+  <svg viewBox="0 0 24 24" className="gn-icon" aria-hidden="true">
+    <path d="M4 10.5 12 4l8 6.5" />
+    <path d="M6 10v9h12v-9" />
+    <path d="M10 19v-5h4v5" />
+  </svg>
+);
+
+/** Create a new document. */
+export const NewDocumentIcon = () => (
+  <svg viewBox="0 0 24 24" className="gn-icon" aria-hidden="true">
+    <path d="M14 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V7.5z" />
+    <path d="M14 3v4.5h4.5" />
+    <path d="M12 11v6M9 14h6" />
+  </svg>
+);
