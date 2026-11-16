@@ -41,9 +41,23 @@
  */
 export type ToolMenuPlacement = "anchored" | "docked" | "floating";
 
+/**
+ * The placements a user can actually cycle to.
+ *
+ * `"docked"` is deliberately absent. It was the default before the floating
+ * bar landed, and it cannot work alongside it: the band renders in flow at
+ * the top of the shell, so it paints over the floating bar (the bar's pill
+ * sits at y=10, the band spans y=0..77) and, because its height depends on
+ * the active tool, it resizes the canvas on every tool change — measured at
+ * 1194x834: canvas height 834 -> 758 for the pen, -> 782 for the eraser.
+ * That is the "the header disappears and the page resizes when I switch
+ * tools" bug. The value is still accepted by the type and still renders, so
+ * nothing that passes `placement="docked"` explicitly breaks, but the UI no
+ * longer offers it and a stored one is migrated away (see
+ * {@link loadToolMenuPlacement}).
+ */
 export const TOOL_MENU_PLACEMENTS: readonly ToolMenuPlacement[] = [
   "anchored",
-  "docked",
   "floating",
 ];
 
@@ -58,10 +72,23 @@ const isPlacement = (value: unknown): value is ToolMenuPlacement =>
 
 const placementListeners = new Set<(placement: ToolMenuPlacement) => void>();
 
-/** Read the saved placement. Never throws; falls back to `"anchored"`. */
+/**
+ * Read the saved placement. Never throws; falls back to `"anchored"`.
+ *
+ * A stored `"docked"` is migrated to the default. Everyone who used the app
+ * before the floating bar has that value persisted, because it was then both
+ * the default and one step of the header button's cycle — so without this
+ * they are silently upgraded into the broken layout described on
+ * {@link TOOL_MENU_PLACEMENTS}. The stored value is rewritten rather than
+ * just ignored, so the migration happens once.
+ */
 export const loadToolMenuPlacement = (): ToolMenuPlacement => {
   try {
     const raw = localStorage.getItem(TOOL_MENU_PLACEMENT_STORAGE_KEY);
+    if (raw === "docked") {
+      saveToolMenuPlacement(DEFAULT_TOOL_MENU_PLACEMENT);
+      return DEFAULT_TOOL_MENU_PLACEMENT;
+    }
     return isPlacement(raw) ? raw : DEFAULT_TOOL_MENU_PLACEMENT;
   } catch {
     return DEFAULT_TOOL_MENU_PLACEMENT;
