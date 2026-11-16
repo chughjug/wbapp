@@ -699,6 +699,14 @@ const ExcalidrawWrapper = ({
       // `data.scene` keeps the usual defaults and the `#json=` import path
       // working for a document that has never been saved.
       const docScene = docId ? await getScene(docId) : null;
+      // A brand-new library document has no saved scene. `data.scene` is
+      // upstream Excalidraw's *single*-scene localStorage, so falling back to
+      // it here opened every new notebook on the previous notebook's ink —
+      // distinct id, distinct library entry, somebody else's drawing. A
+      // document we own starts empty instead. `appState` is still carried
+      // over, deliberately: that is where the pen colour, width and theme
+      // live, and those should follow the user between notebooks.
+      const startsEmpty = docId !== null && !data.isExternalScene;
       initialStatePromiseRef.current.promise.resolve(
         docScene
           ? {
@@ -714,6 +722,8 @@ const ExcalidrawWrapper = ({
             }
           : {
               ...data.scene,
+              elements: startsEmpty ? [] : data.scene?.elements,
+              files: startsEmpty ? {} : data.scene?.files,
               appState: {
                 ...data.scene?.appState,
                 viewBackgroundColor: "transparent",
