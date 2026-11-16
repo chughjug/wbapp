@@ -1,5 +1,6 @@
 import { FONT_FAMILY, FONT_SIZES } from "@excalidraw/common";
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -34,9 +35,11 @@ import {
 import {
   EDGE_MARGIN,
   describePosition,
+  loadToolMenuPlacement,
   loadToolMenuPosition,
   moveByKeyboard,
   placementToPixels,
+  saveToolMenuPlacement,
   saveToolMenuPosition,
   snapToEdge,
 } from "./position";
@@ -54,7 +57,7 @@ import type {
   ToolMenuToolId,
   ToolMenuWidthKey,
 } from "./editor";
-import type { ToolMenuPosition } from "./position";
+import type { ToolMenuPlacement, ToolMenuPosition } from "./position";
 import type { PenPreset } from "../types";
 
 /* -------------------------------------------------------------------------- */
@@ -294,6 +297,18 @@ export interface ToolMenuProps {
    */
   onToolChange?: (tool: ToolMenuToolId) => void;
   /**
+   * `"docked"` (the default) renders the panel as a horizontal band in normal
+   * document flow — put it between the nav bar and `.gn-shell-body` and it
+   * sits under the bar, spanning the content width, overlapping nothing.
+   * `"floating"` is the original edge-snapped, draggable overlay.
+   *
+   * Omit it and the panel uses the user's persisted choice (default
+   * `"docked"`); pass it to force one placement.
+   */
+  placement?: ToolMenuPlacement;
+  /** Fired when the user flips placement with the dock / undock button. */
+  onPlacementChange?: (placement: ToolMenuPlacement) => void;
+  /**
    * Scope Excalidraw's CSS custom properties onto the panel's own root. Pass
    * this ONLY when the panel is mounted outside `<Excalidraw>`; inside it, the
    * properties are already in scope and the extra `.excalidraw` class is
@@ -317,6 +332,8 @@ export const ToolMenu = ({
   tool,
   onClose,
   onToolChange,
+  placement: placementProp,
+  onPlacementChange,
   scopeTheme,
   className,
 }: ToolMenuProps) => {
@@ -519,6 +536,64 @@ export const ToolMenu = ({
     [commitPosition, panelSize, position, viewport],
   );
 
+  /* --------------------------- placement --------------------------------- */
+
+  const [storedPlacement, setStoredPlacement] = useState<ToolMenuPlacement>(
+    () => placementProp ?? loadToolMenuPlacement(),
+  );
+  const menuPlacement = placementProp ?? storedPlacement;
+  const isDocked = menuPlacement === "docked";
+
+  const togglePlacement = useCallback(() => {
+    const next: ToolMenuPlacement =
+      menuPlacement === "docked" ? "floating" : "docked";
+    setStoredPlacement(next);
+    saveToolMenuPlacement(next);
+    onPlacementChange?.(next);
+  }, [menuPlacement, onPlacementChange]);
+
+  /* --------------------------- band overflow ------------------------------ */
+
+  // In the band the controls run in ONE row. When the window is too narrow for
+  // them, the row is clipped and a "More" disclosure wraps it onto extra rows
+  // (and reveals the explanatory note) — rather than a scroller, which hides
+  // controls behind a gesture, or a submenu, which is the GoodNotes mistake
+  // this panel exists to undo.
+  const groupsRef = useRef<HTMLDivElement | null>(null);
+  const [hasOverflow, setHasOverflow] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [tool, menuPlacement]);
+
+  useEffect(() => {
+    if (!isDocked || !open) {
+      return;
+    }
+    const node = groupsRef.current;
+    if (!node) {
+      return;
+    }
+    const measure = () => {
+      if (expandedRef.current) {
+        // expanded = wrapped, so scrollWidth no longer reports the truth;
+        // keep the last collapsed measurement so the toggle does not vanish
+        return;
+      }
+      const overflowing = node.scrollWidth > node.clientWidth + 1;
+      setHasOverflow((current) =>
+        current === overflowing ? current : overflowing,
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isDocked, open, tool, expanded]);
+
   /* ---------------------------- escape ----------------------------------- */
 
   useEffect(() => {
@@ -690,212 +765,247 @@ export const ToolMenu = ({
 
   /* ---------------------------- panels ----------------------------------- */
 
-  let body: ReactNode = null;
+  /**
+   * The body is built as a FLAT LIST of groups plus (optionally) one
+   * explanatory note. Both placements render the same groups: the floating
+   * panel stacks them in a column, the band flows them in a row with
+   * separators and puts the note in the disclosure. Nothing is placement-only,
+   * so no control is reachable in one placement and not the other.
+   */
+  const groups: ReactNode[] = [];
+  let note: ReactNode = null;
+
+  const push = (key: string, node: ReactNode) => {
+    groups.push(<Fragment key={key}>{node}</Fragment>);
+  };
 
   if (tool === "pen" || tool === "highlighter") {
-    body = (
-      <>
-        {presetChips}
-        {colorGroup(tool === "highlighter" ? "Colour" : "Ink", onColor)}
-        {widthGroup(onWidth)}
-        {tool === "highlighter" ? opacityControl(onOpacity) : null}
-        {tool === "pen" ? (
-          <>
-            <Group legend="Nib" className="gn-tool-menu__group--nib">
-              {(
-                [
-                  { value: "variable", label: "Fountain (tapered)" },
-                  { value: "constant", label: "Ballpoint (even)" },
-                ] as const
-              ).map((option) => (
-                <Radio
-                  key={option.value}
-                  name="gn-tool-menu-nib"
-                  value={option.value}
-                  checked={style.variability === option.value}
-                  label={option.label}
-                  onSelect={(value) =>
-                    applyInk(excalidrawAPI, {
-                      variability: value as StrokeVariability,
-                    })
-                  }
-                />
-              ))}
-            </Group>
-            <p className="gn-tool-menu__note">
-              Fountain and ballpoint map onto Excalidraw&rsquo;s real stroke
-              pressure setting. A pencil nib would need a stroke texture the
-              editor does not have, so it is not offered here.
-            </p>
-          </>
-        ) : null}
-      </>
+    if (presetChips) {
+      push("presets", presetChips);
+    }
+    push(
+      "color",
+      colorGroup(tool === "highlighter" ? "Colour" : "Ink", onColor),
     );
-  } else if (tool === "eraser") {
-    body = (
-      <>
-        {presetChips}
-        <p className="gn-tool-menu__note">
-          Excalidraw&rsquo;s eraser removes a whole stroke on contact. It has no
-          brush size and no per-kind filter, so there is nothing here to size or
-          to limit to highlighter strokes &mdash; shipping either control would
-          be a dial wired to nothing.
-        </p>
-      </>
-    );
-  } else if (tool === "shape") {
-    body = (
-      <>
-        <Group legend="Shape" className="gn-tool-menu__group--shapes">
-          {SHAPE_OPTIONS.map((option) => (
-            <Radio
-              key={option.value}
-              name="gn-tool-menu-shape"
-              value={option.value}
-              checked={style.shape === option.value}
-              label={option.label}
-              onSelect={(value) => {
-                activateTool(excalidrawAPI, "shape", {
-                  shape: value as ToolMenuShapeId,
-                });
-                onToolChange?.("shape");
-              }}
-            />
-          ))}
-        </Group>
-        <Group legend="Stroke" className="gn-tool-menu__group--swatches">
-          {INK_SWATCHES.map((swatch) => (
-            <Radio
-              key={swatch.value}
-              name="gn-tool-menu-shape-stroke"
-              value={swatch.value}
-              checked={
-                swatch.value.toLowerCase() === style.strokeColor.toLowerCase()
-              }
-              label={`${swatch.label} stroke`}
-              onSelect={(value) =>
-                applyShapeStyle(excalidrawAPI, { strokeColor: value })
-              }
-              className="gn-tool-menu__radio--swatch"
-            >
-              <span
-                className="gn-tool-menu__swatch"
-                aria-hidden="true"
-                style={{ ["--gn-swatch" as string]: swatch.value }}
-              />
-            </Radio>
-          ))}
-        </Group>
-        <Group legend="Fill" className="gn-tool-menu__group--swatches">
-          {FILL_SWATCHES.map((swatch) => (
-            <Radio
-              key={swatch.value}
-              name="gn-tool-menu-shape-fill"
-              value={swatch.value}
-              checked={
-                swatch.value.toLowerCase() ===
-                style.backgroundColor.toLowerCase()
-              }
-              label={swatch.label}
-              onSelect={(value) =>
-                applyShapeStyle(excalidrawAPI, { backgroundColor: value })
-              }
-              className="gn-tool-menu__radio--swatch"
-            >
-              <span
-                className="gn-tool-menu__swatch"
-                aria-hidden="true"
-                data-transparent={swatch.value === "transparent" || undefined}
-                style={{ ["--gn-swatch" as string]: swatch.value }}
-              />
-            </Radio>
-          ))}
-        </Group>
-        {widthGroup((widthKey) => applyShapeStyle(excalidrawAPI, { widthKey }))}
-        <Group legend="Edges">
+    push("width", widthGroup(onWidth));
+    if (tool === "highlighter") {
+      push("opacity", opacityControl(onOpacity));
+    }
+    if (tool === "pen") {
+      push(
+        "nib",
+        <Group legend="Nib" className="gn-tool-menu__group--nib">
           {(
             [
-              { value: "sharp", label: "Sharp edges" },
-              { value: "round", label: "Round edges" },
+              { value: "variable", label: "Fountain (tapered)" },
+              { value: "constant", label: "Ballpoint (even)" },
             ] as const
           ).map((option) => (
             <Radio
               key={option.value}
-              name="gn-tool-menu-roundness"
+              name="gn-tool-menu-nib"
               value={option.value}
-              checked={style.roundness === option.value}
+              checked={style.variability === option.value}
               label={option.label}
               onSelect={(value) =>
-                applyShapeStyle(excalidrawAPI, {
-                  roundness: value as AppState["currentItemRoundness"],
+                applyInk(excalidrawAPI, {
+                  variability: value as StrokeVariability,
                 })
               }
             />
           ))}
-        </Group>
-        {opacityControl((opacity) =>
-          applyShapeStyle(excalidrawAPI, { opacity }),
-        )}
-      </>
+        </Group>,
+      );
+      note = (
+        <p className="gn-tool-menu__note">
+          Fountain and ballpoint map onto Excalidraw&rsquo;s real stroke
+          pressure setting. A pencil nib would need a stroke texture the editor
+          does not have, so it is not offered here.
+        </p>
+      );
+    }
+  } else if (tool === "eraser") {
+    if (presetChips) {
+      push("presets", presetChips);
+    }
+    note = (
+      <p className="gn-tool-menu__note">
+        Excalidraw&rsquo;s eraser removes a whole stroke on contact. It has no
+        brush size and no per-kind filter, so there is nothing here to size or
+        to limit to highlighter strokes &mdash; shipping either control would be
+        a dial wired to nothing.
+      </p>
+    );
+  } else if (tool === "shape") {
+    push(
+      "shape",
+      <Group legend="Shape" className="gn-tool-menu__group--shapes">
+        {SHAPE_OPTIONS.map((option) => (
+          <Radio
+            key={option.value}
+            name="gn-tool-menu-shape"
+            value={option.value}
+            checked={style.shape === option.value}
+            label={option.label}
+            onSelect={(value) => {
+              activateTool(excalidrawAPI, "shape", {
+                shape: value as ToolMenuShapeId,
+              });
+              onToolChange?.("shape");
+            }}
+          />
+        ))}
+      </Group>,
+    );
+    push(
+      "stroke",
+      <Group legend="Stroke" className="gn-tool-menu__group--swatches">
+        {INK_SWATCHES.map((swatch) => (
+          <Radio
+            key={swatch.value}
+            name="gn-tool-menu-shape-stroke"
+            value={swatch.value}
+            checked={
+              swatch.value.toLowerCase() === style.strokeColor.toLowerCase()
+            }
+            label={`${swatch.label} stroke`}
+            onSelect={(value) =>
+              applyShapeStyle(excalidrawAPI, { strokeColor: value })
+            }
+            className="gn-tool-menu__radio--swatch"
+          >
+            <span
+              className="gn-tool-menu__swatch"
+              aria-hidden="true"
+              style={{ ["--gn-swatch" as string]: swatch.value }}
+            />
+          </Radio>
+        ))}
+      </Group>,
+    );
+    push(
+      "fill",
+      <Group legend="Fill" className="gn-tool-menu__group--swatches">
+        {FILL_SWATCHES.map((swatch) => (
+          <Radio
+            key={swatch.value}
+            name="gn-tool-menu-shape-fill"
+            value={swatch.value}
+            checked={
+              swatch.value.toLowerCase() === style.backgroundColor.toLowerCase()
+            }
+            label={swatch.label}
+            onSelect={(value) =>
+              applyShapeStyle(excalidrawAPI, { backgroundColor: value })
+            }
+            className="gn-tool-menu__radio--swatch"
+          >
+            <span
+              className="gn-tool-menu__swatch"
+              aria-hidden="true"
+              data-transparent={swatch.value === "transparent" || undefined}
+              style={{ ["--gn-swatch" as string]: swatch.value }}
+            />
+          </Radio>
+        ))}
+      </Group>,
+    );
+    push(
+      "width",
+      widthGroup((widthKey) => applyShapeStyle(excalidrawAPI, { widthKey })),
+    );
+    push(
+      "edges",
+      <Group legend="Edges">
+        {(
+          [
+            { value: "sharp", label: "Sharp edges" },
+            { value: "round", label: "Round edges" },
+          ] as const
+        ).map((option) => (
+          <Radio
+            key={option.value}
+            name="gn-tool-menu-roundness"
+            value={option.value}
+            checked={style.roundness === option.value}
+            label={option.label}
+            onSelect={(value) =>
+              applyShapeStyle(excalidrawAPI, {
+                roundness: value as AppState["currentItemRoundness"],
+              })
+            }
+          />
+        ))}
+      </Group>,
+    );
+    push(
+      "opacity",
+      opacityControl((opacity) => applyShapeStyle(excalidrawAPI, { opacity })),
     );
   } else {
-    body = (
-      <>
-        <Group legend="Colour" className="gn-tool-menu__group--swatches">
-          {INK_SWATCHES.map((swatch) => (
-            <Radio
-              key={swatch.value}
-              name="gn-tool-menu-text-color"
-              value={swatch.value}
-              checked={
-                swatch.value.toLowerCase() === style.strokeColor.toLowerCase()
-              }
-              label={`${swatch.label} text`}
-              onSelect={(value) =>
-                applyTextStyle(excalidrawAPI, { color: value })
-              }
-              className="gn-tool-menu__radio--swatch"
-            >
-              <span
-                className="gn-tool-menu__swatch"
-                aria-hidden="true"
-                style={{ ["--gn-swatch" as string]: swatch.value }}
-              />
-            </Radio>
-          ))}
-        </Group>
-        <Group legend="Size">
-          {FONT_SIZE_OPTIONS.map((option) => (
-            <Radio
-              key={option.value}
-              name="gn-tool-menu-font-size"
-              value={option.value}
-              checked={style.fontSize === option.value}
-              label={option.label}
-              onSelect={(value) =>
-                applyTextStyle(excalidrawAPI, { fontSize: Number(value) })
-              }
+    push(
+      "color",
+      <Group legend="Colour" className="gn-tool-menu__group--swatches">
+        {INK_SWATCHES.map((swatch) => (
+          <Radio
+            key={swatch.value}
+            name="gn-tool-menu-text-color"
+            value={swatch.value}
+            checked={
+              swatch.value.toLowerCase() === style.strokeColor.toLowerCase()
+            }
+            label={`${swatch.label} text`}
+            onSelect={(value) =>
+              applyTextStyle(excalidrawAPI, { color: value })
+            }
+            className="gn-tool-menu__radio--swatch"
+          >
+            <span
+              className="gn-tool-menu__swatch"
+              aria-hidden="true"
+              style={{ ["--gn-swatch" as string]: swatch.value }}
             />
-          ))}
-        </Group>
-        <Group legend="Font">
-          {FONT_FAMILY_OPTIONS.map((option) => (
-            <Radio
-              key={String(option.value)}
-              name="gn-tool-menu-font-family"
-              value={String(option.value)}
-              checked={style.fontFamily === option.value}
-              label={option.label}
-              onSelect={() =>
-                applyTextStyle(excalidrawAPI, { fontFamily: option.value })
-              }
-            />
-          ))}
-        </Group>
-        {opacityControl((opacity) =>
-          applyTextStyle(excalidrawAPI, { opacity }),
-        )}
-      </>
+          </Radio>
+        ))}
+      </Group>,
+    );
+    push(
+      "size",
+      <Group legend="Size">
+        {FONT_SIZE_OPTIONS.map((option) => (
+          <Radio
+            key={option.value}
+            name="gn-tool-menu-font-size"
+            value={option.value}
+            checked={style.fontSize === option.value}
+            label={option.label}
+            onSelect={(value) =>
+              applyTextStyle(excalidrawAPI, { fontSize: Number(value) })
+            }
+          />
+        ))}
+      </Group>,
+    );
+    push(
+      "font",
+      <Group legend="Font">
+        {FONT_FAMILY_OPTIONS.map((option) => (
+          <Radio
+            key={String(option.value)}
+            name="gn-tool-menu-font-family"
+            value={String(option.value)}
+            checked={style.fontFamily === option.value}
+            label={option.label}
+            onSelect={() =>
+              applyTextStyle(excalidrawAPI, { fontFamily: option.value })
+            }
+          />
+        ))}
+      </Group>,
+    );
+    push(
+      "opacity",
+      opacityControl((opacity) => applyTextStyle(excalidrawAPI, { opacity })),
     );
   }
 
@@ -908,16 +1018,125 @@ export const ToolMenu = ({
       : ` excalidraw${resolvedTheme === "dark" ? " theme--dark" : ""}`;
 
   const titleId = "gn-tool-menu-title";
+  const groupsId = "gn-tool-menu-groups";
+  const toolTitle = TOOL_TITLES[tool];
+
+  const lockToggle = (
+    <label className="gn-tool-menu__toggle">
+      <input
+        type="checkbox"
+        checked={style.locked}
+        onChange={(event) => setToolLocked(excalidrawAPI, event.target.checked)}
+      />
+      <span>Keep tool active</span>
+    </label>
+  );
+
+  const placementButton = (
+    <button
+      type="button"
+      className="gn-tool-menu__text-button"
+      data-testid="gn-tool-menu-placement"
+      aria-label={
+        isDocked
+          ? `Undock ${toolTitle.toLowerCase()} settings into a floating panel`
+          : `Dock ${toolTitle.toLowerCase()} settings under the nav bar`
+      }
+      onClick={togglePlacement}
+    >
+      {isDocked ? "Undock" : "Dock"}
+    </button>
+  );
+
+  const closeButton = (
+    <button
+      type="button"
+      className="gn-tool-menu__close"
+      aria-label={`Close ${toolTitle.toLowerCase()} settings`}
+      onClick={onClose}
+    >
+      <span aria-hidden="true">&times;</span>
+    </button>
+  );
+
+  /* ------------------------- docked: a band ------------------------------ */
+
+  if (isDocked) {
+    const showDisclosure = hasOverflow || note !== null;
+    return (
+      <div
+        className={`gn-tool-menu-scope gn-tool-menu-scope--docked${scopeClass}`}
+        data-testid="gn-tool-menu-scope"
+        data-placement="docked"
+      >
+        <div
+          ref={panelRef}
+          className={`gn-tool-menu gn-tool-menu--docked ${
+            className ?? ""
+          }`.trim()}
+          data-testid="gn-tool-menu"
+          data-placement="docked"
+          data-expanded={expanded ? "true" : undefined}
+          role="region"
+          aria-labelledby={titleId}
+        >
+          <h2 className="gn-tool-menu__title" id={titleId}>
+            {toolTitle}
+          </h2>
+
+          <div
+            className="gn-tool-menu__band-groups"
+            id={groupsId}
+            ref={groupsRef}
+            data-clipped={!expanded && hasOverflow ? "true" : undefined}
+          >
+            {groups}
+          </div>
+
+          <div className="gn-tool-menu__band-actions">
+            {showDisclosure ? (
+              <button
+                type="button"
+                className="gn-tool-menu__text-button"
+                data-testid="gn-tool-menu-more"
+                aria-expanded={expanded}
+                aria-controls={groupsId}
+                aria-label={
+                  expanded
+                    ? `Hide the rest of the ${toolTitle.toLowerCase()} settings`
+                    : `Show all ${toolTitle.toLowerCase()} settings`
+                }
+                onClick={() => setExpanded((value) => !value)}
+              >
+                {expanded ? "Less" : "More"}
+              </button>
+            ) : null}
+            {lockToggle}
+            {placementButton}
+            {closeButton}
+          </div>
+
+          {expanded && note ? (
+            <div className="gn-tool-menu__band-note">{note}</div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  /* ----------------------- floating: the overlay ------------------------- */
 
   return (
     <div
       className={`gn-tool-menu-scope${scopeClass}`}
       data-testid="gn-tool-menu-scope"
+      data-placement="floating"
     >
       <div
         ref={panelRef}
         className={`gn-tool-menu ${className ?? ""}`.trim()}
         data-testid="gn-tool-menu"
+        data-placement="floating"
         data-edge={position.edge}
         data-dragging={drag ? "true" : undefined}
         role="dialog"
@@ -945,31 +1164,19 @@ export const ToolMenu = ({
             <span className="gn-tool-menu__grip" aria-hidden="true" />
           </button>
           <h2 className="gn-tool-menu__title" id={titleId}>
-            {TOOL_TITLES[tool]}
+            {toolTitle}
           </h2>
-          <button
-            type="button"
-            className="gn-tool-menu__close"
-            aria-label={`Close ${TOOL_TITLES[tool].toLowerCase()} settings`}
-            onClick={onClose}
-          >
-            <span aria-hidden="true">&times;</span>
-          </button>
+          {closeButton}
         </div>
 
-        <div className="gn-tool-menu__body">{body}</div>
+        <div className="gn-tool-menu__body">
+          {groups}
+          {note}
+        </div>
 
         <div className="gn-tool-menu__footer">
-          <label className="gn-tool-menu__toggle">
-            <input
-              type="checkbox"
-              checked={style.locked}
-              onChange={(event) =>
-                setToolLocked(excalidrawAPI, event.target.checked)
-              }
-            />
-            <span>Keep tool active</span>
-          </label>
+          {lockToggle}
+          {placementButton}
         </div>
 
         <p className="gn-tool-menu__sr-only" role="status" aria-live="polite">

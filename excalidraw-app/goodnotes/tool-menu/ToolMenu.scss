@@ -429,3 +429,207 @@
     transition: none;
   }
 }
+
+/* ===========================================================================
+   DOCKED placement — a band under the nav bar (the default)
+
+   The panel is no longer an overlay: it is the third band of the shell
+   (`gn-shell-layout` → tabs / nav bar / **tool band** / `gn-shell-body`), in
+   normal document flow. It therefore has no `left`/`top`, no drag handle and
+   no edge model; the flex column above it decides where it goes, and it
+   overlaps neither the page panel nor the canvas because it is a sibling of
+   neither.
+
+   The contents are RELAID OUT, not just squashed: each group becomes a
+   compact label-over-controls cell, cells run in one row separated by rules,
+   and when the row no longer fits it is clipped behind a "More" disclosure
+   that wraps it onto further rows. Nothing moves into a submenu.
+   =========================================================================== */
+
+.gn-tool-menu-scope.gn-tool-menu-scope.gn-tool-menu-scope--docked {
+  position: relative;
+  inset: auto;
+  flex: 0 0 auto;
+  pointer-events: auto;
+  // below the nav bar's own z-index (125) — the band never needs to paint
+  // over the bar, and the bar's popovers must paint over the band
+  z-index: 124;
+}
+
+.gn-tool-menu.gn-tool-menu--docked {
+  position: static;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+
+  min-height: 2.75rem;
+  padding: 0.3125rem 0.625rem;
+
+  border: none;
+  border-bottom: 1px solid var(--color-border-outline-variant, #c5c5d0);
+  border-radius: 0;
+  box-shadow: none;
+  background-color: var(--island-bg-color, #fff);
+  transition: none;
+
+  .gn-tool-menu__title {
+    flex: 0 0 auto;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--input-label-color, #495057);
+  }
+
+  /* ----------------------- the single row of groups ------------------- */
+
+  .gn-tool-menu__band-groups {
+    display: flex;
+    // basis 0, NOT auto: the band may wrap (the note needs its own line), and
+    // with an auto basis the row's content width would push the trailing
+    // actions onto a second line instead of letting the row clip.
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    min-width: 0;
+    // collapsed: anything that does not fit is clipped and reachable through
+    // the "More" disclosure, never through a submenu
+    overflow: hidden;
+
+    // a soft right edge, so a clipped row reads as "there is more" rather
+    // than as a control chopped in half
+    &[data-clipped="true"] {
+      mask-image: linear-gradient(
+        to right,
+        #000 calc(100% - 1.25rem),
+        transparent
+      );
+    }
+
+    > * + * {
+      margin-left: 0.5rem;
+      padding-left: 0.5rem;
+      border-left: 1px solid var(--color-border-outline-variant, #c5c5d0);
+    }
+
+    // NB: the groups are <fieldset>s and are left as blocks (legend above the
+    // control row). A flex fieldset makes the rendered <legend> a special
+    // box in some engines; not worth the risk for two lines of stacking.
+    > * {
+      flex: 0 0 auto;
+    }
+  }
+
+  /* expanded: the row wraps onto as many lines as it needs. `min-width` keeps
+     it on the same flex line as the trailing actions (a basis of 0 alone would
+     let it collapse to min-content and strand the actions beside a narrow
+     column), and everything aligns to the top because the row is now tall. */
+  &[data-expanded="true"] {
+    align-items: flex-start;
+
+    .gn-tool-menu__band-groups {
+      flex-wrap: wrap;
+      overflow: visible;
+      row-gap: 0.5rem;
+      min-width: 60%;
+      mask-image: none;
+    }
+
+    .gn-tool-menu__title,
+    .gn-tool-menu__band-actions {
+      align-self: flex-start;
+      padding-top: 0.375rem;
+    }
+  }
+
+  .gn-tool-menu__legend,
+  legend {
+    padding: 0;
+    font-size: 0.625rem;
+  }
+
+  /* the band is horizontally scarce, so the controls are tightened: smaller
+     gaps and tighter radio padding buy roughly a group's worth of width,
+     which is the difference between the shape row fitting a laptop and not */
+  .gn-tool-menu__row {
+    flex-wrap: nowrap;
+    gap: 0.1875rem;
+  }
+
+  .gn-tool-menu__radio {
+    padding: 0.1875rem 0.3125rem;
+  }
+
+  /* opacity: label over [slider][value], so it is the same height as a group */
+  .gn-tool-menu__field {
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 0.375rem;
+    align-items: center;
+
+    > .gn-tool-menu__legend {
+      grid-column: 1 / 3;
+    }
+  }
+
+  .gn-tool-menu__range {
+    width: 4.5rem;
+  }
+
+  /* ---------------------------- trailing actions ----------------------- */
+
+  .gn-tool-menu__band-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+    padding-left: 0.5rem;
+    border-left: 1px solid var(--color-border-outline-variant, #c5c5d0);
+  }
+
+  /* the explanation of the deliberately-missing controls: full width, under
+     the row, only while the disclosure is open */
+  .gn-tool-menu__band-note {
+    // `width`, not `max-width`: a max-width here would shrink the item's
+    // hypothetical size and let it share the previous flex line
+    flex: 1 0 100%;
+    width: 100%;
+    padding-top: 0.375rem;
+    border-top: 1px solid var(--color-border-outline-variant, #c5c5d0);
+
+    > p {
+      max-width: 68ch;
+    }
+  }
+}
+
+/* Narrow windows: the title is the band's accessible name, which the heading
+   still provides to AT even when the text is dropped to buy room. */
+@media (max-width: 40rem) {
+  .gn-tool-menu.gn-tool-menu--docked {
+    padding-inline: 0.5rem;
+    column-gap: 0.375rem;
+
+    .gn-tool-menu__title {
+      font-size: 0.6875rem;
+    }
+
+    .gn-tool-menu__band-actions .gn-tool-menu__toggle span {
+      // the checkbox keeps its accessible name from the hidden text
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+}

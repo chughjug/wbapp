@@ -1146,6 +1146,8 @@ const ExcalidrawWrapper = ({
         ]}
       />
       {/* band 3 — page panel + canvas */}
+      {/* the active tool's settings, docked as a band under the bar */}
+      <ToolMenu {...toolMenu.menuProps} />
       <div className="gn-shell-body">
         <PagePanel
           open={isPagePanelOpen}
@@ -1393,7 +1395,6 @@ const ExcalidrawWrapper = ({
           </Excalidraw>
         </div>
       </div>
-      <ToolMenu {...toolMenu.menuProps} />
       {/* Contextual actions above the selection. It hides itself while the
           lasso overlay is active; it does not need hiding for the tool menu,
           because selecting an object switches to the selection tool, which

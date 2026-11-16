@@ -753,6 +753,24 @@ export const NavBar = ({
               return;
             }
             setOpenMenu(null);
+            // Tapping an already-active tool opens its settings panel —
+            // the same gesture the shape slot above uses. Restricted to the
+            // tools the Active Tool Menu actually has panels for, so
+            // re-tapping e.g. Image still re-opens its file picker.
+            if (
+              onActiveToolMenu &&
+              control.pressed &&
+              (control.id === "pen" ||
+                control.id === "highlighter" ||
+                control.id === "eraser" ||
+                control.id === "text")
+            ) {
+              onActiveToolMenu(
+                control.id,
+                buttonRefs.current.get(control.id) ?? null,
+              );
+              return;
+            }
             control.onSelect?.();
           }}
         >

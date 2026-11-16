@@ -1,5 +1,7 @@
 # Integration — Active Tool Menu (`goodnotes/tool-menu`)
 
+> **Changed:** the panel is now a **band docked under the nav bar** by default (`placement="docked"`), not a floating overlay. §1c below is the one-element move in `App.tsx` that puts it there. The old floating behaviour is still available as `placement="floating"`.
+
 Self-contained app-level module. **No `packages/` patch is required** — it is built entirely on the documented `ExcalidrawImperativeAPI` surface (`setActiveTool`, `updateScene({ appState })`, `onChange`, `getAppState`).
 
 It does depend on one `packages/` change that `goodnotes/pens` already shipped: `appState.currentItemCustomData`, which is what makes a freedraw stroke a highlighter. That is already on `main` (`packages/excalidraw/types.ts`, `appState.ts`, `components/App.tsx`, `element/src/renderElement.ts`).
@@ -24,17 +26,33 @@ const toolMenu = useActiveToolMenu({ excalidrawAPI });
 
 `excalidrawAPI` may be `null` on the first render — the hook handles that and subscribes as soon as the API arrives.
 
-### 1c. Render the panel
+### 1c. Render the panel — as band 3 of the shell
 
-It is a fixed-position, click-through layer, so it can go either inside or outside `<Excalidraw>`. Simplest is next to `<Taskbar>` (~line 1309), i.e. **after** the closing `</Excalidraw>`:
+**This is the change to make.** The panel is now a flow-layout band, so it must be a child of `.gn-shell-layout`, _between_ `<NavBar …/>` and `<div className="gn-shell-body">`. Today it is rendered as a floating sibling **after** the body (just before `<ObjectMenu …/>`, ~line 1396); move that one element up:
 
-```tsx
-      </Excalidraw>
-      <ToolMenu {...toolMenu.menuProps} />
-      <Taskbar … />
+```diff
+       <NavBar
+         …
+       />
++      {/* band 3 — the active tool's settings, docked under the bar */}
++      <ToolMenu {...toolMenu.menuProps} />
+-      {/* band 3 — page panel + canvas */}
++      {/* band 4 — page panel + canvas */}
+       <div className="gn-shell-body">
+         <PagePanel … />
+         <div className="gn-shell-canvas">
+           …
+         </div>
+       </div>
+-      <ToolMenu {...toolMenu.menuProps} />
+       <ObjectMenu … />
 ```
 
-The panel's root carries the `excalidraw` (and `theme--dark`) class itself, so Excalidraw's CSS custom properties are in scope wherever it is mounted. The theme is read from `appState.theme`; pass `scopeTheme="light" | "dark"` to override, or `scopeTheme={false}` if you mount it inside `<Excalidraw>` and would rather not have the extra class.
+Nothing else changes: no props to add, no layout classes to write. The band is `flex: 0 0 auto` inside `gn-shell-layout`, so it takes its own height and `gn-shell-body` (page panel + canvas) shrinks to fit below it. Measured at 1400×900: nav bar `y 37.7 → 89.7`, band `y 89.7 → 142.2` full-width, body `y 142.2 → 900` — contiguous, zero overlap with the page panel or the canvas.
+
+Where the element sits in the tree only matters for `"docked"`. In `"floating"` the root is `position: fixed` and can be mounted anywhere; the single call site above works for both, which is why the band position is the one to use.
+
+**It unmounts when closed.** Like before, the panel renders `null` when no supported tool is active, so the band disappears and the canvas grows into the space. If you would rather the canvas never resized, give `.gn-shell-layout` a reserved row — but the band's height is tool-dependent (52px for pen, more when "More" is open), so reserving is a worse trade than the reflow.
 
 ### 1d. Wire the nav bar (the other agent's three-zone bar)
 
@@ -78,7 +96,7 @@ Note the tray also owns the global `1`–`9` preset shortcuts. This module does 
 
 ### 1f. Nothing else
 
-No provider, no context, no state lifting. Position and presets persist themselves.
+No provider, no context, no state lifting. Placement, edge position and presets persist themselves.
 
 ---
 
@@ -94,6 +112,8 @@ interface ToolMenuProps {
   tool: ToolMenuToolId | null;      // "pen"|"highlighter"|"eraser"|"shape"|"text"
   onClose: () => void;
   onToolChange?: (tool: ToolMenuToolId) => void;
+  placement?: ToolMenuPlacement;           // "docked" (default) | "floating"
+  onPlacementChange?: (p: ToolMenuPlacement) => void;
   scopeTheme?: "light" | "dark" | false;   // default: follow appState.theme
   className?: string;
 }
@@ -132,7 +152,15 @@ const widthKeyToPresetWidth: (key: ToolMenuWidthKey) => number;
 const HIGHLIGHTER_MARKER: { goodnotes: { highlighter: true } };
 const SHAPE_TOOL_TYPES: readonly ["rectangle","ellipse","diamond","arrow","line"];
 
-// ── placement model (pure; exported for tests / host resets) ────────────────
+// ── placement: docked band vs floating overlay ─────────────────────────────
+type ToolMenuPlacement = "docked" | "floating";
+const DEFAULT_TOOL_MENU_PLACEMENT: "docked";
+const TOOL_MENU_PLACEMENTS: readonly ["docked", "floating"];
+const TOOL_MENU_PLACEMENT_STORAGE_KEY: "goodnotes-tool-menu-placement";
+const loadToolMenuPlacement: () => ToolMenuPlacement;   // never throws
+const saveToolMenuPlacement: (p: ToolMenuPlacement) => boolean;
+
+// ── edge model for placement="floating" (pure; tests / host resets) ────────
 const TOOL_MENU_POSITION_STORAGE_KEY: "goodnotes-tool-menu-position";
 const DEFAULT_TOOL_MENU_POSITION: ToolMenuPosition; // left edge, 68% down
 const TOOL_MENU_EDGES: readonly ["left","right","bottom"];
@@ -182,8 +210,10 @@ Smaller, deliberate omissions: the shape and text panels have no custom-colour `
 ## 4. Behaviour worth knowing
 
 - **Opens from the editor, not from the bar.** `useActiveToolMenu` subscribes with `excalidrawAPI.onChange` and derives the tool from `appState.activeTool` + the highlighter marker, so pressing `p`, `r`, `e`, `8`… on the keyboard retargets and opens the panel exactly like a tap. For tools with nothing genuine to offer (selection, lasso, hand, frame, laser, image, embeddable) the panel _closes_ rather than showing an empty shell. Pass `openOnToolChange: false` to make opening purely explicit.
-- **Draggable, remembered per edge.** Drag the grip; on release the panel snaps to the nearest of the left / right / bottom edges, and the position _along_ that edge is stored per edge in `localStorage` as a 0–1 ratio (so it survives resize and rotation). Default is **left edge, 68% down** — never the centre of an edge, and measured never to overlap the centre of the canvas.
-- **Keyboard drag.** With the grip focused: the arrows running along the current edge move the panel 24px (96px with Shift); the arrows running across dock it to that edge; `ArrowDown` at the bottom of a vertical edge wraps onto the bottom edge and `ArrowUp` on the bottom edge returns to the nearer vertical edge, so every edge is reachable with arrows alone. Each move is announced in an `aria-live="polite"` region and reflected in the grip's accessible name.
+- **Docked is the default.** The band sits in flow under the nav bar, spans the content width and overlaps nothing. It carries no drag handle and no edge model — there is nothing to drag a band to, so no dead affordance is shown (`[data-testid="gn-tool-menu-handle"]` simply does not exist while docked) and the live region / arrow-key drag go with it.
+- **The band is a relayout, not a squeeze.** Each group becomes a compact _label over controls_ cell (`INK`, `WIDTH`, `NIB`, `SAVED PENS`, …), cells run in one row separated by vertical rules, the trailing cluster (More / Keep tool active / Undock / ×) is pinned right. Measured heights: 52px for pen, highlighter, eraser and text; 52px for shape at ≥1400px wide.
+- **Overflow: a disclosure, never a submenu.** When the row no longer fits, it is clipped behind a soft right-edge fade and a **More** button appears; pressing it wraps the row onto as many lines as it needs (`aria-expanded`, `aria-controls` the row) and reveals the explanatory note. No control is moved into a nested menu — the whole point of the panel. Measured at 760px: pen clips, `More` shown, expanded band 208px tall with every control visible; at 420px the same, band still 52px collapsed.
+- **Undock if you prefer floating.** The **Undock** button (both placements carry its counterpart) switches to `placement="floating"`: the original fixed overlay with the drag grip, edge snapping, per-edge `localStorage` memory (0–1 ratio, survives resize/rotation), the arrow-key drag with its `aria-live` announcements, and the default **left edge, 68% down**. The docked/floating choice itself persists under `goodnotes-tool-menu-placement`; pass the `placement` prop to override the stored choice and `onPlacementChange` to observe it.
 - **Live preset editing.** Click a saved-pen chip and it becomes the live target: subsequent colour / width / opacity changes are written back onto that preset and persisted to `goodnotes-pens` immediately. "Reset pens" restores the shipped defaults via `resetPenPresets()`.
 - **Escape** closes and returns focus to the trigger that opened the panel. Clicking the canvas does _not_ close it — it is a persistent surface, like GoodNotes'.
 
@@ -191,4 +221,6 @@ Smaller, deliberate omissions: the shape and text panels have no custom-colour `
 
 Native semantics throughout: `<fieldset>`/`<legend>` groups of real `<input type="radio">` for every swatch, width, nib, shape, size and font (arrow-key roving and group semantics come free); `<button aria-pressed>` for preset chips; `role="dialog"` + `aria-labelledby` on the panel; an accessible name on every single control (audited in the browser — zero unnamed buttons or inputs); `:focus-visible` rings at specificity (0,3,0) so they beat Excalidraw's own 1px `box-shadow` override (measured: `2px solid rgb(165, 216, 255)`); `@media (prefers-reduced-motion: reduce)` drops the transitions (measured: `transition-property: none`); Escape closes and restores focus.
 
-Colour comes only from Excalidraw's custom properties, verified in both themes: panel `#fff` / `rgb(35,35,41)`, body text `rgb(27,27,31)` / `rgb(227,227,232)`, group labels `rgb(73,80,87)` / `rgb(233,236,239)`. `--color-muted` is deliberately unused — it is a _background_ grey and fails as text; de-emphasised text uses `--input-label-color`.
+Docked, the band's root is a `role="region"` labelled by its heading (not a `dialog` — it is a persistent, non-modal strip of the page chrome); floating, it stays a `role="dialog"`. Re-audited in the band at 1400px: **zero** unnamed buttons or inputs, focus ring measured `2px solid rgb(165, 216, 255)`, `transition-property: none` under `prefers-reduced-motion: reduce`, Escape closes the band and returns focus to the nav bar button that opened it (`#r1-pen`). At ≤640px the "Keep tool active" caption is clipped visually but stays in the accessibility tree as the checkbox's name.
+
+Colour comes only from Excalidraw's custom properties, verified in both themes: band/panel `rgb(255,255,255)` / `rgb(35,35,41)`, body text `rgb(27,27,31)` / `rgb(227,227,232)`, group labels and the band title `rgb(73,80,87)` / `rgb(233,236,239)`, band bottom rule `rgb(197,197,208)` / `rgb(70,70,79)`. `--color-muted` is deliberately unused — it is a _background_ grey and fails as text; de-emphasised text uses `--input-label-color`.

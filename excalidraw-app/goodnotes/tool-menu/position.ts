@@ -1,5 +1,9 @@
 /**
- * Where the floating panel sits, and how that survives a reload.
+ * Where the panel sits, and how that survives a reload.
+ *
+ * Two placements. `"docked"` (the default) is a band in normal document flow
+ * under the nav bar and has no geometry to model at all — the layout does it.
+ * Everything else in this file is the `"floating"` placement's edge model.
  *
  * Design note (this is the second GoodNotes failure the panel exists to fix):
  * GoodNotes' floating tool menu snaps to the exact *centre* of a screen edge,
@@ -11,6 +15,63 @@
  * The along-edge position is stored as a 0–1 ratio of the available travel,
  * not pixels, so it survives window resizes and rotation.
  */
+
+/* -------------------------------------------------------------------------- */
+/*  Placement: docked band vs floating panel                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Where the panel lives.
+ *
+ * - `"docked"` (**default**) — a horizontal band in normal document flow,
+ *   directly under the nav bar and above `.gn-shell-body`. It spans the
+ *   content width, pushes nothing, and overlaps neither the page panel nor the
+ *   canvas. This is what the app ships, because a panel that floats over the
+ *   canvas covers the thing you are writing on.
+ * - `"floating"` — the original edge-snapped overlay, draggable and remembered
+ *   per edge (everything below in this file). Kept as a non-default option.
+ */
+export type ToolMenuPlacement = "docked" | "floating";
+
+export const TOOL_MENU_PLACEMENTS: readonly ToolMenuPlacement[] = [
+  "docked",
+  "floating",
+];
+
+/** The shipped default. */
+export const DEFAULT_TOOL_MENU_PLACEMENT: ToolMenuPlacement = "docked";
+
+/** localStorage key holding the user's {@link ToolMenuPlacement} choice. */
+export const TOOL_MENU_PLACEMENT_STORAGE_KEY = "goodnotes-tool-menu-placement";
+
+const isPlacement = (value: unknown): value is ToolMenuPlacement =>
+  value === "docked" || value === "floating";
+
+/** Read the saved placement. Never throws; falls back to `"docked"`. */
+export const loadToolMenuPlacement = (): ToolMenuPlacement => {
+  try {
+    const raw = localStorage.getItem(TOOL_MENU_PLACEMENT_STORAGE_KEY);
+    return isPlacement(raw) ? raw : DEFAULT_TOOL_MENU_PLACEMENT;
+  } catch {
+    return DEFAULT_TOOL_MENU_PLACEMENT;
+  }
+};
+
+/** Persist the placement. Returns `false` if storage rejected the write. */
+export const saveToolMenuPlacement = (
+  placement: ToolMenuPlacement,
+): boolean => {
+  try {
+    localStorage.setItem(TOOL_MENU_PLACEMENT_STORAGE_KEY, placement);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/*  Edge model (floating placement only)                                        */
+/* -------------------------------------------------------------------------- */
 
 /** Edges the panel can dock to. "top" is excluded: the app's nav bar lives there. */
 export type ToolMenuEdge = "left" | "right" | "bottom";

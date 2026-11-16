@@ -1,8 +1,8 @@
 /**
  * GoodNotes-style **Active Tool Menu**.
  *
- * Selecting a tool opens a small floating panel with that tool's settings,
- * instead of a permanently-docked properties ribbon.
+ * Selecting a tool reveals that tool's settings — by default as a horizontal
+ * band directly under the nav bar, not as a panel floating over the canvas.
  *
  * ```tsx
  * import { ToolMenu, useActiveToolMenu } from "./goodnotes/tool-menu";
@@ -12,7 +12,7 @@
  * // a nav bar button — callback-shaped entry point
  * <button onClick={(event) => toolMenu.onToolSelect("pen", event)}>Pen</button>
  *
- * // inside <Excalidraw>
+ * // band 3 of the shell: BETWEEN <NavBar /> and <div className="gn-shell-body">
  * <ToolMenu {...toolMenu.menuProps} />
  * ```
  *
@@ -22,18 +22,24 @@
  * 1. **No nesting.** Ink colours (five swatches plus a custom picker) and the
  *    three stroke widths are direct, one-tap controls. GoodNotes buries them
  *    in submenus; everything here is one interaction deep.
- * 2. **Draggable, not centred.** GoodNotes snaps its floating menu to the exact
- *    centre of a screen edge, which is out of reach for someone holding a
- *    tablet by the bottom. This panel snaps to an edge but the position *along*
- *    the edge is the user's, remembered per edge in `localStorage`, and the
- *    default (left edge, 68% down) never covers the centre of the canvas.
+ * 2. **Out of the canvas' way.** GoodNotes floats its menu over the page.
+ *    The default placement here is `"docked"`: a band in normal document flow
+ *    under the nav bar, spanning the content width, overlapping neither the
+ *    page panel nor the canvas. `placement="floating"` keeps the original
+ *    edge-snapped, draggable overlay for anyone who prefers it (snapped to an
+ *    edge, but the position *along* the edge is the user's, remembered per
+ *    edge in `localStorage`). The choice itself is persisted.
  *
  * See `INTEGRATION.md` in this folder for the exact `App.tsx` changes, and for
  * the honest list of controls that are NOT shipped because Excalidraw has
  * nothing to back them.
  */
 
-/** The floating panel. Render it as a child of `<Excalidraw>`. */
+/**
+ * The panel. Docked (the default) it is a flow-layout band — render it
+ * between the nav bar and `.gn-shell-body`. Floating it is a fixed overlay and
+ * can be rendered anywhere.
+ */
 export { ToolMenu } from "./ToolMenu";
 export type { ToolMenuProps } from "./ToolMenu";
 
@@ -77,7 +83,20 @@ export type {
 } from "./editor";
 
 /**
- * The edge-snapping placement model and its `localStorage` persistence.
+ * The docked / floating choice, and its `localStorage` persistence.
+ */
+export {
+  DEFAULT_TOOL_MENU_PLACEMENT,
+  TOOL_MENU_PLACEMENTS,
+  TOOL_MENU_PLACEMENT_STORAGE_KEY,
+  loadToolMenuPlacement,
+  saveToolMenuPlacement,
+} from "./position";
+export type { ToolMenuPlacement } from "./position";
+
+/**
+ * The edge-snapping model used by `placement="floating"`, and its
+ * `localStorage` persistence.
  * Exported mainly so it can be unit-tested, but also usable if a host wants to
  * reset or preset the panel's position.
  */
