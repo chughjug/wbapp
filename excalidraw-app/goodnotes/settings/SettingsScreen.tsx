@@ -91,7 +91,11 @@ export const SETTINGS_SECTIONS = [
   "storage",
 ] as const;
 
-export type SettingsSectionId = typeof SETTINGS_SECTIONS[number];
+// written via an alias because the repo's standalone Prettier and its
+// eslint-plugin-prettier disagree about parenthesising `typeof X[number]`
+type SettingsSections = typeof SETTINGS_SECTIONS;
+
+export type SettingsSectionId = SettingsSections[number];
 
 const SECTION_LABELS: Record<SettingsSectionId, string> = {
   input: "Pen & touch",
