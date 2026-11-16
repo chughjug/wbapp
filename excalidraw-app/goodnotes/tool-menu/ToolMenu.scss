@@ -60,17 +60,18 @@
 
   transition: left 160ms ease, top 160ms ease;
 
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
   &[data-dragging="true"] {
     transition: none;
     box-shadow: var(
       --shadow-island-stronger,
       0 10px 28px rgba(0, 0, 0, 0.28)
     );
-  }
-
-  :focus-visible {
-    outline: 2px solid var(--focus-highlight-color, #a5d8ff);
-    outline-offset: 2px;
   }
 
   /* ----------------------------- header ------------------------------- */
@@ -207,7 +208,7 @@
     }
 
     &--swatch {
-      width: 1.875rem;
+      width: 2rem;
       padding: 0.1875rem;
     }
 
@@ -405,6 +406,26 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+}
+
+/**
+ * Focus rings. Excalidraw's own `styles.scss` replaces the outline on every
+ * `button` / `input` inside `.excalidraw` with a 1px `box-shadow` ring at
+ * specificity (0,2,1); these selectors are deliberately written at (0,3,0) so
+ * the panel keeps a 2px `--focus-highlight-color` ring instead of a faint one.
+ */
+.gn-tool-menu.gn-tool-menu :focus-visible {
+  outline: 2px solid var(--focus-highlight-color, #a5d8ff);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+// the swatch / width radios hide their native input, so the ring goes on the
+// label that visually stands in for it
+.gn-tool-menu.gn-tool-menu .gn-tool-menu__radio:has(:focus-visible),
+.gn-tool-menu.gn-tool-menu .gn-tool-menu__custom:has(:focus-visible) {
+  outline: 2px solid var(--focus-highlight-color, #a5d8ff);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

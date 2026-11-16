@@ -84,6 +84,8 @@ export type {
 export {
   DEFAULT_TOOL_MENU_POSITION,
   EDGE_MARGIN,
+  NARROW_VIEWPORT_WIDTH,
+  defaultPositionForViewport,
   TOOL_MENU_EDGES,
   TOOL_MENU_POSITION_STORAGE_KEY,
   describePosition,

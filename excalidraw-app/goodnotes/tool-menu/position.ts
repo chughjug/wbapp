@@ -44,6 +44,22 @@ export const DEFAULT_TOOL_MENU_POSITION: ToolMenuPosition = {
   offsets: { left: 0.68, right: 0.68, bottom: 0.5 },
 };
 
+/**
+ * Below this viewport width the panel is about half the screen tall, so no
+ * along-edge position on a side edge can keep the centre of the canvas clear.
+ * Phones therefore default to the bottom edge, which does clear it (and is
+ * where a thumb already is).
+ */
+export const NARROW_VIEWPORT_WIDTH = 600;
+
+/** The shipped default for a given viewport. */
+export const defaultPositionForViewport = (
+  viewportWidth: number,
+): ToolMenuPosition => ({
+  edge: viewportWidth < NARROW_VIEWPORT_WIDTH ? "bottom" : "left",
+  offsets: { ...DEFAULT_TOOL_MENU_POSITION.offsets },
+});
+
 const clamp01 = (value: number): number =>
   Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0.5;
 
@@ -51,20 +67,26 @@ const isEdge = (value: unknown): value is ToolMenuEdge =>
   value === "left" || value === "right" || value === "bottom";
 
 /** Read the saved position. Never throws; falls back to the default. */
-export const loadToolMenuPosition = (): ToolMenuPosition => {
+export const loadToolMenuPosition = (
+  viewportWidth: number = typeof window === "undefined"
+    ? 1024
+    : window.innerWidth,
+): ToolMenuPosition => {
+  const fallback = () => defaultPositionForViewport(viewportWidth);
   try {
     const raw = localStorage.getItem(TOOL_MENU_POSITION_STORAGE_KEY);
     if (!raw) {
-      return { ...DEFAULT_TOOL_MENU_POSITION, offsets: { ...DEFAULT_TOOL_MENU_POSITION.offsets } };
+      return fallback();
     }
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null) {
       throw new Error("malformed");
     }
     const value = parsed as Partial<ToolMenuPosition>;
+    const base = fallback();
     const offsets = (value.offsets ?? {}) as Partial<Record<ToolMenuEdge, number>>;
     return {
-      edge: isEdge(value.edge) ? value.edge : DEFAULT_TOOL_MENU_POSITION.edge,
+      edge: isEdge(value.edge) ? value.edge : base.edge,
       offsets: {
         left: clamp01(offsets.left ?? DEFAULT_TOOL_MENU_POSITION.offsets.left),
         right: clamp01(
@@ -76,10 +98,7 @@ export const loadToolMenuPosition = (): ToolMenuPosition => {
       },
     };
   } catch {
-    return {
-      ...DEFAULT_TOOL_MENU_POSITION,
-      offsets: { ...DEFAULT_TOOL_MENU_POSITION.offsets },
-    };
+    return fallback();
   }
 };
 
