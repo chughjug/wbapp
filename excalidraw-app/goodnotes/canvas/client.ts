@@ -61,7 +61,10 @@ export interface CanvasFile {
 const describe = (status: number): [string, CanvasError["kind"]] => {
   switch (status) {
     case 401:
-      return ["Canvas rejected the token. It may have been revoked.", "unauthorized"];
+      return [
+        "Canvas rejected the token. It may have been revoked.",
+        "unauthorized",
+      ];
     case 403:
       return ["Canvas refused the request for this account.", "forbidden"];
     case 404:
@@ -84,9 +87,9 @@ const requestPage = async <T>(
     }
   });
 
-  const url = `${RELAY}?path=${encodeURIComponent(path)}&query=${encodeURIComponent(
-    search.toString(),
-  )}`;
+  const url = `${RELAY}?path=${encodeURIComponent(
+    path,
+  )}&query=${encodeURIComponent(search.toString())}`;
 
   let response: Response;
   try {
@@ -131,14 +134,22 @@ const requestAll = async <T>(
 ): Promise<T[]> => {
   const connection = loadCanvasConnection();
   if (!connection) {
-    throw new CanvasError("Canvas is not connected.", undefined, "not-connected");
+    throw new CanvasError(
+      "Canvas is not connected.",
+      undefined,
+      "not-connected",
+    );
   }
 
   const out: T[] = [];
   let page: string | null = "1";
   for (let i = 0; i < maxPages && page; i++) {
     const { data, next }: { data: T[]; next: string | null } =
-      await requestPage<T[]>(path, { ...query, per_page: 100, page }, connection);
+      await requestPage<T[]>(
+        path,
+        { ...query, per_page: 100, page },
+        connection,
+      );
     out.push(...(Array.isArray(data) ? data : []));
     page = next;
   }
@@ -175,8 +186,16 @@ export const listCourseFiles = (courseId: string) =>
 export const getFile = async (fileId: string): Promise<CanvasFile> => {
   const connection = loadCanvasConnection();
   if (!connection) {
-    throw new CanvasError("Canvas is not connected.", undefined, "not-connected");
+    throw new CanvasError(
+      "Canvas is not connected.",
+      undefined,
+      "not-connected",
+    );
   }
-  const { data } = await requestPage<CanvasFile>(`files/${fileId}`, {}, connection);
+  const { data } = await requestPage<CanvasFile>(
+    `files/${fileId}`,
+    {},
+    connection,
+  );
   return data;
 };

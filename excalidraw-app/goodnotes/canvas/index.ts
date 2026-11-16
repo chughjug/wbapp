@@ -47,3 +47,83 @@ export {
   CanvasDownloadError,
 } from "./sync";
 export type { AssignmentRow } from "./sync";
+
+export { canvasAssignmentTag, canvasFileTag, canvasCourseLabel } from "./sync";
+
+// ---------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------
+
+/** The connect screen: address + token, with the token warning up front. */
+export { CanvasConnectDialog } from "./CanvasConnectDialog";
+export type { CanvasConnectDialogProps } from "./CanvasConnectDialog";
+
+/**
+ * Callback-shaped entry point for opening the connect screen:
+ * `const canvas = useCanvasConnect(); <button onClick={canvas.open}/>{canvas.dialog}`
+ */
+export { useCanvasConnect } from "./useCanvasConnect";
+export type {
+  CanvasConnectController,
+  UseCanvasConnectOptions,
+} from "./useCanvasConnect";
+
+/** The per-course browser: Assignments / Files / My notebooks. */
+export { CourseBrowser } from "./CourseBrowser";
+export type { CourseBrowserProps, CourseBrowserTab } from "./CourseBrowser";
+
+/** Building blocks, exported so a host can compose its own layout. */
+export { CanvasTabs, tabId, tabPanelId } from "./CanvasTabs";
+export type { CanvasTabsProps, CanvasTabSpec } from "./CanvasTabs";
+export { AssignmentList } from "./AssignmentList";
+export type { AssignmentListProps } from "./AssignmentList";
+export { FileList } from "./FileList";
+export type { FileListProps } from "./FileList";
+export { FilePreviewPane } from "./FilePreviewPane";
+export type { FilePreviewPaneProps } from "./FilePreviewPane";
+export { NotebookList } from "./NotebookList";
+export type { NotebookListProps } from "./NotebookList";
+export { CanvasProgress, describeImportPhase } from "./CanvasProgress";
+export type { CanvasProgressProps } from "./CanvasProgress";
+
+// ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
+
+export { useCanvasConnection } from "./useCanvasConnection";
+export type { UseCanvasConnection } from "./useCanvasConnection";
+
+export {
+  useCanvasCourses,
+  useCourseAssignments,
+  useCourseFiles,
+  useCourseNotebooks,
+  findCourse,
+} from "./useCanvasData";
+export type { CanvasResource, CourseFileRow } from "./useCanvasData";
+
+// ---------------------------------------------------------------------------
+// Files, previews and error copy
+// ---------------------------------------------------------------------------
+
+export {
+  /** importCanvasFileAsDocument + an "imported from this file" tag. */
+  importCanvasFile,
+  loadImportedFileIndex,
+  fetchCanvasFileBlob,
+  renderPdfFirstPage,
+  describeImportOutcome,
+  describeUnsupportedFile,
+  canvasFileName,
+  isPdfFile,
+} from "./files";
+export type { PdfPreview } from "./files";
+
+export {
+  /** Any thrown value -> a sentence that says what actually happened. */
+  describeCanvasError,
+  canvasErrorKind,
+  needsReconnect,
+  TOKEN_SETTINGS_PATH,
+} from "./errors";
+export type { CanvasErrorContext } from "./errors";

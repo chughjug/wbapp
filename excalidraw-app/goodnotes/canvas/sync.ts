@@ -15,7 +15,16 @@ import type { CanvasAssignment, CanvasCourse, CanvasFile } from "./client";
 import type { DocMeta } from "../types";
 
 /** customData-free marker kept on the document so we don't import twice. */
-const canvasTag = (assignmentId: string) => `canvas:${assignmentId}`;
+export const canvasAssignmentTag = (assignmentId: string) =>
+  `canvas:${assignmentId}`;
+
+const canvasTag = canvasAssignmentTag;
+
+/**
+ * Marker tag put on a document imported from a Canvas *file*, so the file
+ * browser can show "already imported" instead of making a second copy.
+ */
+export const canvasFileTag = (fileId: string) => `canvas-file:${fileId}`;
 
 export interface AssignmentRow {
   assignment: CanvasAssignment;
@@ -67,8 +76,11 @@ export const listUpcomingWork = async (): Promise<AssignmentRow[]> => {
   );
 };
 
-const courseLabel = (course: CanvasCourse) =>
+/** The course name this app files documents under. */
+export const canvasCourseLabel = (course: CanvasCourse) =>
   course.course_code?.trim() || course.name;
+
+const courseLabel = canvasCourseLabel;
 
 /** Create a notebook for an assignment, carrying its course and due date. */
 export const createDocumentForAssignment = async (
@@ -108,7 +120,11 @@ export const refreshLinkedDueDates = async (): Promise<number> => {
 };
 
 export class CanvasDownloadError extends Error {
-  constructor(message: string, readonly canOpenInTab: boolean, readonly url?: string) {
+  constructor(
+    message: string,
+    readonly canOpenInTab: boolean,
+    readonly url?: string,
+  ) {
     super(message);
     this.name = "CanvasDownloadError";
   }

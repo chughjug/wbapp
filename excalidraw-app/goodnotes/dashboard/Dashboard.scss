@@ -1,0 +1,489 @@
+/**
+ * Dashboard styling.
+ *
+ * Colour comes only from Excalidraw's own custom properties, so both themes
+ * work without a hardcoded value. Two rules worth stating:
+ *
+ *  - `--color-muted` is a *background* grey in both themes and is never used
+ *    for text here; secondary text goes through the local `--gn-dash-muted`
+ *    alias (gray-70 light / gray-40 dark), the same trick Shelf.scss uses.
+ *  - the danger and warning pairs only contrast correctly when the
+ *    background comes from `*-background` and the text from the matching
+ *    `*-color` (in dark theme `--color-danger-text` equals
+ *    `--color-danger-background`, which would be invisible).
+ */
+
+.excalidraw.gn-dash {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--color-surface-mid);
+  color: var(--text-primary-color);
+  user-select: text;
+
+  --gn-dash-muted: var(--color-gray-70);
+  --gn-dash-card-height: 9.25rem;
+
+  &.theme--dark {
+    --gn-dash-muted: var(--color-gray-40);
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  .gn-dash__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: var(--border-radius-lg, 0.5rem);
+  }
+
+  // ------------------------------------------------------------- shell
+  .gn-dash__top {
+    flex: 0 0 auto;
+    max-height: 60%;
+    overflow-y: auto;
+    padding: 1rem 1.25rem 0.25rem;
+    background-color: var(--color-surface-low);
+    border-block-end: 1px solid var(--default-border-color);
+  }
+
+  .gn-dash__shelf {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+  }
+
+  // ------------------------------------------------------------- sections
+  .gn-dash__section {
+    margin-block-end: 0.75rem;
+  }
+
+  .gn-dash__section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-block-end: 0.5rem;
+  }
+
+  .gn-dash__h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  .gn-dash__section-end {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .gn-dash__muted {
+    font-size: 0.8125rem;
+    color: var(--gn-dash-muted);
+  }
+
+  // ------------------------------------------------------------- buttons
+  .gn-dash__button {
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-primary-color);
+    background-color: var(--island-bg-color);
+    border: 1px solid var(--default-border-color);
+    border-radius: var(--border-radius-lg, 0.5rem);
+    padding: 0.3rem 0.7rem;
+    cursor: pointer;
+    transition: background-color 150ms ease;
+
+    &:hover:not(:disabled) {
+      background-color: var(--button-hover-bg, var(--color-surface-high));
+    }
+
+    &:disabled {
+      cursor: default;
+      color: var(--color-disabled);
+    }
+
+    &--quiet {
+      background: none;
+      border-color: transparent;
+      font-weight: 500;
+      color: var(--gn-dash-muted);
+    }
+  }
+
+  .gn-dash__link-button {
+    font: inherit;
+    font-size: inherit;
+    font-weight: 600;
+    color: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  // ------------------------------------------------------------- strip
+  .gn-dash__strip {
+    // reserved from the first paint: skeletons, cards, the failure notice
+    // and the empty line all live in a box of this height, so the document
+    // grid below never moves when deadlines arrive.
+    min-height: var(--gn-dash-card-height);
+    display: flex;
+    align-items: stretch;
+  }
+
+  .gn-dash__row {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0.25rem;
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    width: 100%;
+  }
+
+  .gn-dash__cell {
+    flex: 0 0 auto;
+    display: flex;
+  }
+
+  .gn-dash__card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+    width: 15.5rem;
+    height: var(--gn-dash-card-height);
+    text-align: start;
+    font: inherit;
+    color: var(--text-primary-color);
+    background-color: var(--island-bg-color);
+    border: 1px solid var(--default-border-color);
+    border-inline-start: 4px solid var(--color-gray-40);
+    border-radius: var(--border-radius-lg, 0.5rem);
+    padding: 0.7rem 0.8rem;
+    cursor: pointer;
+    transition: background-color 150ms ease, transform 150ms ease;
+
+    &:hover:not(:disabled) {
+      background-color: var(--button-hover-bg, var(--color-surface-high));
+    }
+
+    &:disabled {
+      cursor: progress;
+    }
+
+    // the left rule repeats the urgency the chip already states in words
+    &--overdue {
+      border-inline-start-color: var(--color-danger);
+    }
+    &--today,
+    &--tomorrow {
+      border-inline-start-color: var(--color-warning-dark);
+    }
+    &--week {
+      border-inline-start-color: var(--color-primary);
+    }
+  }
+
+  .gn-dash__card-title {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .gn-dash__card-course {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    font-size: 0.8125rem;
+    color: var(--gn-dash-muted);
+  }
+
+  .gn-dash__card-course-name,
+  .gn-dash__course-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gn-dash__card-foot {
+    margin-block-start: auto;
+    width: 100%;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .gn-dash__card-when {
+    font-size: 0.75rem;
+    color: var(--gn-dash-muted);
+  }
+
+  .gn-dash__card-action {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  .gn-dash__dot {
+    flex: 0 0 auto;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.625rem;
+    line-height: 1;
+  }
+
+  // ------------------------------------------------------------- chips
+  .gn-dash__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background-color: var(--color-surface-high);
+    color: var(--text-primary-color);
+  }
+
+  .gn-dash__chip-mark {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background-color: currentColor;
+  }
+
+  .gn-dash__card--overdue .gn-dash__chip,
+  .gn-dash__chip--overdue {
+    background-color: var(--color-danger-background);
+    color: var(--color-danger-color);
+  }
+
+  .gn-dash__card--today .gn-dash__chip,
+  .gn-dash__card--tomorrow .gn-dash__chip,
+  .gn-dash__chip--today,
+  .gn-dash__chip--tomorrow {
+    background-color: var(--color-warning-background);
+    color: var(--color-warning-color);
+  }
+
+  // ------------------------------------------------------------- notices
+  .gn-dash__notice {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    width: 100%;
+    align-self: flex-start;
+    background-color: var(--island-bg-color);
+    border: 1px dashed var(--default-border-color);
+    border-radius: var(--border-radius-lg, 0.5rem);
+    padding: 0.75rem 0.9rem;
+  }
+
+  .gn-dash__notice-text {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--text-primary-color);
+  }
+
+  .gn-dash__empty {
+    margin: 0;
+    align-self: center;
+    font-size: 0.875rem;
+    color: var(--gn-dash-muted);
+  }
+
+  .gn-dash__inline-error {
+    margin: 0.5rem 0 0;
+    font-size: 0.8125rem;
+    background-color: var(--color-danger-background);
+    color: var(--color-danger-color);
+    border-radius: var(--border-radius-lg, 0.5rem);
+    padding: 0.4rem 0.6rem;
+  }
+
+  // ------------------------------------------------------------- courses
+  .gn-dash__courses {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .gn-dash__course {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    width: 15.5rem;
+    min-height: 4.25rem;
+    text-align: start;
+    font: inherit;
+    color: var(--text-primary-color);
+    background-color: var(--island-bg-color);
+    border: 1px solid var(--default-border-color);
+    border-radius: var(--border-radius-lg, 0.5rem);
+    padding: 0.6rem 0.75rem;
+    cursor: pointer;
+    transition: background-color 150ms ease;
+
+    &:hover {
+      background-color: var(--button-hover-bg, var(--color-surface-high));
+    }
+  }
+
+  .gn-dash__course-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    min-width: 0;
+    font-weight: 600;
+    font-size: 0.9375rem;
+  }
+
+  .gn-dash__course-head .gn-dash__chip {
+    margin-inline-start: auto;
+  }
+
+  .gn-dash__course-meta {
+    font-size: 0.8125rem;
+    color: var(--gn-dash-muted);
+  }
+
+  // ------------------------------------------------------------- invite
+  .gn-dash__invite {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 1.25rem;
+    background-color: var(--color-surface-low);
+    border-block-end: 1px solid var(--default-border-color);
+  }
+
+  .gn-dash__invite-text {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--gn-dash-muted);
+  }
+
+  .gn-dash__invite-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  // ------------------------------------------------------------- skeleton
+  .gn-dash__card--skeleton,
+  .gn-dash__course--skeleton {
+    cursor: default;
+    border-inline-start-color: var(--default-border-color);
+    justify-content: flex-start;
+    gap: 0.55rem;
+  }
+
+  .gn-dash__sk {
+    display: block;
+    border-radius: 0.25rem;
+    background-color: var(--color-surface-high);
+    animation: gn-dash-pulse 1.4s ease-in-out infinite;
+
+    &--chip {
+      width: 4.5rem;
+      height: 0.9rem;
+    }
+    &--title {
+      width: 85%;
+      height: 1.1rem;
+    }
+    &--course {
+      width: 55%;
+      height: 0.8rem;
+    }
+    &--foot {
+      margin-block-start: auto;
+      width: 70%;
+      height: 0.8rem;
+    }
+  }
+
+  .gn-dash__card--s1 .gn-dash__sk--title {
+    width: 70%;
+  }
+  .gn-dash__card--s2 .gn-dash__sk--title {
+    width: 60%;
+  }
+
+  @media (max-width: 48rem) {
+    .gn-dash__top {
+      padding-inline: 0.75rem;
+      max-height: 50%;
+    }
+    .gn-dash__card,
+    .gn-dash__course {
+      width: 13rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gn-dash__card,
+    .gn-dash__course,
+    .gn-dash__button {
+      transition: none;
+    }
+    .gn-dash__sk {
+      animation: none;
+    }
+  }
+}
+
+@keyframes gn-dash-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
