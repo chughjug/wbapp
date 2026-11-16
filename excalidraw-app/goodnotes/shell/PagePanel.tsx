@@ -26,9 +26,9 @@ import { CloseIcon } from "../taskbar/icons";
 
 import { PAGE_PANEL_OPEN_CLASS } from "./NavBar";
 
-import type { ShellPlacement } from "./NavBar";
-
 import "./PagePanel.scss";
+
+import type { ShellPlacement } from "./NavBar";
 
 /** Default panel width, in px. Matches the GoodNotes study's rail. */
 export const PAGE_PANEL_WIDTH = 188;

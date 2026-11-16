@@ -17,12 +17,12 @@
 import clsx from "clsx";
 import { useCallback, useId } from "react";
 
-import type { JSX } from "react";
-
 import { resolveDarkModeTheme } from "./darkMode";
 import { useDarkMode } from "./useDarkMode";
 
 import "./DarkModeToggle.scss";
+
+import type { JSX } from "react";
 
 import type { DarkModePreference } from "./darkMode";
 

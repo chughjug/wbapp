@@ -74,6 +74,7 @@ import { ExportDialog, getOrderedPageFrames } from "./goodnotes/export";
 import { NavBar, PagePanel } from "./goodnotes/shell";
 import { TabBar, useOpenDocs } from "./goodnotes/tabs";
 import { ToolMenu, useActiveToolMenu } from "./goodnotes/tool-menu";
+import { ObjectMenu } from "./goodnotes/object-menu";
 import { useDarkMode } from "./goodnotes/dark";
 import { ImportPdfDialog } from "./goodnotes/import-pdf";
 import {
@@ -1393,6 +1394,14 @@ const ExcalidrawWrapper = ({
         </div>
       </div>
       <ToolMenu {...toolMenu.menuProps} />
+      {/* Contextual actions above the selection. It hides itself while the
+          lasso overlay is active; it does not need hiding for the tool menu,
+          because selecting an object switches to the selection tool, which
+          the tool menu has no panel for and closes on. */}
+      <ObjectMenu
+        excalidrawAPI={excalidrawAPI}
+        onOpenBackdrop={backdrops.open}
+      />
       <FuzzySelectOverlay excalidrawAPI={excalidrawAPI} />
       <BackdropPanel {...backdrops.panelProps} />
       {isPdfImportOpen && excalidrawAPI && (

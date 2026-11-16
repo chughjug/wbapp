@@ -49,6 +49,14 @@ import {
   useState,
 } from "react";
 
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+
+import type {
+  ExcalidrawFreeDrawElement,
+  ExcalidrawImageElement,
+  ExcalidrawTextElement,
+} from "@excalidraw/element/types";
+
 import { useFuzzySelectActive } from "../fuzzy-select/activation";
 
 import {
@@ -75,13 +83,6 @@ import { useSelectedElements } from "./useSelectedElements";
 import "./ObjectMenu.scss";
 
 import type { ObjectSelection } from "./useSelectedElements";
-
-import type {
-  ExcalidrawFreeDrawElement,
-  ExcalidrawImageElement,
-  ExcalidrawTextElement,
-} from "@excalidraw/element/types";
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 /** Gap between the selection box and the bar, in CSS px. */
 const MENU_GAP = 12;

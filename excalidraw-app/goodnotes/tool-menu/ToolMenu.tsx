@@ -8,12 +8,6 @@ import {
   useState,
 } from "react";
 
-import type {
-  KeyboardEvent as ReactKeyboardEvent,
-  PointerEvent as ReactPointerEvent,
-  ReactNode,
-} from "react";
-
 import type { StrokeVariability } from "@excalidraw/element/types";
 import type {
   AppState,
@@ -48,6 +42,12 @@ import {
 } from "./position";
 
 import "./ToolMenu.scss";
+
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from "react";
 
 import type {
   ToolMenuShapeId,
