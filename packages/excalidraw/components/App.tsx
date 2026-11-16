@@ -7669,14 +7669,20 @@ class App extends React.Component<AppProps, AppState> {
     // discard the freedraw element if it is very short because it is likely
     // just a spike, otherwise finalize the freedraw element when the second
     // finger is lifted
+    //
+    // PALM REJECTION: likewise, a *pen* coming down while a *touch* is
+    // mid-freedraw means that touch was a palm resting ahead of the nib —
+    // drop that stroke whatever its length, the user is writing with the pen.
+    const isPalmStrokeSupersededByPen =
+      event.pointerType === "pen" && this.state.lastPointerDownWith === "touch";
     if (
-      event.pointerType === "touch" &&
+      (event.pointerType === "touch" || isPalmStrokeSupersededByPen) &&
       this.state.newElement &&
       this.state.newElement.type === "freedraw"
     ) {
       const element = this.state.newElement as ExcalidrawFreeDrawElement;
       this.updateScene({
-        ...(element.points.length < 10
+        ...(isPalmStrokeSupersededByPen || element.points.length < 10
           ? {
               elements: this.scene
                 .getElementsIncludingDeleted()
@@ -7702,7 +7708,11 @@ class App extends React.Component<AppProps, AppState> {
             ? CaptureUpdateAction.EVENTUALLY
             : CaptureUpdateAction.NEVER,
       });
-      return;
+      // the pen must still go on to start its own stroke; only the
+      // second-finger case ends the interaction here
+      if (!isPalmStrokeSupersededByPen) {
+        return;
+      }
     }
 
     // remove any active selection when we start to interact with canvas
@@ -8106,6 +8116,15 @@ class App extends React.Component<AppProps, AppState> {
   private updateGestureOnPointerDown(
     event: React.PointerEvent<HTMLElement>,
   ): void {
+    // PALM REJECTION: a stylus must never take part in a multi-touch gesture.
+    // Otherwise a palm resting on the screen plus the nib coming down reads as
+    // two pointers, which turns the pen stroke into a pinch/pan (and the
+    // `gesture.pointers.size > 1` guard in `handleCanvasPointerDown` then
+    // swallows the stroke entirely). Pinch/pan are finger gestures.
+    if (event.pointerType === "pen") {
+      return;
+    }
+
     gesture.pointers.set(event.pointerId, {
       x: event.clientX,
       y: event.clientY,
@@ -8147,8 +8166,15 @@ class App extends React.Component<AppProps, AppState> {
       gesture.lastCenter = center;
 
       const distance = getDistance(Array.from(gesture.pointers.values()));
+      // In pen mode with the freedraw tool, fingers must not zoom *while a
+      // stroke is being drawn* (that is a palm brushing the glass), but a
+      // deliberate two-finger pinch between strokes must still zoom — on a
+      // tablet the user lives in the freedraw tool, so keying this off the
+      // tool alone made pinch-zoom unreachable while writing.
       const scaleFactor =
-        this.state.activeTool.type === "freedraw" && this.state.penMode
+        this.state.activeTool.type === "freedraw" &&
+        this.state.penMode &&
+        this.state.newElement?.type === "freedraw"
           ? 1
           : distance / gesture.initialDistance;
 

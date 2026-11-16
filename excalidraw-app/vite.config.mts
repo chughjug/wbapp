@@ -9,6 +9,13 @@ import { createHtmlPlugin } from "vite-plugin-html";
 import Sitemap from "vite-plugin-sitemap";
 import { woff2BrowserPlugin } from "../scripts/woff2/woff2-vite-plugins";
 
+import {
+  SHARE_SW_FILE_NAME,
+  SHARE_SW_URL,
+  SHARE_TARGET_MANIFEST,
+} from "./goodnotes/share-target/constants";
+import { shareTargetSwPlugin } from "./goodnotes/share-target/vitePlugin";
+
 import { MERMAID_CHUNKS_LIST_NAME } from "./data/cacheMermaidChunks";
 
 import type { Plugin, Rollup } from "vite";
@@ -298,6 +305,7 @@ export default defineConfig(({ mode }) => {
       }),
       svgrPlugin(),
       ViteEjsPlugin(),
+      shareTargetSwPlugin(),
       VitePWA({
         registerType: "autoUpdate",
         devOptions: {
@@ -320,6 +328,11 @@ export default defineConfig(({ mode }) => {
             // lazy-loaded Firebase SDK, only needed for collab/sharing, which
             // require network anyway
             "**/firebaseSDK-*.js",
+            // the share-target handler: the service worker already pulls it
+            // in with `importScripts` (which the browser stores alongside the
+            // SW script), so precaching a second, separately-versioned copy
+            // would only risk serving a stale one
+            SHARE_SW_FILE_NAME,
           ],
           // mermaid chunks are excluded here rather than via `globIgnores`
           // as their file names are arbitrary
@@ -331,6 +344,19 @@ export default defineConfig(({ mode }) => {
               warnings: [],
             }),
           ],
+          // Our own `fetch` listener for the share-target POST. workbox's
+          // `generateSW` has no hook for a custom route, but it emits
+          // `importScripts(...)` at the very top of the generated SW, so this
+          // listener is registered *before* workbox's router and gets first
+          // refusal on the request. The file is produced by
+          // `shareTargetSwPlugin` (build) / its dev middleware.
+          importScripts: [SHARE_SW_URL],
+          // NOTE — deliberately no `navigateFallbackDenylist` entry for
+          // `/share-target`. The POST never reaches workbox's NavigationRoute
+          // (that route only matches GET), while the GET that follows the
+          // SW's 303 redirect *must* be served `index.html` so the SPA can
+          // render the receive screen. Denylisting the path would send that
+          // GET to the static host, which has no such file.
           runtimeCaching: [
             {
               urlPattern: new RegExp(".+.woff2"),
@@ -436,23 +462,23 @@ export default defineConfig(({ mode }) => {
               },
             },
           ],
-          share_target: {
-            action: "/web-share-target",
-            method: "POST",
-            enctype: "multipart/form-data",
-            params: {
-              files: [
-                {
-                  name: "file",
-                  accept: [
-                    "application/vnd.excalidraw+json",
-                    "application/json",
-                    ".excalidraw",
-                  ],
-                },
-              ],
-            },
-          },
+          // Receive a PDF from the OS share sheet and open it as an
+          // annotatable document. Handled by the service worker (see
+          // `importScripts` above) and by the `/share-target` route in the
+          // app; `goodnotes/share-target/constants.ts` is the single source
+          // of truth shared by all three.
+          //
+          // Works on installed Chromium PWAs on Android/ChromeOS only —
+          // WebKit does not implement Web Share Target, so no iOS browser
+          // can offer this. The in-app file picker and drag-and-drop cover
+          // every platform; see goodnotes/share-target/INTEGRATION.md.
+          //
+          // Replaces the former `/web-share-target` + `.excalidraw` entry:
+          // nothing in this fork served that route (the SW had no POST
+          // handler, and `/` renders the document shelf rather than the
+          // editor that reads upstream's `web-share-target` cache), so it
+          // advertised a capability the app did not have.
+          share_target: SHARE_TARGET_MANIFEST,
           screenshots: [
             {
               src: "/screenshots/virtual-whiteboard.png",

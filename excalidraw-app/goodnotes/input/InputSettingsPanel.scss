@@ -1,0 +1,132 @@
+.gn-input-settings {
+  --gn-input-fg: var(--text-primary-color, #1b1b1f);
+  --gn-input-muted: var(--color-gray-60, #6b6b73);
+  --gn-input-bg: var(--island-bg-color, #fff);
+  --gn-input-border: var(--default-border-color, #e9ecef);
+
+  box-sizing: border-box;
+  max-width: 24rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: var(--gn-input-bg);
+  color: var(--gn-input-fg);
+  font-size: 0.875rem;
+  line-height: 1.4;
+
+  &.theme--dark {
+    --gn-input-fg: #e8e8ec;
+    --gn-input-muted: #a0a0ab;
+    --gn-input-bg: #232329;
+    --gn-input-border: #3b3b44;
+  }
+
+  &__title {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  &__group {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  &__legend {
+    // the <legend> is the group's accessible name; it is visually redundant
+    // with the heading, so hide it without removing it from the a11y tree
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  &__row {
+    display: flex;
+    gap: 0.625rem;
+    align-items: flex-start;
+    padding: 0.5rem 0;
+
+    & + & {
+      border-top: 1px solid var(--gn-input-border);
+    }
+  }
+
+  &__checkbox {
+    flex: 0 0 auto;
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0.1rem 0 0;
+    accent-color: var(--color-primary, #6965db);
+    // a comfortable hit target on glass without disturbing the layout
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary, #6965db);
+      outline-offset: 2px;
+      border-radius: 0.25rem;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+  }
+
+  &__text {
+    min-width: 0;
+  }
+
+  &__label {
+    display: block;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  &__hint {
+    margin: 0.15rem 0 0;
+    color: var(--gn-input-muted);
+    font-size: 0.8125rem;
+  }
+
+  &__status {
+    margin: 0.75rem 0 0;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--gn-input-border);
+    color: var(--gn-input-muted);
+    font-size: 0.8125rem;
+  }
+}
+
+/* --- stylus hover preview ------------------------------------------------ */
+
+.gn-input-hover-preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  pointer-events: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-primary, #6965db);
+  background: color-mix(
+    in srgb,
+    var(--color-primary, #6965db) 18%,
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 90ms ease-out;
+  will-change: transform;
+
+  &--visible {
+    opacity: 0.85;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-input-hover-preview {
+    transition: none;
+  }
+}

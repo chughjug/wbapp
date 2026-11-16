@@ -1,0 +1,378 @@
+/**
+ * Styling for the share-target receive screen, the PDF drop zone and the
+ * window-wide drop overlay.
+ *
+ * Colours come only from Excalidraw's own custom properties (declared on
+ * `.excalidraw` / `.excalidraw.theme--dark` in
+ * packages/excalidraw/css/theme.scss), so light and dark are both correct
+ * with no hardcoded hex values. Each root element carries the `excalidraw`
+ * class (plus `theme--dark`) so those properties resolve even when the
+ * component is portalled outside the editor.
+ *
+ * NOTE: `--color-muted` is a *background* grey in Excalidraw's palette — it
+ * is never used for text here. Secondary text goes through the local
+ * `--gn-share-text-muted` alias, which flips between the two themes.
+ */
+
+@mixin gn-share-tokens {
+  --gn-share-text-muted: var(--color-gray-70);
+  --gn-share-border: var(--color-gray-30);
+  --gn-share-surface: var(--island-bg-color, var(--color-surface-lowest));
+  --gn-share-accent: var(--color-primary, #6965db);
+
+  &.theme--dark {
+    --gn-share-text-muted: var(--color-gray-40);
+    --gn-share-border: var(--color-gray-70);
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--gn-share-accent);
+    outline-offset: 2px;
+    border-radius: var(--border-radius-md, 0.375rem);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// shared bits
+// ---------------------------------------------------------------------------
+
+.gn-share-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  width: 100%;
+
+  &__label {
+    font-size: 0.8125rem;
+    color: var(--gn-share-text-muted);
+  }
+
+  &__track {
+    height: 0.375rem;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 999px;
+    background-color: var(--color-surface-high, rgba(128, 128, 128, 0.2));
+  }
+
+  &__bar {
+    height: 100%;
+    border-radius: 999px;
+    background-color: var(--gn-share-accent);
+    transition: width 160ms ease-out;
+  }
+
+  &__bar--indeterminate {
+    width: 35%;
+    animation: gn-share-slide 1.1s ease-in-out infinite;
+  }
+}
+
+.gn-share-error {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--color-danger, #c92a2a);
+}
+
+.gn-share-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--border-radius-lg, 0.5rem);
+  border: 1px solid var(--gn-share-border);
+  background-color: var(--gn-share-surface);
+  color: var(--text-primary-color);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-surface-high, rgba(128, 128, 128, 0.14));
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+
+  &--primary {
+    border-color: transparent;
+    background-color: var(--gn-share-accent);
+    color: var(--color-icon-white, #fff);
+
+    &:hover:not(:disabled) {
+      background-color: var(--color-primary-darker, var(--gn-share-accent));
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// drop zone
+// ---------------------------------------------------------------------------
+
+.excalidraw.gn-share-dropzone {
+  @include gn-share-tokens;
+
+  display: block;
+  width: 100%;
+  color: var(--text-primary-color);
+  font-family: inherit;
+
+  &__button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 9rem;
+    padding: 1.25rem;
+    border: 2px dashed var(--gn-share-border);
+    border-radius: var(--border-radius-lg, 0.5rem);
+    background-color: var(--gn-share-surface);
+    color: inherit;
+    font: inherit;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 120ms ease-out, background-color 120ms ease-out,
+      transform 120ms ease-out;
+
+    &:hover:not(:disabled) {
+      border-color: var(--gn-share-accent);
+    }
+
+    &:disabled {
+      cursor: progress;
+    }
+  }
+
+  &--dragging &__button {
+    border-color: var(--gn-share-accent);
+    background-color: var(--color-primary-light, rgba(105, 101, 219, 0.12));
+    transform: scale(1.01);
+  }
+
+  &__icon {
+    color: var(--gn-share-accent);
+    flex: 0 0 auto;
+  }
+
+  &__title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+
+  &__hint {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--gn-share-text-muted);
+  }
+
+  &__status {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  &__input {
+    // visually hidden, still reachable programmatically. `display: none`
+    // would be fine for a click-proxied input, but keeping it in the layout
+    // tree avoids surprises with form-association in older WebKit.
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  // compact variant for a toolbar / header slot
+  &--inline &__button {
+    flex-direction: row;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.9rem;
+    border-style: solid;
+    border-width: 1px;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// share-target receive screen
+// ---------------------------------------------------------------------------
+
+.excalidraw.gn-share-receiver {
+  @include gn-share-tokens;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  padding: 1.5rem;
+  overflow: auto;
+  background-color: var(--color-surface-mid);
+  color: var(--text-primary-color);
+  font-family: inherit;
+  user-select: text;
+
+  &__panel {
+    width: min(30rem, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+    border: 1px solid var(--gn-share-border);
+    border-radius: var(--border-radius-lg, 0.5rem);
+    background-color: var(--gn-share-surface);
+    box-shadow: var(--modal-shadow, 0 20px 40px rgba(0, 0, 0, 0.18));
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 700;
+  }
+
+  &__text {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--gn-share-text-muted);
+  }
+
+  &__list {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--gn-share-text-muted);
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// window-wide drop overlay
+// ---------------------------------------------------------------------------
+
+.excalidraw.gn-share-overlay {
+  @include gn-share-tokens;
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  pointer-events: none;
+  background-color: var(--overlay-bg-color, rgba(0, 0, 0, 0.35));
+  animation: gn-share-fade 120ms ease-out;
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: min(22rem, 100%);
+    padding: 1.5rem 2rem;
+    border: 2px dashed var(--gn-share-accent);
+    border-radius: var(--border-radius-lg, 0.5rem);
+    background-color: var(--gn-share-surface);
+    color: var(--text-primary-color);
+    text-align: center;
+    box-shadow: var(--modal-shadow, 0 20px 40px rgba(0, 0, 0, 0.25));
+  }
+
+  &__title {
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  &__text {
+    font-size: 0.8125rem;
+    color: var(--gn-share-text-muted);
+  }
+
+  // the busy/error variant is not a drag hint: it must be clickable
+  &--busy,
+  &--error {
+    background-color: transparent;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 1.25rem;
+  }
+
+  &--busy &__card,
+  &--error &__card {
+    pointer-events: auto;
+    border-style: solid;
+    border-color: var(--gn-share-border);
+    width: min(26rem, 100%);
+    align-items: stretch;
+    text-align: left;
+  }
+}
+
+@keyframes gn-share-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes gn-share-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .excalidraw.gn-share-overlay {
+    animation: none;
+  }
+
+  .gn-share-progress__bar,
+  .excalidraw.gn-share-dropzone__button,
+  .excalidraw.gn-share-dropzone .gn-share-dropzone__button,
+  .gn-share-button {
+    transition: none;
+  }
+
+  .gn-share-progress__bar--indeterminate {
+    animation: none;
+    width: 100%;
+    opacity: 0.55;
+  }
+
+  .excalidraw.gn-share-dropzone--dragging .gn-share-dropzone__button {
+    transform: none;
+  }
+}
