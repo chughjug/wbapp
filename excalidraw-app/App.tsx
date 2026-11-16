@@ -403,6 +403,7 @@ const ExcalidrawWrapper = ({
 
   const [isPdfExportOpen, setIsPdfExportOpen] = useState(false);
   const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
+  const [isInputSettingsOpen, setIsInputSettingsOpen] = useState(false);
   const isFuzzySelectActive = useFuzzySelectActive();
   const backdrops = useBackdropPanel(excalidrawAPI);
   // view transform mirrored out of AppState so the paper layer, which lives
@@ -1138,6 +1139,11 @@ const ExcalidrawWrapper = ({
         currentPage={currentPageNumber ?? undefined}
         moreItems={[
           {
+            id: "input-settings",
+            label: "Pen & touch…",
+            onSelect: () => setIsInputSettingsOpen(true),
+          },
+          {
             id: "theme",
             label:
               themePreference === "dark"
@@ -1410,7 +1416,43 @@ const ExcalidrawWrapper = ({
           lasso overlay is active; it does not need hiding for the tool menu,
           because selecting an object switches to the selection tool, which
           the tool menu has no panel for and closes on. */}
-      <InputSettingsPanel {...input.settingsPanelProps} theme={editorTheme} />
+      {isInputSettingsOpen && (
+        // the panel ships as a plain block, so it needs a host: without one
+        // it rendered inline in the app root and landed wherever the layout
+        // happened to put it
+        <div
+          className="gn-settings-backdrop"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setIsInputSettingsOpen(false);
+            }
+          }}
+        >
+          <div
+            className="gn-settings-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Pen and touch settings"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setIsInputSettingsOpen(false);
+              }
+            }}
+          >
+            <InputSettingsPanel
+              {...input.settingsPanelProps}
+              theme={editorTheme}
+            />
+            <button
+              type="button"
+              className="gn-settings-dialog__close"
+              onClick={() => setIsInputSettingsOpen(false)}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
       <GlobalPdfDropOverlay mode="document" />
       <ObjectMenu
         excalidrawAPI={excalidrawAPI}

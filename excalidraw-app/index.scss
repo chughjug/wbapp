@@ -70,3 +70,49 @@
     display: none;
   }
 }
+
+/* Host for the pen & touch settings panel. The panel itself is a plain
+   block element owned by goodnotes/input; this gives it somewhere to live
+   instead of rendering inline in the app root. */
+.gn-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.gn-settings-dialog {
+  /* The panel's root carries Excalidraw's `excalidraw` class to pick up its
+     CSS custom properties, but that class is also a flex container, so the
+     heading and the fieldset end up side by side and collide. Force normal
+     block flow and give it room, without editing the module's own styles. */
+  .gn-input-settings {
+    display: block;
+    max-width: none;
+    width: 100%;
+  }
+
+  width: min(30rem, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  border-radius: 0.75rem;
+  background: var(--island-bg-color, #fff);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+
+  &__close {
+    display: block;
+    margin: 0 1rem 1rem auto;
+    padding: 0.45rem 1.1rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: #6965db;
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
