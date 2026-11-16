@@ -75,6 +75,13 @@ import { NavBar, PagePanel } from "./goodnotes/shell";
 import { TabBar, useOpenDocs } from "./goodnotes/tabs";
 import { ToolMenu, useActiveToolMenu } from "./goodnotes/tool-menu";
 import { ObjectMenu } from "./goodnotes/object-menu";
+import { InputSettingsPanel, useInputGestures } from "./goodnotes/input";
+import {
+  GlobalPdfDropOverlay,
+  PdfDropZone,
+  ShareTargetReceiver,
+  isShareTargetUrl,
+} from "./goodnotes/share-target";
 import { useDarkMode } from "./goodnotes/dark";
 import { ImportPdfDialog } from "./goodnotes/import-pdf";
 import {
@@ -412,6 +419,8 @@ const ExcalidrawWrapper = ({
 
   const { seedFirstPage, pages, addPage } = usePages(excalidrawAPI);
   const toolMenu = useActiveToolMenu({ excalidrawAPI });
+  // palm rejection, page flick and tap gestures go live from here
+  const input = useInputGestures(excalidrawAPI);
   const [isPagePanelOpen, setIsPagePanelOpen] = useState(true);
   const openDocs = useOpenDocs(docId ?? undefined);
   const { preference: themePreference, setPreference: setThemePreference } =
@@ -1122,6 +1131,8 @@ const ExcalidrawWrapper = ({
         }}
         backdropsActive={backdrops.isOpen}
         backdropsDisabled={!backdrops.hasImageSelection}
+        onUndo={input.undo}
+        onRedo={input.redo}
         onAddPage={() => addPage()}
         pageCount={pages.length}
         currentPage={currentPageNumber ?? undefined}
@@ -1399,6 +1410,8 @@ const ExcalidrawWrapper = ({
           lasso overlay is active; it does not need hiding for the tool menu,
           because selecting an object switches to the selection tool, which
           the tool menu has no panel for and closes on. */}
+      <InputSettingsPanel {...input.settingsPanelProps} theme={editorTheme} />
+      <GlobalPdfDropOverlay mode="document" />
       <ObjectMenu
         excalidrawAPI={excalidrawAPI}
         onOpenBackdrop={backdrops.open}
@@ -1451,6 +1464,8 @@ const GoodNotesRoot = () => {
   });
   // the editor, not the shelf, is what a shared link resolves to
   const [isTransientScene] = useState(hasTransientSceneInUrl);
+  // a PDF arriving from the OS share sheet
+  const [isShareTarget, setIsShareTarget] = useState(isShareTargetUrl);
   const { editorTheme } = useDarkMode();
 
   const openDocument = useCallback((doc: DocMeta) => {
@@ -1468,13 +1483,29 @@ const GoodNotesRoot = () => {
     const onPopState = () => {
       const match = window.location.pathname.match(/^\/d\/([^/]+)$/);
       setDocId(match ? decodeURIComponent(match[1]) : null);
+      setIsShareTarget(isShareTargetUrl());
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  // the receive screen consumes the shared file, imports it and navigates
+  // to /d/<newDocId> itself
+  if (isShareTarget) {
+    return <ShareTargetReceiver theme={editorTheme} />;
+  }
+
   if (!docId && !isTransientScene) {
-    return <Shelf theme={editorTheme} onOpenDocument={openDocument} />;
+    return (
+      <>
+        <Shelf
+          theme={editorTheme}
+          onOpenDocument={openDocument}
+          headerExtra={<PdfDropZone variant="inline" />}
+        />
+        <GlobalPdfDropOverlay mode="library" />
+      </>
+    );
   }
 
   return (
