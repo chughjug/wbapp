@@ -30,8 +30,10 @@ const Harness = () => {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0 }}>
-      <Excalidraw onExcalidrawAPI={setApi} theme={theme} />
+    <div className="gn-shell-layout" style={{ position: "fixed", inset: 0 }}>
+      <div id="fake-tabs" style={{ height: 36, background: "#ddd", flex: "0 0 auto" }}>
+        tabs band
+      </div>
       <NavBar
         excalidrawAPI={api}
         suppressDefaultChrome
@@ -58,12 +60,17 @@ const Harness = () => {
         onShare={() => note("share")}
         onActiveToolMenu={(tool) => note(`tool-menu:${tool}`)}
       />
-      <PagePanel
-        excalidrawAPI={api}
-        open={pagesOpen}
-        theme={theme}
-        onClose={() => setPagesOpen(false)}
-      />
+      <div className="gn-shell-body">
+        <PagePanel
+          excalidrawAPI={api}
+          open={pagesOpen}
+          theme={theme}
+          onClose={() => setPagesOpen(false)}
+        />
+        <div className="gn-shell-canvas">
+          <Excalidraw onExcalidrawAPI={setApi} theme={theme} />
+        </div>
+      </div>
       <button
         id="toggle-theme"
         style={{ position: "fixed", bottom: 8, right: 8, zIndex: 500 }}

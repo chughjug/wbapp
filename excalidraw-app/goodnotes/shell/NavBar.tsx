@@ -114,6 +114,18 @@ export const PAGE_PANEL_OPEN_CLASS = "gn-shell-page-panel-open";
 /** Editing posture. `read` is a presentation hint; the host owns view mode. */
 export type ShellMode = "write" | "read";
 
+/**
+ * How a shell surface is positioned.
+ *
+ * - `flow` (default): a normal block in the document flow. The shell is a
+ *   BAND — the host stacks tab strip / nav bar / body, and nothing overlaps.
+ * - `fixed`: pinned to the top of the viewport, floating over the canvas.
+ *   Only use this when the bar is the topmost thing on screen; if anything
+ *   else (a document tab strip) sits above it, the host must inset the editor
+ *   itself. See `INTEGRATION.md`.
+ */
+export type ShellPlacement = "flow" | "fixed";
+
 const SHAPE_ITEMS: { id: TaskbarShapeId; label: string; icon: ReactNode }[] = [
   { id: "rectangle", label: "Rectangle", icon: <RectangleIcon /> },
   { id: "ellipse", label: "Ellipse", icon: <EllipseIcon /> },
@@ -260,6 +272,11 @@ export interface NavBarProps {
   suppressDefaultChrome?: boolean;
   /** @deprecated Old taskbar name for {@link NavBarProps.suppressDefaultChrome}. */
   suppressDefaultToolbar?: boolean;
+  /**
+   * `flow` (default) renders the bar as a band in normal document flow;
+   * `fixed` pins it to the top of the viewport (the old taskbar behaviour).
+   */
+  placement?: ShellPlacement;
   /** Accessible name of the bar. Default `"Editor navigation"`. */
   ariaLabel?: string;
   className?: string;
@@ -327,6 +344,7 @@ export const NavBar = ({
   moreItems,
   suppressDefaultChrome = false,
   suppressDefaultToolbar = false,
+  placement = "flow",
   ariaLabel = "Editor navigation",
   className,
 }: NavBarProps) => {
@@ -989,7 +1007,7 @@ export const NavBar = ({
 
   return (
     <div
-      className={`gn-nav-scope excalidraw${
+      className={`gn-nav-scope gn-nav-scope--${placement} excalidraw${
         resolvedTheme === "dark" ? " theme--dark" : ""
       }${className ? ` ${className}` : ""}`}
       data-testid="goodnotes-navbar"

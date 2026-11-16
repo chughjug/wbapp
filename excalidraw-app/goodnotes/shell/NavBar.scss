@@ -18,18 +18,17 @@
   --gn-nav-height: 3.25rem;
 }
 
-/* The root both scopes the theme tokens and positions the bar. It carries
-   `.excalidraw`, whose base rule is a full-size flex container — undone here. */
-.gn-nav-scope.gn-nav-scope {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: auto;
-  /* above Excalidraw's own UI layers (library 120 / main menu 110 / top 100)
-     but below its modal layer (1000) so dialogs still cover the bar */
-  z-index: 125;
+/* The root both scopes the theme tokens and places the bar. It carries
+   `.excalidraw`, whose base rule is a full-size flex container — undone here.
 
+   DEFAULT (`--flow`): the bar is a BAND in normal document flow. It is the
+   middle of three stacked bands (document tabs, nav bar, body) and overlaps
+   nothing; `position: relative` + a z-index only exist so the bar's popovers
+   paint over the canvas below.
+
+   `--fixed`: the old taskbar behaviour, pinned to the viewport top. Only
+   correct when nothing else occupies the top of the window. */
+.gn-nav-scope.gn-nav-scope {
   display: block;
   width: auto;
   height: auto;
@@ -38,6 +37,58 @@
 
   font-family: var(--ui-font, system-ui, sans-serif);
   color: var(--text-primary-color, #1b1b1f);
+
+  &.gn-nav-scope--flow {
+    position: relative;
+    inset: auto;
+    flex: 0 0 auto;
+    /* above the canvas and Excalidraw's in-canvas UI layers, below its modal
+       layer (1000), so the bar's menus overlay the drawing but dialogs still
+       cover the bar */
+    z-index: 125;
+  }
+
+  &.gn-nav-scope--fixed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    z-index: 125;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Optional layout helpers for the host.
+
+   The shell is designed as three stacked bands. These three classes are all
+   the host needs to assemble them; see INTEGRATION.md.
+
+     .gn-shell-layout   column: [tabs] / nav bar / body
+       .gn-shell-body   row: page panel / canvas
+         .gn-shell-canvas  the <Excalidraw> wrapper (fills what is left)
+   --------------------------------------------------------------------------- */
+
+.gn-shell-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gn-shell-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.gn-shell-canvas {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 
 .gn-nav {

@@ -11,17 +11,10 @@
  */
 
 .gn-page-panel.gn-page-panel {
-  position: fixed;
-  top: var(--gn-nav-height, 3.25rem);
-  left: 0;
-  bottom: 0;
-  right: auto;
-  z-index: 124; /* just under the nav bar, above Excalidraw's UI layers */
-
-  /* `.excalidraw` (worn for its theme tokens) is a full-size box; with an
-     explicit height, `bottom` would be ignored and the panel would hang off
-     the bottom of the viewport by the height of the bar. */
+  /* `.excalidraw` (worn for its theme tokens) is a full-size box; its
+     `height`/`width` are undone here so the panel can size itself. */
   height: auto;
+  width: auto;
 
   display: flex;
   flex-direction: column;
@@ -34,6 +27,27 @@
 
   font-family: var(--ui-font, system-ui, sans-serif);
   color: var(--text-primary-color, #1b1b1f);
+
+  /* DEFAULT: the first column of the shell's body row — a sibling of the
+     canvas, not an overlay. Width comes from the inline style. */
+  &.gn-page-panel--flow {
+    position: relative;
+    inset: auto;
+    flex: 0 0 auto;
+    height: 100%;
+    align-self: stretch;
+  }
+
+  /* Pinned to the left edge, overlaying the canvas, starting below a nav bar
+     that is itself `placement="fixed"`. */
+  &.gn-page-panel--fixed {
+    position: fixed;
+    top: var(--gn-nav-height, 3.25rem);
+    left: 0;
+    bottom: 0;
+    right: auto;
+    z-index: 124;
+  }
 }
 
 /* children & re-skin: plain class, so `&__x` concatenation is correct */

@@ -24,10 +24,12 @@
  * (`onFuzzySelect`, `onImportPdf`, `onExportPdf`, `onOpenBackdrops`,
  * `onAddPage`, `pageCount`, `currentPage`, `suppressDefaultToolbar`, …), so an
  * existing call site keeps compiling; the new zones simply stay empty until
- * you pass their callbacks. See `goodnotes/shell/INTEGRATION.md`.
+ * you pass their callbacks. It also keeps the legacy `placement="fixed"`
+ * (the new `NavBar` default is `"flow"`, a band in the host's layout).
+ * See `goodnotes/shell/INTEGRATION.md`.
  */
-export { NavBar as Taskbar } from "../shell/NavBar";
-export type { NavBarProps as TaskbarProps } from "../shell/NavBar";
+export { Taskbar } from "./LegacyTaskbar";
+export type { TaskbarProps } from "./LegacyTaskbar";
 
 /**
  * @deprecated Renamed to `SUPPRESS_DEFAULT_CHROME_CLASS` in

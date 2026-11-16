@@ -26,6 +26,8 @@ import { CloseIcon } from "../taskbar/icons";
 
 import { PAGE_PANEL_OPEN_CLASS } from "./NavBar";
 
+import type { ShellPlacement } from "./NavBar";
+
 import "./PagePanel.scss";
 
 /** Default panel width, in px. Matches the GoodNotes study's rail. */
@@ -44,6 +46,14 @@ export interface PagePanelProps {
   thumbnails?: boolean;
   /** Panel width in px. Default {@link PAGE_PANEL_WIDTH}. */
   width?: number;
+  /**
+   * `flow` (default): the panel is the first column of the shell's body row,
+   * so the canvas simply starts to its right and Excalidraw's own bottom-left
+   * zoom pill moves with the canvas. `fixed`: the panel is pinned to the left
+   * edge, overlaying the canvas, and the pill is nudged clear of it with a
+   * body class. Use the same placement as the nav bar.
+   */
+  placement?: ShellPlacement;
   /** Header text. Default `"Pages"` (rendered in small caps). */
   title?: string;
   className?: string;
@@ -56,13 +66,16 @@ export const PagePanel = ({
   theme = "light",
   thumbnails = true,
   width = PAGE_PANEL_WIDTH,
+  placement = "flow",
   title = "Pages",
   className,
 }: PagePanelProps) => {
-  // While the panel is open, Excalidraw's own bottom-left footer (the zoom /
-  // undo pill, which we deliberately do NOT absorb) is pushed clear of it.
+  // While a FIXED panel is open, Excalidraw's own bottom-left footer (the
+  // zoom / undo pill, which we deliberately do NOT absorb) is pushed clear of
+  // it. In flow placement the canvas itself starts to the right of the panel,
+  // so the pill is already clear and no body class is needed.
   useEffect(() => {
-    if (!open || typeof document === "undefined") {
+    if (!open || placement !== "fixed" || typeof document === "undefined") {
       return;
     }
     const { body } = document;
@@ -72,7 +85,7 @@ export const PagePanel = ({
       body.classList.remove(PAGE_PANEL_OPEN_CLASS);
       body.style.removeProperty("--gn-page-panel-width");
     };
-  }, [open, width]);
+  }, [open, width, placement]);
 
   if (!open) {
     return null;
@@ -80,7 +93,7 @@ export const PagePanel = ({
 
   return (
     <aside
-      className={`gn-page-panel excalidraw${
+      className={`gn-page-panel gn-page-panel--${placement} excalidraw${
         theme === "dark" ? " theme--dark" : ""
       }${className ? ` ${className}` : ""}`}
       style={{ width: `${width}px` }}
