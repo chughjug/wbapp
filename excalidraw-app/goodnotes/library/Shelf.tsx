@@ -52,7 +52,7 @@ import { PromptDialog } from "./PromptDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { CourseFolders } from "./CourseFolders";
 import { DocumentCard } from "./DocumentCard";
-import { fromDateInputValue, toDateInputValue } from "./DocumentEditor";
+import { fromDateInputValue } from "./DocumentEditor";
 import { DocumentRow } from "./DocumentRow";
 import { Sidebar } from "./Sidebar";
 import {
@@ -803,9 +803,9 @@ export const Shelf = ({
           }
           void actions.renameCourse(state.course, target).then((changed) => {
             setAnnouncement(
-              `Renamed course to ${formatCoursePath(
-                target,
-              )} on ${bulkNoun(changed)}`,
+              `Renamed course to ${formatCoursePath(target)} on ${bulkNoun(
+                changed,
+              )}`,
             );
             setFilter((current) =>
               current.kind === "course" && current.course === state.course
@@ -842,9 +842,7 @@ export const Shelf = ({
               ? FILTER_ALL
               : current,
           );
-          setAnnouncement(
-            `Deleted tag ${state.tag} from ${bulkNoun(changed)}`,
-          );
+          setAnnouncement(`Deleted tag ${state.tag} from ${bulkNoun(changed)}`);
         });
         break;
       case "remove-course":
@@ -928,7 +926,9 @@ export const Shelf = ({
         courseTree={courseTree}
         courseStyleOf={courseStyles.styleOf}
         tags={tags}
-        onRenameCourse={(course) => setPrompt({ kind: "rename-course", course })}
+        onRenameCourse={(course) =>
+          setPrompt({ kind: "rename-course", course })
+        }
         onRemoveCourse={(course) =>
           setConfirming({
             kind: "remove-course",
@@ -1066,9 +1066,7 @@ export const Shelf = ({
               : `${heading}: ${visible.length} ${
                   visible.length === 1 ? "document" : "documents"
                 } shown${
-                  selection.count > 0
-                    ? `, ${selection.count} selected`
-                    : ""
+                  selection.count > 0 ? `, ${selection.count} selected` : ""
                 }`}
           </p>
           <p className="gn-sr-only" role="status" aria-live="polite">

@@ -134,7 +134,10 @@ const CourseTreeRow = ({
   const hasChildren = node.children.length > 0;
   const isOpen = !expanded.has(node.path);
   const style = styleOf(node.path);
-  const childrenId = `gn-course-children-${node.path.replace(/[^a-z0-9]/gi, "-")}`;
+  const childrenId = `gn-course-children-${node.path.replace(
+    /[^a-z0-9]/gi,
+    "-",
+  )}`;
 
   return (
     <li>
@@ -208,7 +211,10 @@ const CourseTreeRow = ({
         )}
       </div>
       {hasChildren && isOpen && (
-        <ul className="gn-sidebar__list gn-sidebar__list--nested" id={childrenId}>
+        <ul
+          className="gn-sidebar__list gn-sidebar__list--nested"
+          id={childrenId}
+        >
           {node.children.map((child) => (
             <CourseTreeRow
               key={child.path}
@@ -328,8 +334,8 @@ export const Sidebar = ({
       {courseTree ? (
         courseTree.length === 0 ? (
           <p className="gn-sidebar__hint">
-            Give a document a course and it will appear here. Use “ / ” to
-            nest, e.g. MATH 221 / Problem sets.
+            Give a document a course and it will appear here. Use “ / ” to nest,
+            e.g. MATH 221 / Problem sets.
           </p>
         ) : (
           <ul className="gn-sidebar__list" aria-labelledby="gn-sidebar-courses">

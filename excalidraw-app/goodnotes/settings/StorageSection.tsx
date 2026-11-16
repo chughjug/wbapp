@@ -139,11 +139,9 @@ export const StorageSection = ({
       const result = await exportBackup(onProgress);
       downloadBackup(result.blob, result.fileName);
       setStatus(
-        `Backup ready: ${result.fileName} — ${
-          result.documentCount
-        } notebook${result.documentCount === 1 ? "" : "s"}, ${formatBytes(
-          result.bytes,
-        )}. Check your downloads.`,
+        `Backup ready: ${result.fileName} — ${result.documentCount} notebook${
+          result.documentCount === 1 ? "" : "s"
+        }, ${formatBytes(result.bytes)}. Check your downloads.`,
       );
       setProgress((current) => ({ ...current, phase: "done" }));
     } catch (caught: any) {
@@ -159,29 +157,28 @@ export const StorageSection = ({
     }
   }, [onProgress, refresh]);
 
-  const handleFile = useCallback(
-    async (file: File | undefined) => {
-      if (!file) {
-        return;
-      }
-      setError(null);
-      setStatus(`Reading ${file.name}…`);
-      try {
-        const bundle = await readBundleFile(file);
-        setPending({ bundle, fileName: file.name });
-        setStatus(
-          `${file.name} holds ${bundle.documents.length} notebook${
-            bundle.documents.length === 1 ? "" : "s"
-          }, backed up on ${new Date(bundle.createdAt).toLocaleString()}. Choose how to restore it.`,
-        );
-      } catch (caught: any) {
-        const message = caught?.message ?? String(caught);
-        setError(message);
-        setStatus(message);
-      }
-    },
-    [],
-  );
+  const handleFile = useCallback(async (file: File | undefined) => {
+    if (!file) {
+      return;
+    }
+    setError(null);
+    setStatus(`Reading ${file.name}…`);
+    try {
+      const bundle = await readBundleFile(file);
+      setPending({ bundle, fileName: file.name });
+      setStatus(
+        `${file.name} holds ${bundle.documents.length} notebook${
+          bundle.documents.length === 1 ? "" : "s"
+        }, backed up on ${new Date(
+          bundle.createdAt,
+        ).toLocaleString()}. Choose how to restore it.`,
+      );
+    } catch (caught: any) {
+      const message = caught?.message ?? String(caught);
+      setError(message);
+      setStatus(message);
+    }
+  }, []);
 
   const handleRestore = useCallback(async () => {
     if (!pending) {
@@ -207,7 +204,9 @@ export const StorageSection = ({
       setStatus(
         `Restored ${result.documentsRestored} notebook${
           result.documentsRestored === 1 ? "" : "s"
-        } (${result.scenesRestored} with pages) from ${fileName}.${warningText} Reload the app to see them.`,
+        } (${
+          result.scenesRestored
+        } with pages) from ${fileName}.${warningText} Reload the app to see them.`,
       );
       setProgress((current) => ({ ...current, phase: "done" }));
       onRestored?.();
@@ -271,13 +270,15 @@ export const StorageSection = ({
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(report.ratio * 100)}
-            aria-valuetext={`${formatBytes(
-              report.usage ?? 0,
-            )} of ${formatBytes(report.quota ?? 0)} used`}
+            aria-valuetext={`${formatBytes(report.usage ?? 0)} of ${formatBytes(
+              report.quota ?? 0,
+            )} used`}
             aria-label="Storage used by this app"
           >
             <span
-              style={{ width: `${Math.min(100, report.ratio * 100).toFixed(2)}%` }}
+              style={{
+                width: `${Math.min(100, report.ratio * 100).toFixed(2)}%`,
+              }}
             />
           </div>
           <p className="gn-settings-field__hint">
@@ -300,9 +301,8 @@ export const StorageSection = ({
       <h3 className="gn-settings-section__sub">Back up</h3>
       <p className="gn-settings-field__hint">
         One file with every notebook&rsquo;s details and pages, including
-        imported images and PDFs. Large libraries make a large file — the
-        images are stored as text, so expect it to be bigger than the figure
-        above.
+        imported images and PDFs. Large libraries make a large file — the images
+        are stored as text, so expect it to be bigger than the figure above.
       </p>
       <div className="gn-settings-actions">
         <button
@@ -356,7 +356,9 @@ export const StorageSection = ({
           aria-labelledby={`${idPrefix}-confirm-title`}
         >
           <p id={`${idPrefix}-confirm-title`}>
-            <strong>Restore {pending.bundle.documents.length} notebook(s)</strong>{" "}
+            <strong>
+              Restore {pending.bundle.documents.length} notebook(s)
+            </strong>{" "}
             from {pending.fileName}?
           </p>
           <fieldset
@@ -379,7 +381,10 @@ export const StorageSection = ({
                 </span>
               </div>
             </label>
-            <label className="gn-settings-radio" htmlFor={`${idPrefix}-replace`}>
+            <label
+              className="gn-settings-radio"
+              htmlFor={`${idPrefix}-replace`}
+            >
               <input
                 type="radio"
                 id={`${idPrefix}-replace`}
@@ -408,7 +413,9 @@ export const StorageSection = ({
             />
             <div>
               Also restore settings
-              <span>Pen &amp; touch, theme, view mode, pens, default paper.</span>
+              <span>
+                Pen &amp; touch, theme, view mode, pens, default paper.
+              </span>
             </div>
           </label>
           <div className="gn-settings-actions">

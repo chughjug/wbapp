@@ -49,7 +49,11 @@ import { loadPenPresets, resetPenPresets } from "../pens";
 
 import { GesturesReference } from "./GesturesReference";
 import { dismissGesturesHint } from "./firstRun";
-import { loadDefaultPaper, saveDefaultPaper, subscribeDefaultPaper } from "./prefs";
+import {
+  loadDefaultPaper,
+  saveDefaultPaper,
+  subscribeDefaultPaper,
+} from "./prefs";
 import { StorageSection } from "./StorageSection";
 import { useFocusTrap } from "./useFocusTrap";
 
@@ -87,7 +91,7 @@ export const SETTINGS_SECTIONS = [
   "storage",
 ] as const;
 
-export type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number];
+export type SettingsSectionId = typeof SETTINGS_SECTIONS[number];
 
 const SECTION_LABELS: Record<SettingsSectionId, string> = {
   input: "Pen & touch",
@@ -192,11 +196,7 @@ export const SettingsScreen = ({
         <h1 className="gn-settings__title" id={`${idPrefix}-title`}>
           Settings
         </h1>
-        <button
-          type="button"
-          className="gn-settings__close"
-          onClick={onClose}
-        >
+        <button type="button" className="gn-settings__close" onClick={onClose}>
           Done
         </button>
       </div>
@@ -259,7 +259,10 @@ export const SettingsScreen = ({
 
           <div className="gn-settings-field">
             <div className="gn-settings-field__text">
-              <span className="gn-settings-field__label" id={`${idPrefix}-theme-l`}>
+              <span
+                className="gn-settings-field__label"
+                id={`${idPrefix}-theme-l`}
+              >
                 Theme
               </span>
               <p className="gn-settings-field__hint">
@@ -284,8 +287,8 @@ export const SettingsScreen = ({
                 View mode
               </label>
               <p className="gn-settings-field__hint">
-                Paged shows one page filling the workspace. Continuous gives
-                you the infinite canvas.
+                Paged shows one page filling the workspace. Continuous gives you
+                the infinite canvas.
               </p>
             </div>
             <div className="gn-settings-field__control">
@@ -346,8 +349,8 @@ export const SettingsScreen = ({
                 {penCount} saved pen{penCount === 1 ? "" : "s"}
               </span>
               <p className="gn-settings-field__hint">
-                Resetting restores the four pens the app ships with and
-                discards your own.
+                Resetting restores the four pens the app ships with and discards
+                your own.
               </p>
             </div>
             <div className="gn-settings-field__control">
@@ -357,16 +360,18 @@ export const SettingsScreen = ({
                 onClick={() => {
                   const next = resetPenPresets();
                   setPenCount(next.length);
-                  setPenStatus(
-                    `Pens reset to the ${next.length} defaults.`,
-                  );
+                  setPenStatus(`Pens reset to the ${next.length} defaults.`);
                 }}
               >
                 Reset pens to defaults
               </button>
             </div>
           </div>
-          <p className="gn-settings-field__hint" role="status" aria-live="polite">
+          <p
+            className="gn-settings-field__hint"
+            role="status"
+            aria-live="polite"
+          >
             {penStatus}
           </p>
         </section>

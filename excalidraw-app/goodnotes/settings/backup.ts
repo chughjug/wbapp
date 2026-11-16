@@ -394,7 +394,9 @@ export const readBundleFile = async (file: File): Promise<BackupBundle> => {
   try {
     text = await file.text();
   } catch (error: any) {
-    throw new Error(`That file could not be read (${error?.message ?? error}).`);
+    throw new Error(
+      `That file could not be read (${error?.message ?? error}).`,
+    );
   }
   let parsed: unknown;
   try {
@@ -502,7 +504,10 @@ export const importBackup = async (
   let preferencesRestored = 0;
   if (options.preferences !== false && isRecord(bundle.preferences)) {
     for (const [key, value] of Object.entries(bundle.preferences)) {
-      if (!BACKED_UP_PREFERENCE_KEYS.includes(key) || typeof value !== "string") {
+      if (
+        !BACKED_UP_PREFERENCE_KEYS.includes(key) ||
+        typeof value !== "string"
+      ) {
         continue;
       }
       try {
@@ -566,8 +571,9 @@ export const formatBytes = (bytes: number): string => {
 export const getStorageReport = async (): Promise<StorageReport> => {
   let documentCount = 0;
   try {
-    documentCount = (await listDocs()).filter((meta) => !isProbe(meta?.id))
-      .length;
+    documentCount = (await listDocs()).filter(
+      (meta) => !isProbe(meta?.id),
+    ).length;
   } catch {
     documentCount = 0;
   }
@@ -589,7 +595,9 @@ export const getStorageReport = async (): Promise<StorageReport> => {
   let persisted: boolean | null = null;
   try {
     persisted =
-      typeof storage.persisted === "function" ? await storage.persisted() : null;
+      typeof storage.persisted === "function"
+        ? await storage.persisted()
+        : null;
   } catch {
     persisted = null;
   }

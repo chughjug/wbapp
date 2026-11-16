@@ -89,7 +89,7 @@ const emitChange = () => {
  * Nestable; the emit happens when the outermost batch resolves, and still
  * happens if `fn` throws part-way (subscribers must see partial writes).
  */
-export const runBatched = async <T,>(fn: () => Promise<T>): Promise<T> => {
+export const runBatched = async <T>(fn: () => Promise<T>): Promise<T> => {
   batchDepth++;
   try {
     return await fn();
@@ -426,8 +426,7 @@ export const updateManyDocs = async (
       if (!current) {
         continue;
       }
-      const resolved =
-        typeof patch === "function" ? patch(current) : patch;
+      const resolved = typeof patch === "function" ? patch(current) : patch;
       if (!resolved) {
         continue;
       }
@@ -437,9 +436,7 @@ export const updateManyDocs = async (
   });
 
 /** Delete many documents (metadata + scenes). Resolves with the count. */
-export const deleteManyDocs = async (
-  ids: readonly string[],
-): Promise<number> =>
+export const deleteManyDocs = async (ids: readonly string[]): Promise<number> =>
   runBatched(async () => {
     let removed = 0;
     for (const id of ids) {
@@ -502,7 +499,8 @@ export const renameTagEverywhere = async (
     let changed = 0;
     for (const doc of docs) {
       const next = renameTagInList(doc.tags, from, to);
-      if (next.length !== doc.tags.length ||
+      if (
+        next.length !== doc.tags.length ||
         next.some((it, index) => it !== doc.tags[index])
       ) {
         await updateDocMeta(doc.id, { tags: next });

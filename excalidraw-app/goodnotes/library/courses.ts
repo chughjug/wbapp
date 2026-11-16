@@ -296,7 +296,8 @@ export const renameCourseStyleTree = async (
     if (key !== source && !key.startsWith(prefix)) {
       continue;
     }
-    const nextKey = key === source ? target : `${target}${key.slice(source.length)}`;
+    const nextKey =
+      key === source ? target : `${target}${key.slice(source.length)}`;
     await set(nextKey, style, styleStore);
     await del(key, styleStore);
     moved++;

@@ -154,11 +154,31 @@ export const KEYBOARD_GROUPS: ReferenceGroup[] = [
     entries: [
       { id: "undo", trigger: "Ctrl/Cmd + Z", effect: "Undo." },
       { id: "redo", trigger: "Ctrl/Cmd + Shift + Z", effect: "Redo." },
-      { id: "copy", trigger: "Ctrl/Cmd + C / V / X", effect: "Copy, paste, cut." },
-      { id: "dup", trigger: "Ctrl/Cmd + D", effect: "Duplicate the selection." },
-      { id: "selectall", trigger: "Ctrl/Cmd + A", effect: "Select everything on the canvas." },
-      { id: "delete", trigger: "Delete / Backspace", effect: "Delete the selection." },
-      { id: "escape", trigger: "Escape", effect: "Close the open panel, menu or dialog; drop the selection." },
+      {
+        id: "copy",
+        trigger: "Ctrl/Cmd + C / V / X",
+        effect: "Copy, paste, cut.",
+      },
+      {
+        id: "dup",
+        trigger: "Ctrl/Cmd + D",
+        effect: "Duplicate the selection.",
+      },
+      {
+        id: "selectall",
+        trigger: "Ctrl/Cmd + A",
+        effect: "Select everything on the canvas.",
+      },
+      {
+        id: "delete",
+        trigger: "Delete / Backspace",
+        effect: "Delete the selection.",
+      },
+      {
+        id: "escape",
+        trigger: "Escape",
+        effect: "Close the open panel, menu or dialog; drop the selection.",
+      },
     ],
   },
   {
@@ -222,16 +242,14 @@ export const REFERENCE_GROUPS: ReferenceGroup[] = [
  * {@link UNDOCUMENTED_GESTURE_SETTINGS} will be non-empty so the screen can
  * say so out loud instead of quietly lying.
  */
-export const GESTURE_SETTING_COVERAGE: Record<keyof InputSettings, string[]> =
-  (Object.keys(DEFAULT_INPUT_SETTINGS) as (keyof InputSettings)[]).reduce(
-    (acc, key) => {
-      acc[key] = GESTURE_GROUP.entries
-        .filter((entry) => entry.setting === key)
-        .map((entry) => entry.id);
-      return acc;
-    },
-    {} as Record<keyof InputSettings, string[]>,
-  );
+export const GESTURE_SETTING_COVERAGE: Record<keyof InputSettings, string[]> = (
+  Object.keys(DEFAULT_INPUT_SETTINGS) as (keyof InputSettings)[]
+).reduce((acc, key) => {
+  acc[key] = GESTURE_GROUP.entries
+    .filter((entry) => entry.setting === key)
+    .map((entry) => entry.id);
+  return acc;
+}, {} as Record<keyof InputSettings, string[]>);
 
 /** Switches in `goodnotes/input` that no reference row documents. */
 export const UNDOCUMENTED_GESTURE_SETTINGS: (keyof InputSettings)[] = (

@@ -298,7 +298,9 @@ const restoreFreedrawStrokeOptions = (
     ...(isFiniteNumber(options?.smoothing)
       ? { smoothing: options.smoothing }
       : {}),
-    ...(isFiniteNumber(options?.thinning) ? { thinning: options.thinning } : {}),
+    ...(isFiniteNumber(options?.thinning)
+      ? { thinning: options.thinning }
+      : {}),
   };
 };
 

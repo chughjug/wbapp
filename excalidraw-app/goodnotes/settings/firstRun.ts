@@ -28,7 +28,8 @@ export const isGesturesHintDismissed = (): boolean => {
     return true;
   }
   try {
-    cached = window.localStorage.getItem(GESTURES_HINT_STORAGE_KEY) === DISMISSED;
+    cached =
+      window.localStorage.getItem(GESTURES_HINT_STORAGE_KEY) === DISMISSED;
   } catch {
     // storage disabled: showing the hint every launch would be worse than
     // never showing it, so treat it as already seen

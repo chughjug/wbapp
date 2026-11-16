@@ -58,13 +58,28 @@ export interface DocumentActions {
   // it touches, so the shelf repaints once per bulk action.
 
   /** Move many documents to a course path (`null` clears it). */
-  bulkSetCourse: (ids: readonly string[], course: string | null) => Promise<DocMeta[]>;
-  bulkSetDueDate: (ids: readonly string[], dueDate: number | null) => Promise<DocMeta[]>;
+  bulkSetCourse: (
+    ids: readonly string[],
+    course: string | null,
+  ) => Promise<DocMeta[]>;
+  bulkSetDueDate: (
+    ids: readonly string[],
+    dueDate: number | null,
+  ) => Promise<DocMeta[]>;
   bulkAddTag: (ids: readonly string[], tag: string) => Promise<DocMeta[]>;
   bulkRemoveTag: (ids: readonly string[], tag: string) => Promise<DocMeta[]>;
-  bulkSetFavourite: (ids: readonly string[], favourite: boolean) => Promise<DocMeta[]>;
-  bulkSetArchived: (ids: readonly string[], archived: boolean) => Promise<DocMeta[]>;
-  bulkSetPinned: (ids: readonly string[], pinned: boolean) => Promise<DocMeta[]>;
+  bulkSetFavourite: (
+    ids: readonly string[],
+    favourite: boolean,
+  ) => Promise<DocMeta[]>;
+  bulkSetArchived: (
+    ids: readonly string[],
+    archived: boolean,
+  ) => Promise<DocMeta[]>;
+  bulkSetPinned: (
+    ids: readonly string[],
+    pinned: boolean,
+  ) => Promise<DocMeta[]>;
   bulkDuplicate: (ids: readonly string[]) => Promise<DocMeta[]>;
   /** Delete many. ONE confirmation belongs in the UI, not here. */
   bulkRemove: (ids: readonly string[]) => Promise<number>;
@@ -237,8 +252,7 @@ export const useDocuments = (): UseDocumentsResult => {
       },
       bulkSetCourse: (ids, course) =>
         store.updateManyDocs(ids, { course: normalizeCoursePath(course) }),
-      bulkSetDueDate: (ids, dueDate) =>
-        store.updateManyDocs(ids, { dueDate }),
+      bulkSetDueDate: (ids, dueDate) => store.updateManyDocs(ids, { dueDate }),
       bulkAddTag: (ids, tag) =>
         tag.trim()
           ? store.setTagOnMany(ids, tag.trim(), true)

@@ -55,7 +55,8 @@ const hasTag = (doc: DocMeta, tag: string): boolean =>
 /** Documents opened within this window appear under "Recent". */
 export const RECENT_WINDOW_MS = 30 * DAY;
 
-export const isFavourite = (doc: DocMeta): boolean => hasTag(doc, FAVOURITE_TAG);
+export const isFavourite = (doc: DocMeta): boolean =>
+  hasTag(doc, FAVOURITE_TAG);
 
 export const isArchived = (doc: DocMeta): boolean => hasTag(doc, ARCHIVED_TAG);
 

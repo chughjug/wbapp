@@ -14,10 +14,7 @@
 
 import { useMemo } from "react";
 
-import {
-  REFERENCE_GROUPS,
-  UNDOCUMENTED_GESTURE_SETTINGS,
-} from "./gestureList";
+import { REFERENCE_GROUPS, UNDOCUMENTED_GESTURE_SETTINGS } from "./gestureList";
 
 import type { ReferenceEntry, ReferenceGroup } from "./gestureList";
 import type { InputSettings } from "../input";
@@ -67,7 +64,10 @@ const Row = ({
         {isOff && (
           <span className="gn-settings-ref__off">
             Off
-            <span className="gn-settings-sr"> — turned off in Pen &amp; touch</span>
+            <span className="gn-settings-sr">
+              {" "}
+              — turned off in Pen &amp; touch
+            </span>
           </span>
         )}
       </div>
@@ -93,7 +93,10 @@ const Group = ({
   const Heading = (headingLevel === 3 ? "h3" : "h4") as "h3" | "h4";
   return (
     <section aria-labelledby={`gn-ref-${group.id}`}>
-      <Heading className="gn-settings-ref__group-title" id={`gn-ref-${group.id}`}>
+      <Heading
+        className="gn-settings-ref__group-title"
+        id={`gn-ref-${group.id}`}
+      >
         {group.title}
       </Heading>
       <div>

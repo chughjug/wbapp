@@ -10,13 +10,7 @@ import React, { useId, useState } from "react";
 
 import { visibleTags } from "./filters";
 import { formatCoursePath } from "./coursePath";
-import {
-  Icon,
-  ICON_ARCHIVE,
-  ICON_CHECK,
-  ICON_CLOSE,
-  ICON_PIN,
-} from "./icons";
+import { Icon, ICON_ARCHIVE, ICON_CHECK, ICON_CLOSE, ICON_PIN } from "./icons";
 
 import type { CourseStyle } from "./courses";
 import type { DocMeta } from "../types";
