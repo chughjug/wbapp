@@ -11,7 +11,69 @@ below finish the job.
 
 ---
 
-## 0. What replaces what
+## 0. Band order (read this first)
+
+The shell is **not** a floating overlay any more. `NavBar` and `PagePanel`
+both default to `placement="flow"`, i.e. normal document flow, so they stack
+cleanly with the document tab strip (owned by another module):
+
+```
+┌─────────────────────────────────────────────┐
+│ document tabs            (another module)   │  band 1
+├─────────────────────────────────────────────┤
+│ NavBar — left │ centre tools │ right        │  band 2
+├──────────┬──────────────────────────────────┤
+│ PagePanel│ <Excalidraw> (zoom pill inside)  │  band 3 (a row)
+│  188px   │                                  │
+└──────────┴──────────────────────────────────┘
+```
+
+Three layout classes ship with the module (`NavBar.scss`), so you do not have
+to invent the flexbox:
+
+| class | what it does |
+| --- | --- |
+| `gn-shell-layout` | `display:flex; flex-direction:column; height:100%` — the three bands |
+| `gn-shell-body` | `display:flex; flex:1; min-height:0` — panel + canvas row |
+| `gn-shell-canvas` | `position:relative; flex:1; min-width:0` — the `<Excalidraw>` wrapper |
+
+Skeleton (the tab strip is yours to wire; the shell does not render it):
+
+```tsx
+<div className="gn-shell-layout">
+  <DocumentTabs … />              {/* band 1 — goodnotes/tabs */}
+  <NavBar … />                    {/* band 2 */}
+  <div className="gn-shell-body"> {/* band 3 */}
+    <PagePanel … />
+    <div className="gn-shell-canvas">
+      <Excalidraw …>…</Excalidraw>
+    </div>
+  </div>
+</div>
+```
+
+The root of that tree needs a height (`height: 100vh`, or `position: fixed;
+inset: 0`), as any full-height app shell does.
+
+### If you really want the bar to float
+
+Pass `placement="fixed"` to **both** `NavBar` and `PagePanel`. Then:
+
+* the bar is `position: fixed; top: 0; height: 52px` (`--gn-nav-height`,
+  `3.25rem`) and the page panel is fixed from `top: var(--gn-nav-height)` to
+  the bottom, overlaying the canvas;
+* with a tab strip above, you must offset both: set
+  `--gn-nav-height: calc(3.25rem + <tab strip height>)` on `:root` **and** add
+  `top: <tab strip height>` to `.gn-nav-scope--fixed` — i.e. two offsets to
+  maintain by hand, which is exactly why `flow` is the default.
+
+`goodnotes/taskbar`'s deprecated `Taskbar` alias still defaults to
+`placement="fixed"`, so the un-migrated call site in `App.tsx` keeps behaving
+like the old floating taskbar until you do step 3.
+
+---
+
+## 0b. What replaces what
 
 | Old surface | Replaced by |
 | --- | --- |
@@ -57,12 +119,15 @@ const [shellMode, setShellMode] = useState<ShellMode>("write");
 
 ## 3. Replace the `<Taskbar …>` element
 
-Replace the whole `<Taskbar … />` element (it sits just after `</Excalidraw>`)
-with:
+Delete the whole `<Taskbar … />` element (it currently sits just *after*
+`</Excalidraw>`) and rebuild the editor's markup as the three bands from §0 —
+the bar is no longer an overlay, so it must come *before* the canvas in the
+tree:
 
 ```tsx
 <NavBar
   excalidrawAPI={excalidrawAPI}
+  // placement="flow" is the default: a band, not an overlay
   suppressDefaultChrome
   theme={editorTheme}
   // ---- LEFT ----------------------------------------------------------
@@ -107,6 +172,10 @@ with:
   onClose={() => setIsPagePanelOpen(false)}
 />
 ```
+
+…placed inside the band skeleton of §0: `<NavBar>` directly under the tab
+strip, `<PagePanel>` as the first child of `.gn-shell-body`, and the existing
+`<Excalidraw>…</Excalidraw>` inside `.gn-shell-canvas`.
 
 Every callback is optional: **a missing callback hides its control.** The old
 taskbar props (`onFuzzySelect`/`fuzzySelectActive`, `onImportPdf`,
@@ -175,8 +244,9 @@ suppression is opt-in and fully reversible. It covers:
 * the mobile `MobileMenu` toolbars.
 
 It deliberately leaves `.layer-ui__wrapper__footer-left` — the zoom pill —
-alone. While `PagePanel` is open, a second body class
-(`gn-shell-page-panel-open`) nudges that pill clear of the 188px panel.
+alone. In `flow` placement the canvas starts to the right of the page panel,
+so the pill is already clear of it; in `fixed` placement a second body class
+(`gn-shell-page-panel-open`) nudges the pill clear instead.
 
 There is **no** `UIOptions` switch for those islands: `LayerUI` renders them
 whenever `defaultUIEnabled` is true, and the props that would remove them

@@ -118,9 +118,11 @@
     align-items: center;
     gap: 4px; /* keep in sync with LAYOUT.gap in ../taskbar/model.ts */
     min-width: 0;
-    /* a zone never paints outside its column, so the three zones cannot
-       visually collide however narrow the window gets */
-    overflow: hidden;
+    /* NOT `overflow: hidden`: the zones host the popovers, which must escape
+       the bar. Collisions are prevented by the measured centre budget (the
+       tools move into their overflow menu) rather than by clipping.
+       Below ~380px the side zones can still touch; the bar itself never
+       scrolls horizontally. */
 
     &--left {
       justify-content: flex-start;
@@ -467,12 +469,5 @@ body.gn-shell-suppress-default-ui {
     > * {
       pointer-events: auto;
     }
-  }
-
-  /* leave room for the bar itself: Excalidraw's fixed top container starts
-     below it, and the welcome screen hint no longer points at a hidden
-     toolbar */
-  .excalidraw .FixedSideContainer_side_top {
-    top: calc(var(--gn-nav-height) + var(--editor-container-padding, 0px));
   }
 }

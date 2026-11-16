@@ -13,6 +13,11 @@
  *    - RIGHT: undo/redo, import PDF, add page │ Share (primary), "…"
  * 2. {@link PagePanel} — the ~188px left rail of page thumbnails.
  *
+ * Both default to `placement="flow"`: they are BANDS in the host's layout
+ * (document tabs / nav bar / page panel + canvas), not overlays. The helper
+ * classes `gn-shell-layout`, `gn-shell-body` and `gn-shell-canvas` ship with
+ * `NavBar.scss`. Pass `placement="fixed"` for the old floating behaviour.
+ *
  * The bottom-left zoom pill is deliberately left alone.
  *
  * ```tsx
@@ -54,7 +59,7 @@
  * its control.
  */
 export { NavBar } from "./NavBar";
-export type { NavBarProps, ShellMode } from "./NavBar";
+export type { NavBarProps, ShellMode, ShellPlacement } from "./NavBar";
 
 /**
  * Body classes this module toggles. `SUPPRESS_DEFAULT_CHROME_CLASS` is added
