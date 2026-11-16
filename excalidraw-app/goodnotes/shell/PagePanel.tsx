@@ -116,6 +116,10 @@ export const PagePanel = ({
 }: PagePanelProps) => {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  // read by the document-level Escape listener, which must not be re-bound
+  // every time the host hands us a fresh closure
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const resolvedVariant =
     variant ?? (placement === "flow" ? "inline" : "overlay");
@@ -147,6 +151,9 @@ export const PagePanel = ({
     const first = node?.querySelector<HTMLElement>(FOCUSABLE);
     (first ?? node)?.focus();
     return () => {
+      // Reading the ref *in cleanup* is the point: focus must go wherever the
+      // Pages control is at close time, not where it was at open time.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       const target = returnFocusTo?.current ?? openerRef.current;
       // the opener may have unmounted (document switch); never throw for it
       if (target && document.contains(target)) {
@@ -155,43 +162,55 @@ export const PagePanel = ({
     };
   }, [open, isOverlay, returnFocusTo]);
 
-  const onKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        onClose?.();
+  // Escape is handled on the document, in the capture phase, rather than on
+  // the dialog: focus can legitimately be elsewhere for a moment (React runs
+  // effects twice in StrictMode, and the editor steals focus back on some
+  // scene updates), and an overlay you cannot dismiss with Escape is a trap.
+  // Capture also beats Excalidraw's own window-level Escape handling.
+  useEffect(() => {
+    if (!open || !isOverlay || typeof document === "undefined") {
+      return;
+    }
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) {
         return;
       }
-      if (event.key !== "Tab") {
-        return;
-      }
-      const node = dialogRef.current;
-      if (!node) {
-        return;
-      }
-      const items = Array.from(
-        node.querySelectorAll<HTMLElement>(FOCUSABLE),
-      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
-      if (!items.length) {
-        event.preventDefault();
-        node.focus();
-        return;
-      }
-      const first = items[0];
-      const last = items[items.length - 1];
-      const current = document.activeElement as HTMLElement | null;
-      // wrap at both ends: focus never escapes the dialog while it is open
-      if (event.shiftKey && (current === first || current === node)) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && current === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    },
-    [onClose],
-  );
+      event.preventDefault();
+      event.stopPropagation();
+      onCloseRef.current?.();
+    };
+    document.addEventListener("keydown", onEscape, true);
+    return () => document.removeEventListener("keydown", onEscape, true);
+  }, [open, isOverlay]);
+
+  const onKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab") {
+      return;
+    }
+    const node = dialogRef.current;
+    if (!node) {
+      return;
+    }
+    const items = Array.from(
+      node.querySelectorAll<HTMLElement>(FOCUSABLE),
+    ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+    if (!items.length) {
+      event.preventDefault();
+      node.focus();
+      return;
+    }
+    const first = items[0];
+    const last = items[items.length - 1];
+    const current = document.activeElement as HTMLElement | null;
+    // wrap at both ends: focus never escapes the dialog while it is open
+    if (event.shiftKey && (current === first || current === node)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && current === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }, []);
 
   if (!open) {
     // zero cost when closed: no scrim, no panel, no column, no width
@@ -259,7 +278,9 @@ export const PagePanel = ({
           and the close button are the keyboard routes */}
       <div
         className="gn-page-overlay__scrim"
-        onPointerDown={onClose}
+        // `click`, not `pointerdown`: the browser's own focus shift happens
+        // between the two, and would land after our focus restore otherwise
+        onClick={onClose}
         aria-hidden="true"
         data-testid="goodnotes-page-overlay-scrim"
       />

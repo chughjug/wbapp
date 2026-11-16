@@ -1,6 +1,11 @@
 /**
  * The document tab strip.
  *
+ * It renders ONLY when more than one document is open (override with
+ * `showWhenSingle`). With a single document a full-width strip that names the
+ * document you are already looking at is pure chrome; the title lives in the
+ * floating bar's "…" menu instead.
+ *
  * Presentational: it renders the tabs it is given and calls back. Navigation
  * is the host's job — activating a tab calls `onActivate(docId)` and the host
  * pushes `/d/<id>`; this component never touches `history`.
@@ -53,6 +58,16 @@ export interface TabBarProps {
   className?: string;
   /** Accessible name for the tablist. */
   label?: string;
+  /**
+   * Render the strip even when only one document is open. Default `false`.
+   *
+   * With a single document the strip is pure cost — a full-width band whose
+   * only job is to name the document you are already looking at. That name
+   * now lives in the floating bar: it heads the "…" menu and describes the
+   * Home control. The strip reappears the moment a second document is open,
+   * which is the only point at which it is doing anything.
+   */
+  showWhenSingle?: boolean;
 }
 
 const FALLBACK_TITLE = "Untitled notebook";
@@ -130,6 +145,7 @@ export const TabBar = ({
   theme = "light",
   className,
   label = "Open documents",
+  showWhenSingle = false,
 }: TabBarProps) => {
   const listRef = useRef<HTMLDivElement | null>(null);
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -314,6 +330,12 @@ export const TabBar = ({
     setDragId(null);
     setDropIndex(null);
   }, [dragId, dropIndex, ids, onReorder]);
+
+  // Zero cost below two documents: no band, no height, no scrollport. The
+  // hooks above have all already run, so this early return is legal.
+  if (tabs.length <= 1 && !showWhenSingle) {
+    return null;
+  }
 
   if (tabs.length === 0 && !onNewTab) {
     return null;

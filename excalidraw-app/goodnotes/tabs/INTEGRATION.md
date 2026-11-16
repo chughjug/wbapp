@@ -2,6 +2,25 @@
 
 Everything below lives in `excalidraw-app/goodnotes/tabs/`. The only file you need to change to adopt it is `excalidraw-app/App.tsx` (plus three lines of CSS in `excalidraw-app/index.scss`, if you want the band to push the editor down rather than float over it).
 
+## 0. The strip only renders with more than one document open
+
+**This changed.** With a single document the strip was pure cost: a full-width band (1152x29 = 33,012 px², 3.3% of an iPad Pro 11" viewport) whose only job was to name the document you were already looking at. `TabBar` now returns `null` when `tabs.length <= 1`, so there is no band, no height and no node in the DOM.
+
+The title it used to carry lives in `goodnotes/shell`'s floating bar instead: pass `documentTitle` and it heads the "…" menu and describes the Home control. See `goodnotes/shell/INTEGRATION.md` §2c.
+
+Two consequences for the host:
+
+- **The strip's "+" disappears with one document.** `onNewTab` sent the user back to the library to pick a document; with one document open that route is the bar's **Home** control, and "a brand-new document" is the bar's "…" → **New document**. Both are already wired, so nothing is lost — but do not rely on the strip's "+" being there.
+- **Nothing else changes.** Open a second document and the strip comes back, with every tab, drag-reorder and keyboard behaviour it had.
+
+Pass `showWhenSingle` if you want the old always-on behaviour:
+
+```tsx
+<TabBar … showWhenSingle />
+```
+
+No other prop changed.
+
 ## What this module is, and is not
 
 It is **the tab strip and the open-document model**: an ordered list of open document ids with an active one, persisted to `localStorage`, plus a bar that renders them.

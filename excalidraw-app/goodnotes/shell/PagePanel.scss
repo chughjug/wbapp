@@ -1,18 +1,73 @@
 /**
- * Left page panel.
+ * Page overlay.
  *
- * Two jobs only: the panel frame (fixed column under the nav bar) and a
- * re-skin of `goodnotes/pages`' `PageSidebar`, scoped under `.gn-page-panel`
- * so the sidebar keeps working unchanged anywhere else it is mounted.
+ * Two jobs only: the overlay frame (scrim + slide-over dialog, anchored to the
+ * editor stage) and a re-skin of `goodnotes/pages`' `PageSidebar`, scoped
+ * under `.gn-page-panel` so the sidebar keeps working unchanged anywhere else
+ * it is mounted.
  *
- * Colour tokens follow the same rule as the nav bar: Excalidraw's own custom
+ * The panel used to be a column in the layout. It is now a dialog: when it is
+ * closed nothing is rendered at all, so it costs zero permanent chrome.
+ *
+ * Colour tokens follow the same rule as the bar: Excalidraw's own custom
  * properties, never `--color-muted` (a background grey) or
  * `--keybinding-color` (~1.9:1) as text.
  */
 
+/* ---------------------------------------------------------------------------
+   The overlay: scrim + slide-over, filling the nearest positioned ancestor
+   (the stage, `.gn-shell-stage` / `.gn-shell-body`). It is only ever in the
+   DOM while open.
+   --------------------------------------------------------------------------- */
+
+.gn-page-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 130; /* over the canvas and the floating bar, under modals (1000) */
+  display: flex;
+  /* `.excalidraw` (worn for its theme tokens) would otherwise impose its own
+     box model here */
+  width: auto;
+  height: auto;
+  overflow: visible;
+
+  &[data-side="right"] {
+    justify-content: flex-end;
+  }
+
+  &__scrim {
+    position: absolute;
+    inset: 0;
+    background-color: rgb(0 0 0 / 32%);
+    animation: gn-page-overlay-fade 140ms ease-out;
+  }
+}
+
+.theme--dark.gn-page-overlay .gn-page-overlay__scrim {
+  background-color: rgb(0 0 0 / 52%);
+}
+
+@keyframes gn-page-overlay-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes gn-page-overlay-slide-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes gn-page-overlay-slide-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+/* The dialog itself. The root also scopes the theme tokens, so `.excalidraw`'s
+   full-size flex base rule is undone here. */
 .gn-page-panel.gn-page-panel {
-  /* `.excalidraw` (worn for its theme tokens) is a full-size box; its
-     `height`/`width` are undone here so the panel can size itself. */
   height: auto;
   width: auto;
 
@@ -22,32 +77,50 @@
   overflow: hidden;
 
   background-color: var(--island-bg-color, #fff);
-  border-right: 1px solid var(--color-border-outline-variant, #c5c5d0);
-  box-shadow: 1px 0 3px rgb(0 0 0 / 6%);
-
-  font-family: var(--ui-font, system-ui, sans-serif);
   color: var(--text-primary-color, #1b1b1f);
+  font-family: var(--ui-font, system-ui, sans-serif);
 
-  /* DEFAULT: the first column of the shell's body row — a sibling of the
-     canvas, not an overlay. Width comes from the inline style. */
-  &.gn-page-panel--flow {
+  &:focus {
+    outline: none;
+  }
+
+  /* DEFAULT: the slide-over. Width comes from the inline style. */
+  &.gn-page-panel--overlay {
+    position: relative;
+    z-index: 1;
+    max-width: 86%;
+    height: 100%;
+    box-shadow: 0 0 40px rgb(0 0 0 / 22%);
+    animation: gn-page-overlay-slide-left 180ms cubic-bezier(0.2, 0, 0, 1);
+
+    &.gn-page-panel--left {
+      border-right: 1px solid var(--color-border-outline-variant, #c5c5d0);
+    }
+
+    &.gn-page-panel--right {
+      border-left: 1px solid var(--color-border-outline-variant, #c5c5d0);
+      animation-name: gn-page-overlay-slide-right;
+    }
+  }
+
+  /* LEGACY: the docked column. Kept for hosts that have not migrated; this is
+     the shape the redesign removed, because it holds a column whether or not
+     anyone is looking at it. */
+  &.gn-page-panel--inline {
     position: relative;
     inset: auto;
     flex: 0 0 auto;
     height: 100%;
     align-self: stretch;
+    border-right: 1px solid var(--color-border-outline-variant, #c5c5d0);
+    box-shadow: 1px 0 3px rgb(0 0 0 / 6%);
   }
+}
 
-  /* Pinned to the left edge, overlaying the canvas, starting below a nav bar
-     that is itself `placement="fixed"`. */
-  &.gn-page-panel--fixed {
-    position: fixed;
-    top: var(--gn-nav-height, 3.25rem);
-    left: 0;
-    bottom: 0;
-    right: auto;
-    z-index: 124;
-  }
+.gn-page-panel-inline {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 /* children & re-skin: plain class, so `&__x` concatenation is correct */
@@ -168,6 +241,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .gn-page-overlay,
+  .gn-page-overlay *,
   .gn-page-panel,
   .gn-page-panel * {
     transition: none !important;
@@ -178,23 +253,11 @@
 
 @media (forced-colors: active) {
   .gn-page-panel {
-    border-right: 1px solid CanvasText;
+    border: 1px solid CanvasText;
   }
-}
 
-/**
- * Keep Excalidraw's bottom-left footer — the small zoom / undo pill, which
- * this shell deliberately does NOT absorb — clear of the open panel.
- */
-body.gn-shell-page-panel-open {
-  .excalidraw .layer-ui__wrapper__footer-left {
-    margin-inline-start: var(--gn-page-panel-width, 188px);
-    transition: margin-inline-start 120ms ease;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  body.gn-shell-page-panel-open .excalidraw .layer-ui__wrapper__footer-left {
-    transition: none;
+  .gn-page-overlay__scrim {
+    background-color: Canvas;
+    opacity: 0.8;
   }
 }

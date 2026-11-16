@@ -1,233 +1,292 @@
 # Integrating the GoodNotes shell (`goodnotes/shell`)
 
-One bar, three zones, plus the left page panel. This file is the exact set of `App.tsx` changes; the shell module itself needs nothing else.
-
-Nothing here is wired into `App.tsx` yet — **except** that `goodnotes/taskbar`'s `Taskbar` export is now a deprecated alias for `NavBar`, so the app keeps compiling and already renders the new bar (with its left zone empty, because the old call site passes no left-zone callbacks). Steps 1–5 below finish the job.
+**One floating bar, plus a page overlay.** This file is the exact, copy-pasteable set of `App.tsx` changes. The shell module itself needs nothing else.
 
 ---
 
-## 0. Band order (read this first)
+## 0. What changed
 
-The shell is **not** a floating overlay any more. `NavBar` and `PagePanel` both default to `placement="flow"`, i.e. normal document flow, so they stack cleanly with the document tab strip (owned by another module):
+Measured on an iPad Pro 11" viewport (1194x834) with a document open, the editor's *permanent* chrome was **28.5%** of the screen across six surfaces. `goodnotes/shell` owned two of the worst — the 189x656 page rail (123,954 px²) and the 1194x52 nav bar — plus, with `goodnotes/tabs`, the 1152x29 tab strip.
+
+| before (shell + tabs) | after |
+| --- | --- |
+| nav bar: a 1194x52 full-width band, ~20 controls in three zones | one **380x46 floating pill**, 9 visible controls, `position: absolute`, centred near the top, rounded, translucent with a backdrop blur |
+| page panel: a 189px column that held its place whether open or not | a **slide-over dialog**: closed, nothing is rendered at all |
+| tab strip: always on | renders **only with more than one document open** |
+
+Measured again after the change, same method, same viewport, one document open:
+
+```
+  the one bar                    380x 46 =   17481 px²   floats over the canvas
+  zoom pill (Excalidraw's own)   178x 36 =    6393 px²
+  TOTAL                                      23874 px² of 995796
+  CHROME 2.40%   CANVAS 97.60%
+```
+
+The bar does not displace the canvas: with the overlay closed the editor box is the full 1194x834 and the page gets the whole height.
+
+---
+
+## 1. Band order → ONE stage
+
+There are no bands left. The host needs **one positioned stage**; the bar and the page overlay are absolutely positioned children of it, over the canvas:
 
 ```
 ┌─────────────────────────────────────────────┐
-│ document tabs            (another module)   │  band 1
+│ document tabs      (only with >1 document)  │  a band, still
 ├─────────────────────────────────────────────┤
-│ NavBar — left │ centre tools │ right        │  band 2
-├──────────┬──────────────────────────────────┤
-│ PagePanel│ <Excalidraw> (zoom pill inside)  │  band 3 (a row)
-│  188px   │                                  │
-└──────────┴──────────────────────────────────┘
+│ .gn-shell-stage  (position: relative)       │
+│   ┌───────────────────────────────────────┐ │
+│   │ .gn-shell-canvas → <Excalidraw>       │ │
+│   │        ╭────── FloatingBar ──────╮    │ │   absolute, top: 10px
+│   │        ╰──────────────────────────╯    │ │
+│   │  [PagePanel: scrim + slide-over]      │ │   absolute, only when open
+│   └───────────────────────────────────────┘ │
+└─────────────────────────────────────────────┘
 ```
 
-Three layout classes ship with the module (`NavBar.scss`), so you do not have to invent the flexbox:
+Three classes ship with the module (`FloatingBar.scss`):
 
 | class | what it does |
 | --- | --- |
-| `gn-shell-layout` | `display:flex; flex-direction:column; height:100%` — the three bands |
-| `gn-shell-body` | `display:flex; flex:1; min-height:0` — panel + canvas row |
+| `gn-shell-layout` | `display:flex; flex-direction:column; height:100%` — tab strip, then stage |
+| `gn-shell-stage` | `position:relative; display:flex; flex:1; min-height:0` — **the positioning context the bar and the overlay anchor to** |
 | `gn-shell-canvas` | `position:relative; flex:1; min-width:0` — the `<Excalidraw>` wrapper |
 
-Skeleton (the tab strip is yours to wire; the shell does not render it):
+**`gn-shell-body` is kept as an exact alias of `gn-shell-stage`.** It is now `position: relative`, so if you only move `<FloatingBar>` *inside* your existing `.gn-shell-body` you are already correct and need not rename anything.
 
-```tsx
-<div className="gn-shell-layout">
-  <DocumentTabs … />              {/* band 1 — goodnotes/tabs */}
-  <NavBar … />                    {/* band 2 */}
-  <div className="gn-shell-body"> {/* band 3 */}
-    <PagePanel … />
-    <div className="gn-shell-canvas">
-      <Excalidraw …>…</Excalidraw>
-    </div>
-  </div>
-</div>
-```
+### The one thing you must change
 
-The root of that tree needs a height (`height: 100vh`, or `position: fixed; inset: 0`), as any full-height app shell does.
-
-### If you really want the bar to float
-
-Pass `placement="fixed"` to **both** `NavBar` and `PagePanel`. Then:
-
-- the bar is `position: fixed; top: 0; height: 52px` (`--gn-nav-height`, `3.25rem`) and the page panel is fixed from `top: var(--gn-nav-height)` to the bottom, overlaying the canvas;
-- with a tab strip above, you must offset both: set `--gn-nav-height: calc(3.25rem + <tab strip height>)` on `:root` **and** add `top: <tab strip height>` to `.gn-nav-scope--fixed` — i.e. two offsets to maintain by hand, which is exactly why `flow` is the default.
-
-`goodnotes/taskbar`'s deprecated `Taskbar` alias still defaults to `placement="fixed"`, so the un-migrated call site in `App.tsx` keeps behaving like the old floating taskbar until you do step 3.
+`<FloatingBar>` is `position: absolute`. It anchors to the nearest positioned ancestor. Today that is `.excalidraw-app` (which has an inline `position: relative`), **not** the stage — so with two documents open the pill lands on top of the tab strip. Move it inside the stage and the problem goes away.
 
 ---
 
-## 0b. What replaces what
+## 2. The `App.tsx` diff
 
-| Old surface | Replaced by |
-| --- | --- |
-| `<Taskbar>` (centred bar) | `<NavBar>` — three zones |
-| Excalidraw shapes toolbar | NavBar CENTRE zone (CSS-suppressed) |
-| Top-left hamburger island (`.App-menu_top__left`) | NavBar RIGHT zone + "…" (CSS-suppressed) |
-| Top-right island (`.layer-ui__wrapper__top-right`) | NavBar RIGHT zone: Share (CSS-suppressed) |
-| Right-hand page `Sidebar name="goodnotes-pages"` | `<PagePanel>` on the left |
-| Floating `<PenTray>` | NavBar pen/highlighter/eraser + the floating Active Tool Menu |
-| Bottom-left zoom pill | **kept as-is** — deliberately not absorbed |
+### 2a. Import
+
+```diff
+-import { NavBar, PagePanel } from "./goodnotes/shell";
++import { FloatingBar, PagePanel } from "./goodnotes/shell";
+```
+
+(`NavBar` is still exported as a deprecated alias for `FloatingBar`, so this rename is optional — but every name below assumes you did it.)
+
+### 2b. The page overlay starts closed
+
+```diff
+-  const [isPagePanelOpen, setIsPagePanelOpen] = useState(true);
++  // the page rail is a dialog now; a dialog's resting state is closed
++  const [isPagePanelOpen, setIsPagePanelOpen] = useState(false);
+```
+
+### 2c. Replace the whole `<NavBar> … </div>` block
+
+Delete the `<TabBar>` / `<NavBar>` / `<ToolMenu>` / `.gn-shell-body` markup you have today and use this. The three things that moved are marked:
+
+```tsx
+      {/* the tab strip renders only when more than one document is open */}
+      <TabBar
+        tabs={openDocs.tabs}
+        activeId={openDocs.activeId}
+        theme={editorTheme}
+        onActivate={onActivateTab}
+        onClose={onCloseTab}
+        onReorder={openDocs.actions.reorder}
+        onCloseOthers={openDocs.actions.closeOthers}
+        onNewTab={onNewDocument}
+      />
+      {/* ONE stage: canvas, then the bar and the overlay floating over it */}
+      <div className="gn-shell-stage">
+        <div className="gn-shell-canvas">
+          <PaperBackgroundLayer
+            /* …unchanged… */
+          />
+          <Excalidraw /* …unchanged… */>
+            {/* …unchanged children… */}
+          </Excalidraw>
+        </div>
+
+        {/* MOVED: the bar is now a child of the stage, not a band */}
+        <FloatingBar
+          excalidrawAPI={excalidrawAPI}
+          suppressDefaultChrome
+          theme={editorTheme}
+          // ---- identity ----------------------------------------------
+          onHome={onCloseDocument}
+          // NEW: with one document there is no tab strip to carry the title,
+          // so it heads the "…" menu and describes the Home control
+          documentTitle={openDocs.tabs.find((t) => t.id === docId)?.meta?.title}
+          pagePanelOpen={isPagePanelOpen}
+          onTogglePagePanel={() => setIsPagePanelOpen((v) => !v)}
+          pageCount={pages.length}
+          currentPage={currentPageNumber ?? undefined}
+          // ---- tools ---------------------------------------------------
+          onActiveToolMenu={(tool, anchor) => {
+            if (
+              tool === "pen" ||
+              tool === "highlighter" ||
+              tool === "eraser" ||
+              tool === "shape" ||
+              tool === "text"
+            ) {
+              toolMenu.onToolSelect(tool, anchor);
+            }
+          }}
+          onFuzzySelect={() => {
+            backdrops.close();
+            toggleFuzzySelect();
+          }}
+          fuzzySelectActive={isFuzzySelectActive}
+          // ---- "+" (secondary inserts) ---------------------------------
+          onImportPdf={() => {
+            deactivateFuzzySelect();
+            setIsPdfImportOpen(true);
+          }}
+          // MOVED: graph belongs under "+", not in the "…" overflow
+          onInsertGraph={() => graph.open()}
+          // ---- "…" (document actions) ----------------------------------
+          onNewDocument={onNewDocument}
+          onUndo={input.undo}
+          onRedo={input.redo}
+          onAddPage={newPage.open}
+          onExportPdf={() => {
+            deactivateFuzzySelect();
+            setIsPdfExportOpen(true);
+          }}
+          onOpenBackdrops={() => {
+            // the lasso overlay is modal and covers the window
+            deactivateFuzzySelect();
+            backdrops.open();
+          }}
+          backdropsActive={backdrops.isOpen}
+          backdropsDisabled={!backdrops.hasImageSelection}
+          // NEW: this app controls the editor theme itself (goodnotes/dark
+          // feeds <Excalidraw theme={editorTheme}>), so the bar's own
+          // fallback cannot win — wire it explicitly. See §5.
+          onToggleTheme={() =>
+            setAppTheme(editorTheme === "dark" ? "light" : "dark")
+          }
+          moreItems={[
+            {
+              id: "settings",
+              label: "Settings…",
+              onSelect: () => settings.open(),
+            },
+          ]}
+        />
+
+        {/* MOVED: the overlay is a child of the stage and renders nothing
+            at all while closed */}
+        <PagePanel
+          excalidrawAPI={excalidrawAPI}
+          open={isPagePanelOpen}
+          onClose={() => setIsPagePanelOpen(false)}
+          theme={editorTheme}
+          onAddPage={newPage.open}
+          docId={docId ?? undefined}
+        />
+
+        {/* the active tool's settings — owned by goodnotes/tool-menu */}
+        <ToolMenu {...toolMenu.menuProps} />
+      </div>
+```
+
+`setAppTheme` already comes out of the `useDarkMode()` call at the top of the component — no new import.
+
+Everything else in the file (the `PaperBackgroundLayer` props, the `<Excalidraw>` element and its children, the dialogs after it) is unchanged. `PaperBackgroundLayer` stays a sibling of `<Excalidraw>` inside `.gn-shell-canvas`, so its `offsetLeft={0} offsetTop={0}` reasoning still holds: with the page rail out of the layout, that box is now the whole stage.
+
+### 2d. Props that no longer exist
+
+The three-zone band had an inline search field, an inline Write/Read segmented control and an inline `Share` button. Those *capabilities* survive as `onToggleSearch`, `mode`/`onModeChange` and `onShare`/`shareLabel`, now rendered as items in the "…" menu. The band-only props `searchQuery`, `onSearchChange`, `onSearchSubmit` and `searchPlaceholder` are gone. `App.tsx` passes none of them, so nothing to do.
 
 ---
 
-## 1. Imports
+## 3. Capability audit
 
-```diff
--import { Taskbar } from "./goodnotes/taskbar";
-+import { NavBar, PagePanel } from "./goodnotes/shell";
-+import type { ShellMode } from "./goodnotes/shell";
-```
+Everything the old nav bar exposed, and where it is now. **Nothing became impossible; nothing is more than one tap further away.** Each row was clicked through in a browser at 1194x834.
 
-`PageSidebar` is no longer imported by `App.tsx` (the panel wraps it):
+| capability | old home | new home | taps |
+| --- | --- | --- | --- |
+| home | left zone button | **Home** control on the bar | 1 → 1 |
+| pages panel | left zone toggle | **Pages** control (opens the overlay) | 1 → 1 |
+| page counter "n/N" | folded into the Pages toggle | same, on the Pages control | — |
+| select | centre zone | bar | 1 → 1 |
+| lasso / **fuzzy select** | centre zone | bar (`onFuzzySelect` still backs the slot) | 1 → 1 |
+| pen | centre zone | bar | 1 → 1 |
+| highlighter | centre zone | bar | 1 → 1 |
+| eraser | centre zone | bar | 1 → 1 |
+| text | centre zone | "+" → Text | 1 → 2 |
+| shapes (rectangle, ellipse, diamond, arrow, line) | centre zone menu | "+" → Shapes | 2 → 2 |
+| image | centre zone | "+" → Image | 1 → 2 |
+| sticky note | centre zone | "+" → Sticky note | 1 → 2 |
+| **import PDF** | right zone | "+" → Import PDF… | 1 → 2 |
+| **insert graph** | "…" (host `moreItems`) | "+" → Insert graph… (`onInsertGraph`) | 2 → 2 |
+| **new document** | left zone | "…" → New document | 1 → 2 |
+| **add page** | right zone | "…" → Add page (also the overlay's own `+ Add page` footer) | 1 → 2 |
+| **undo** | right zone | "…" → Undo (also Excalidraw's zoom pill, also Ctrl/Cmd+Z) | 1 → 2 |
+| **redo** | right zone | "…" → Redo (also the zoom pill, also Ctrl/Cmd+Shift+Z) | 1 → 2 |
+| **export PDF** | "…" | "…" → Export to PDF… | 2 → 2 |
+| **backdrops** | "…" | "…" → Image backdrop… (ticked while open) | 2 → 2 |
+| **settings** | "…" (host `moreItems`) | "…" → Settings… (host `moreItems`, unchanged) | 2 → 2 |
+| **theme** | *nowhere* — Excalidraw's hamburger island, which `suppressDefaultChrome` hides | "…" → Dark/Light theme | ∞ → 2 |
+| share | right zone primary button | "…" → Share (`onShare`; this app passes none, so no item) | 1 → 2 |
+| search | left zone field/button | "…" → Search… (`onToggleSearch`; this app passes none) | 1 → 2 |
+| Write / Read | left zone segmented control | "…" → Read mode (`onModeChange`; this app passes none) | 1 → 2 |
+| tool settings (colour, width) | never here | unchanged: the floating Active Tool Menu, via `onActiveToolMenu` | — |
+| zoom / fit | never here | unchanged: Excalidraw's bottom-left pill, deliberately not absorbed | — |
 
-```diff
- import {
--  PageSidebar,
-   usePages,
-   …
- } from "./goodnotes/pages";
-```
+### Deliberately dropped
 
-Also drop `import { PenTray } from "./goodnotes/pens";` once you remove the tray (step 4). Leave the rest of `goodnotes/pens` in place.
+1. **The inline search *field*.** Search itself is still reachable (`onToggleSearch` → "…" → Search…), but a 16rem text input cannot live in a 46px pill without the pill becoming a band again. The host's own search UI is the right place for a field.
+2. **The centre cluster's measured overflow solver** (`planOverflow`). With a fixed set of 9 controls there is nothing to solve; the bar is ~380px wide and fits every viewport down to ~400px. `planOverflow` is still exported from `goodnotes/taskbar` for anyone who wants it.
+3. **The `Share` button's "primary" styling.** Share is a menu item now, not a filled button. The capability is intact; the emphasis is not. If Share matters more than this to you, say so and it gets a slot.
+4. **The separate "more tools" overflow menu.** There is one "+" and one "…" instead of three menus.
 
-## 2. Two pieces of state
+Nothing else was dropped.
 
-Inside the editor component, next to the other `useState`s:
+---
 
-```tsx
-const [isPagePanelOpen, setIsPagePanelOpen] = useState(true);
-const [shellMode, setShellMode] = useState<ShellMode>("write");
-```
+## 4. Accessibility
 
-## 3. Replace the `<Taskbar …>` element
+Implemented and checked in a browser:
 
-Delete the whole `<Taskbar … />` element (it currently sits just _after_ `</Excalidraw>`) and rebuild the editor's markup as the three bands from §0 — the bar is no longer an overlay, so it must come _before_ the canvas in the tree:
+- **The bar is one `role="toolbar"`** with `aria-orientation="horizontal"`: a single tab stop, roving tabindex, Arrow Left/Right to move, Home/End to the ends.
+  - Those keys are bound on the *document* in the capture phase, not as a React handler on the bar. `goodnotes/paged` claims Arrow/Home/End at document capture to turn the page, and its guard is "the target is inside `.excalidraw`" — which the bar's root is, because that is the scope Excalidraw's colour tokens live in. Capturing and calling `preventDefault()` gets the keys back (that controller bails on `defaultPrevented`) without either module reaching into the other.
+- **`aria-pressed` on all five tool toggles**, mirrored from `excalidrawAPI.onChange`, so it stays true when a keyboard shortcut or the Active Tool Menu changes the tool. Read mode uses `aria-disabled`, never `disabled`, so the toolbar never loses its tab stop.
+- **Every icon control has a visually-hidden text name** (`.gn-bar__sr`), plus a `title`.
+- **"+" and "…" are real menus**: `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`; `role="menu"` / `role="menuitem"`; focus moves to the first item on open; Escape, Tab, an outside pointerdown and selecting an item all close and return focus to the trigger.
+- **The page overlay is a labelled dialog**: `role="dialog"`, `aria-modal="true"`, `aria-label="Pages panel"`; focus moves in on open; Tab and Shift+Tab wrap inside it (14 Tabs never escape); Escape (document capture, so it works wherever focus drifted) and a scrim click both dismiss; focus returns to the Pages control either way. The Pages control carries `aria-haspopup="dialog"` + `aria-expanded`.
+- **`:focus-visible` rings** (`--focus-highlight-color`, 2px, 1px offset) are visible against both themes and against the translucent bar.
+- **`@media (prefers-reduced-motion: reduce)`** removes every transition and both overlay animations.
+- **`@media (forced-colors: active)`** gives the bar a `CanvasText` border, an opaque `Canvas` background and drops the blur.
+- **Colour comes only from Excalidraw's custom properties**, funnelled through local `--gn-bar-*` properties that are redeclared under `.theme--dark`, so even the `var()` fallbacks are theme-correct. `--color-muted` (a *background* grey) and `--keybinding-color` (~1.9:1 on white) are not used. De-emphasised text — the "2/12" counter — uses `--input-label-color` (#495057 light / #e9ecef dark).
 
-```tsx
-<NavBar
-  excalidrawAPI={excalidrawAPI}
-  // placement="flow" is the default: a band, not an overlay
-  suppressDefaultChrome
-  theme={editorTheme}
-  // ---- LEFT ----------------------------------------------------------
-  pagePanelOpen={isPagePanelOpen}
-  onTogglePagePanel={() => setIsPagePanelOpen((open) => !open)}
-  onToggleSearch={() =>
-    excalidrawAPI?.toggleSidebar({ name: "default", tab: "search" })
-  }
-  mode={shellMode}
-  onModeChange={setShellMode}
-  // ---- CENTRE (tools) ------------------------------------------------
-  onFuzzySelect={() => {
-    backdrops.close();
-    toggleFuzzySelect();
-  }}
-  fuzzySelectActive={isFuzzySelectActive}
-  // ---- RIGHT ---------------------------------------------------------
-  onImportPdf={() => {
-    deactivateFuzzySelect();
-    setIsPdfImportOpen(true);
-  }}
-  onExportPdf={() => {
-    deactivateFuzzySelect();
-    setIsPdfExportOpen(true);
-  }}
-  onOpenBackdrops={() => {
-    // the lasso overlay is modal and covers the window
-    deactivateFuzzySelect();
-    backdrops.open();
-  }}
-  backdropsActive={backdrops.isOpen}
-  backdropsDisabled={!backdrops.hasImageSelection}
-  onAddPage={() => addPage()}
-  pageCount={pages.length}
-  currentPage={currentPageNumber ?? undefined}
-  onShare={() => setShareDialogState({ isOpen: true, type: "share" })}
-/>
-<PagePanel
-  excalidrawAPI={excalidrawAPI}
-  open={isPagePanelOpen}
-  theme={editorTheme}
-  onClose={() => setIsPagePanelOpen(false)}
-/>
-```
+### Pointer
 
-…placed inside the band skeleton of §0: `<NavBar>` directly under the tab strip, `<PagePanel>` as the first child of `.gn-shell-body`, and the existing `<Excalidraw>…</Excalidraw>` inside `.gn-shell-canvas`.
+A bar floating over the canvas must not swallow drawing. The bar's full-width positioning wrapper (`.gn-bar-scope`) is `pointer-events: none` throughout; only the pill takes pointer events. Verified in a browser: 6px below, 6px above and 10px to the right of the pill all hit-test to `canvas.excalidraw__canvas`, the pill's own centre hit-tests to its button, and a stroke started 10px under the pill draws ink on the page beneath.
 
-Every callback is optional: **a missing callback hides its control.** The old taskbar props (`onFuzzySelect`/`fuzzySelectActive`, `onImportPdf`, `onExportPdf`, `onOpenBackdrops`/`backdropsActive`/`backdropsDisabled`, `onAddPage`, `pageCount`, `currentPage`) all mean exactly what they used to.
+While the overlay is open its scrim (z-index 130) is above the bar (125), as a modal's scrim should be. That means the Pages control cannot be *clicked* to close the overlay — Escape, the overlay's close button, and a scrim click (including a click where the Pages control is) all do it.
 
-### Optional: undo / redo in the right zone
+---
 
-`ExcalidrawImperativeAPI` exposes no `undo()`/`redo()` in this fork (only `history.clear`), so the honest options are:
+## 5. Theme
 
-- **leave `onUndo`/`onRedo` off** — the controls are not rendered and the bottom-left pill keeps its own undo/redo (this is what I recommend today), or
-- dispatch the editor's own shortcut:
+`theme` is the one capability that was not reachable before: it lived in Excalidraw's hamburger island, which `suppressDefaultChrome` hides. It is now a "…" item.
 
-```tsx
-const sendKey = (key: string, shift = false) =>
-  document.querySelector(".excalidraw-container")?.dispatchEvent(
-    new KeyboardEvent("keydown", {
-      key,
-      code: `Key${key.toUpperCase()}`,
-      ctrlKey: true,
-      shiftKey: shift,
-      bubbles: true,
-    }),
-  );
-// onUndo={() => sendKey("z")}  onRedo={() => sendKey("z", true)}
-```
+When `onToggleTheme` is omitted the bar flips `appState.theme` through `excalidrawAPI` — correct for a host that lets the editor own its theme. **This app does not**: `goodnotes/dark`'s `useDarkMode()` feeds `<Excalidraw theme={editorTheme}>`, which is a controlled prop, so the fallback is overwritten on the next render. Pass `onToggleTheme` as in §2c.
 
-### Optional: an inline search field
+---
 
-Pass `searchQuery` + `onSearchChange` (and optionally `onSearchSubmit`) and the left zone renders a real field instead of the icon button; below ~900px it folds back to the icon button and calls `onToggleSearch`.
+## 6. Nothing else
 
-## 4. Remove what the bar replaced
-
-```diff
--        <PenTray excalidrawAPI={excalidrawAPI} />
-```
-
-```diff
--        <Sidebar name="goodnotes-pages" docked onDock={() => {}}>
--          <Sidebar.Header />
--          <PageSidebar excalidrawAPI={excalidrawAPI} />
--        </Sidebar>
-```
-
-and the line that force-opens that sidebar (around line 458):
-
-```diff
--    excalidrawAPI.toggleSidebar({ name: "goodnotes-pages", force: true });
-```
-
-`Sidebar` may then be unused in the `@excalidraw/excalidraw` import list.
-
-## 5. Nothing else
-
-No `UIOptions` change is needed. The Excalidraw chrome the bar replaces is hidden by a body class (`gn-shell-suppress-default-ui`) that `NavBar` adds while `suppressDefaultChrome` is set and removes on unmount, so the suppression is opt-in and fully reversible. It covers:
-
-- `.App-menu_top .shapes-section` (shapes toolbar),
-- `.App-menu_top__left` (hamburger island),
-- `.layer-ui__wrapper__top-right` (Share / collaborators island),
-- the mobile `MobileMenu` toolbars.
-
-It deliberately leaves `.layer-ui__wrapper__footer-left` — the zoom pill — alone. In `flow` placement the canvas starts to the right of the page panel, so the pill is already clear of it; in `fixed` placement a second body class (`gn-shell-page-panel-open`) nudges the pill clear instead.
-
-There is **no** `UIOptions` switch for those islands: `LayerUI` renders them whenever `defaultUIEnabled` is true, and the props that would remove them (`viewModeEnabled`, `zenModeEnabled`) change editor behaviour too. CSS is the correct lever.
+No `UIOptions` change. The Excalidraw chrome the bar replaces is hidden by a body class (`gn-shell-suppress-default-ui`) that `FloatingBar` adds while `suppressDefaultChrome` is set and removes on unmount, so the suppression is opt-in and fully reversible. It covers `.App-menu_top .shapes-section`, `.App-menu_top__left`, `.layer-ui__wrapper__top-right` and the mobile `MobileMenu` toolbars, and deliberately leaves `.layer-ui__wrapper__footer-left` — the zoom pill — alone, because it is a second route to undo/redo and to zoom.
 
 ---
 
 ## Behaviour worth knowing
 
-- **Sticky vs one-shot tools.** Pen, highlighter and eraser stay active after use; shapes, text, image and sticky note revert to select after a single placement. This is Excalidraw's own tool lock (`setActiveTool({ locked })`), set per slot in `goodnotes/taskbar/tools.ts` (`PERSISTENT_TOOLS`), so the editor does the reverting and nothing is re-implemented.
-- **The bar mirrors the editor.** It subscribes to `excalidrawAPI.onChange`, so `aria-pressed` follows keyboard shortcuts, Escape and any other surface.
-- **Tool settings are not here.** Colours and widths belong to the floating Active Tool Menu. `NavBar` only exposes `onActiveToolMenu(tool, anchor)`, which fires when the user activates the tool that is already active — wire it to that module when it lands:
-
-  ```tsx
-  onActiveToolMenu={(tool, anchor) => toolMenu.open(tool, anchor)}
-  ```
-
-- **Read mode** is a presentation hint: the centre tools render as unavailable (`aria-disabled`, still focusable) and the bar stops driving the editor. If you want the canvas itself read-only, pass `viewModeEnabled={shellMode === "read"}` to `<Excalidraw>` — that part is the host's call, not the bar's.
-- **Narrow windows.** Below ~1180px the Write/Read labels drop to icons; below ~900px the search field becomes an icon button and Import PDF / Add page move into the "…" menu; the centre cluster measures itself and moves tools into its own overflow menu as space runs out. Verified down to 480px with no overlap and no horizontal scrolling.
-- **Accessibility.** Centre cluster is `role="toolbar"` with one tab stop, roving tabindex and Arrow/Home/End; Write/Read is a `role="radiogroup"`; every icon control has a text name; focus rings are visible in both themes; all transitions are removed under `prefers-reduced-motion: reduce`.
+- **Sticky vs one-shot tools.** Pen, highlighter and eraser stay active after use; shapes, text, image and sticky note revert to select after one placement. This is Excalidraw's own tool lock, set per slot in `goodnotes/taskbar/tools.ts` (`PERSISTENT_TOOLS`).
+- **Tap the active tool again** for its settings — the GoodNotes gesture. The bar only fires `onActiveToolMenu(tool, anchor)`; it renders no colours or widths itself.
+- **The overlay's width** is 248px (`PAGE_PANEL_WIDTH`), up from the old rail's 188px: it no longer has to pay for itself in permanent layout, so the thumbnails can be bigger. `side="right"` slides it in from the right instead.
+- **`returnFocusTo`** on `PagePanel` lets you name the element focus returns to. Without it, focus goes back to whatever was focused when the overlay opened, which is the Pages control in every normal flow.

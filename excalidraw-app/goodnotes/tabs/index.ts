@@ -43,6 +43,12 @@
 /**
  * The tab strip. Render it above the editor; it is a full-width band, not an
  * overlay, and it scrolls horizontally rather than wrapping.
+ *
+ * It renders **only when more than one document is open**. With one document
+ * a band that names the document you are already looking at is pure cost
+ * (1152x29 = 33k px² on an iPad Pro 11"), and the title now lives in
+ * `goodnotes/shell`'s floating bar — its "…" menu heads with it. Pass
+ * `showWhenSingle` for the old always-on behaviour.
  */
 export { TabBar, docDotColor } from "./TabBar";
 export type { TabBarProps } from "./TabBar";

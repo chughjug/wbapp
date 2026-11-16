@@ -93,7 +93,7 @@ import { GraphIcon, PlusIcon, SettingsIcon, ThemeIcon } from "./icons";
 
 import "./FloatingBar.scss";
 
-import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import type { PenPreset } from "../types";
 
@@ -280,10 +280,18 @@ export interface FloatingBarProps {
   onModeChange?: (mode: ShellMode) => void;
 
   /**
-   * Toggle light/dark. When omitted the bar toggles the editor's own
-   * `appState.theme` through `excalidrawAPI`, so the theme control is always
-   * present — it was previously only reachable from Excalidraw's hamburger
-   * island, which `suppressDefaultChrome` hides.
+   * Toggle light/dark.
+   *
+   * The theme item is always in the "…" menu — theme was previously only
+   * reachable from Excalidraw's hamburger island, which `suppressDefaultChrome`
+   * hides. When this prop is omitted the bar falls back to flipping
+   * `appState.theme` through `excalidrawAPI`, which is correct for a host that
+   * lets the editor own its theme.
+   *
+   * **A host that passes `theme` to `<Excalidraw>` (as this app does, from
+   * `goodnotes/dark`'s `useDarkMode`) controls the theme, and that fallback
+   * cannot win — such a host MUST pass `onToggleTheme`.** See
+   * `INTEGRATION.md`, which gives the one-line wiring.
    */
   onToggleTheme?: () => void;
 
@@ -362,6 +370,7 @@ export const FloatingBar = ({
   className,
 }: FloatingBarProps) => {
   const reactId = useId().replace(/:/g, "");
+  const barRef = useRef<HTMLDivElement | null>(null);
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const [internalTool, setInternalTool] = useState<TaskbarToolId | null>(
@@ -453,7 +462,8 @@ export const FloatingBar = ({
     if (!excalidrawAPI || excalidrawAPI.isDestroyed) {
       return;
     }
-    const next = excalidrawAPI.getAppState().theme === "dark" ? "light" : "dark";
+    const next =
+      excalidrawAPI.getAppState().theme === "dark" ? "light" : "dark";
     excalidrawAPI.updateScene({ appState: { theme: next } });
   }, [onToggleTheme, excalidrawAPI]);
 
@@ -752,31 +762,62 @@ export const FloatingBar = ({
     [focusOrder, activeFocusId],
   );
 
-  const onToolbarKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (openMenu) {
-      return; // the open menu owns the keyboard
+  /**
+   * Toolbar navigation is bound on the DOCUMENT, in the capture phase, rather
+   * than as a React `onKeyDown` on the bar.
+   *
+   * `goodnotes/paged` claims Arrow/Home/End at document capture to turn the
+   * page, and its guard is "the target is inside `.excalidraw`" — which the
+   * bar's root is, because that is the scope Excalidraw's colour tokens live
+   * in. It calls `stopPropagation()`, so a React handler never sees the key.
+   * Capturing at the document and calling `preventDefault()` means the bar
+   * gets its keys back (that controller bails on `defaultPrevented`) without
+   * either module reaching into the other.
+   */
+  const moveFocusRef = useLatest(moveFocus);
+  const menuOpenRef = useLatest(!!openMenu);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
     }
-    switch (event.key) {
-      case "ArrowRight":
-        event.preventDefault();
-        moveFocus(1);
-        break;
-      case "ArrowLeft":
-        event.preventDefault();
-        moveFocus(-1);
-        break;
-      case "Home":
-        event.preventDefault();
-        moveFocus("first");
-        break;
-      case "End":
-        event.preventDefault();
-        moveFocus("last");
-        break;
-      default:
-        break;
-    }
-  };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        menuOpenRef.current ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      ) {
+        return; // an open menu owns the keyboard; modifiers are the host's
+      }
+      const active = document.activeElement;
+      if (
+        !(active instanceof HTMLElement) ||
+        !barRef.current?.contains(active) ||
+        active.closest(".gn-menu")
+      ) {
+        return;
+      }
+      const delta =
+        event.key === "ArrowRight"
+          ? 1
+          : event.key === "ArrowLeft"
+          ? -1
+          : event.key === "Home"
+          ? ("first" as const)
+          : event.key === "End"
+          ? ("last" as const)
+          : null;
+      if (delta === null) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      moveFocusRef.current(delta);
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [moveFocusRef, menuOpenRef]);
 
   // ---- rendering ----------------------------------------------------------
 
@@ -809,12 +850,12 @@ export const FloatingBar = ({
       data-testid="goodnotes-navbar"
     >
       <div
+        ref={barRef}
         className="gn-bar"
         data-testid="goodnotes-floating-bar"
         role="toolbar"
         aria-label={ariaLabel}
         aria-orientation="horizontal"
-        onKeyDown={onToolbarKeyDown}
       >
         {/* ---- identity ------------------------------------------------- */}
         {onHome && (
@@ -881,7 +922,9 @@ export const FloatingBar = ({
             : activeTool === tool.id;
           const disabled =
             readMode || (isLassoSlot ? !!fuzzySelectDisabled : false);
-          const label = isLassoSlot ? "Lasso select (smart selection)" : tool.label;
+          const label = isLassoSlot
+            ? "Lasso select (smart selection)"
+            : tool.label;
           return (
             <button
               key={tool.id}

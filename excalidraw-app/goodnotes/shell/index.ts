@@ -1,78 +1,154 @@
 /**
- * GoodNotes editor shell — ONE navigation bar plus the left page panel.
+ * GoodNotes editor shell — ONE floating bar, plus the page overlay.
  *
- * This module replaces the six control surfaces the editor used to have (a
- * centred taskbar, Excalidraw's hamburger island, its top-right island, the
- * shapes toolbar, the floating pen tray and the right-hand page sidebar) with
- * two objects:
+ * ## What changed, and why
  *
- * 1. {@link NavBar} — one bar, three explicit zones:
- *    - LEFT: page-panel toggle (with the page counter), search, Write/Read
- *    - CENTRE: tools only — select, lasso, pen, highlighter, eraser │
- *      shapes, text, image, sticky
- *    - RIGHT: undo/redo, import PDF, add page │ Share (primary), "…"
- * 2. {@link PagePanel} — the ~188px left rail of page thumbnails.
+ * Measured on an iPad Pro 11" viewport (1194x834) with a document open, the
+ * editor's *permanent* chrome was 28.5% of the screen across six surfaces:
+ * the page rail (189x656), a tool-settings band, bottom page controls, the
+ * tab strip, the nav bar and the zoom pill. This module collapses the parts
+ * it owns into a single ~46px pill that floats over the canvas:
  *
- * Both default to `placement="flow"`: they are BANDS in the host's layout
- * (document tabs / nav bar / page panel + canvas), not overlays. The helper
- * classes `gn-shell-layout`, `gn-shell-body` and `gn-shell-canvas` ship with
- * `NavBar.scss`. Pass `placement="fixed"` for the old floating behaviour.
- *
- * The bottom-left zoom pill is deliberately left alone.
- *
- * ```tsx
- * import { NavBar, PagePanel } from "./goodnotes/shell";
- *
- * const [pagesOpen, setPagesOpen] = useState(true);
- * const [mode, setMode] = useState<ShellMode>("write");
- *
- * <NavBar
- *   excalidrawAPI={excalidrawAPI}
- *   suppressDefaultChrome
- *   pagePanelOpen={pagesOpen}
- *   onTogglePagePanel={() => setPagesOpen((open) => !open)}
- *   onToggleSearch={() => excalidrawAPI?.updateScene({ appState: { openSidebar: null } })}
- *   mode={mode}
- *   onModeChange={setMode}
- *   onUndo={() => excalidrawAPI?.history.undo()}
- *   onRedo={() => excalidrawAPI?.history.redo()}
- *   onShare={() => setShareOpen(true)}
- *   // …plus every callback the old taskbar took; omit one and its control
- *   // is simply not rendered
- * />
- * <PagePanel excalidrawAPI={excalidrawAPI} open={pagesOpen} onClose={() => setPagesOpen(false)} />
+ * ```
+ *          ┌───────────────────────────────────────────┐
+ *          │ ⌂ │ ▤ 2/12 │ ✒ ▰ ⌫ ◌ ▶ │ + │ … │
+ *          └───────────────────────────────────────────┘
  * ```
  *
- * What this module owns: the shell, the three-zone layout, the overflow
- * behaviour, the keyboard model and the editor plumbing for the core tools.
- * What it does NOT own: fuzzy select, PDF import/export, image backdrops,
- * pages (it wraps `goodnotes/pages`) and TOOL SETTINGS — colours and widths
- * belong to the floating Active Tool Menu, for which the bar exposes only the
- * `onActiveToolMenu` hook point.
+ * Three ideas, and that is the whole module:
  *
- * See `INTEGRATION.md` in this folder for copy-pasteable `App.tsx` changes.
+ * 1. {@link FloatingBar} — `position: absolute`, centred near the top of the
+ *    stage, rounded, translucent with a backdrop blur. It *floats over* the
+ *    canvas rather than displacing it, so the page gets the full height. Ten
+ *    visible controls where there were twenty-odd: Home · Pages (with a
+ *    compact "2/12" counter) │ pen, highlighter, eraser, lasso, select │ "+"
+ *    for secondary inserts │ "…" for document actions.
+ * 2. {@link PagePanel} — the page rail is now a slide-over **dialog** with a
+ *    scrim. Closed, it renders nothing and holds no column; open, it traps
+ *    focus, dismisses on Escape and on a scrim click, and returns focus to
+ *    the bar's Pages control.
+ * 3. The tab strip (`goodnotes/tabs`) renders only with more than one
+ *    document open. With one, the title heads the "…" menu instead.
+ *
+ * ## Nothing became unreachable
+ *
+ * Every route the old three-zone nav bar exposed still has a home — at most
+ * one tap further away. `INTEGRATION.md` carries the full audit table; the
+ * short version:
+ *
+ * | capability | where it is now |
+ * | --- | --- |
+ * | home | Home control |
+ * | pages | Pages control (opens the overlay) |
+ * | pen / highlighter / eraser / lasso / select | the bar |
+ * | fuzzy select | the lasso slot (`onFuzzySelect`) |
+ * | text / shapes / image / sticky | "+" |
+ * | import PDF, insert graph | "+" |
+ * | new document, add page, undo, redo | "…" (undo/redo also on the zoom pill) |
+ * | share, export PDF, backdrops | "…" |
+ * | search, read mode, theme, settings | "…" |
+ *
+ * `theme` is new to the bar: it was previously only reachable through
+ * Excalidraw's hamburger island, which `suppressDefaultChrome` hides. The bar
+ * now drives it directly when the host passes no `onToggleTheme`.
+ *
+ * ## Host layout
+ *
+ * There are no bands left. The host needs ONE positioned stage; the bar and
+ * the overlay live inside it, over the canvas:
+ *
+ * ```tsx
+ * import { FloatingBar, PagePanel } from "./goodnotes/shell";
+ *
+ * const [pagesOpen, setPagesOpen] = useState(false); // closed by default now
+ *
+ * <div className="gn-shell-layout">
+ *   <TabBar … />                        // renders only with >1 document
+ *   <div className="gn-shell-stage">    // position: relative
+ *     <div className="gn-shell-canvas">
+ *       <Excalidraw …>…</Excalidraw>
+ *     </div>
+ *     <FloatingBar
+ *       excalidrawAPI={excalidrawAPI}
+ *       suppressDefaultChrome
+ *       pagePanelOpen={pagesOpen}
+ *       onTogglePagePanel={() => setPagesOpen((open) => !open)}
+ *       …
+ *     />
+ *     <PagePanel
+ *       excalidrawAPI={excalidrawAPI}
+ *       open={pagesOpen}
+ *       onClose={() => setPagesOpen(false)}
+ *     />
+ *   </div>
+ * </div>
+ * ```
+ *
+ * `gn-shell-body` is kept as an exact alias of `gn-shell-stage`, so a host
+ * that only moves `<FloatingBar>` and `<PagePanel>` *inside* its existing
+ * `.gn-shell-body` is already correct. See `INTEGRATION.md` for the exact,
+ * copy-pasteable `App.tsx` changes.
+ *
+ * What this module does NOT own: fuzzy select, PDF import/export, image
+ * backdrops, pages (it wraps `goodnotes/pages`) and TOOL SETTINGS — colours
+ * and widths belong to the floating Active Tool Menu, for which the bar
+ * exposes only the `onActiveToolMenu` hook point.
  */
 
+// ---------------------------------------------------------------------------
+// The bar
+// ---------------------------------------------------------------------------
+
 /**
- * The bar. The only component you need for the chrome.
- * Every prop is documented on {@link NavBarProps}; a missing callback hides
- * its control.
+ * The one bar. Every prop is documented on {@link FloatingBarProps}; a missing
+ * callback hides its control or menu item, so the bar never advertises
+ * something the host cannot do.
  */
-export { NavBar } from "./NavBar";
-export type { NavBarProps, ShellMode, ShellPlacement } from "./NavBar";
+export { FloatingBar } from "./FloatingBar";
+export type {
+  FloatingBarProps,
+  ShellMode,
+  ShellPlacement,
+} from "./FloatingBar";
+
+/**
+ * @deprecated The three-zone band is gone. `NavBar` is an alias for
+ * {@link FloatingBar} so existing importers keep compiling; `NavBarProps` is
+ * an alias for {@link FloatingBarProps}. Band-only props
+ * (`searchQuery`/`onSearchChange`/`onSearchSubmit` as an inline field, the
+ * inline Write/Read segmented control, the inline `Share` button) are gone —
+ * their capabilities moved into the "…" menu. See `INTEGRATION.md`.
+ */
+export { FloatingBar as NavBar } from "./FloatingBar";
+export type { FloatingBarProps as NavBarProps } from "./FloatingBar";
 
 /**
  * Body classes this module toggles. `SUPPRESS_DEFAULT_CHROME_CLASS` is added
  * while `suppressDefaultChrome` is set (shapes toolbar + hamburger island +
  * top-right island hidden, zoom pill untouched); `PAGE_PANEL_OPEN_CLASS` is
- * added while the page panel is open. Both are removed on unmount — the
- * suppression is opt-in and reversible.
+ * added while the page overlay is open, for hosts that want to react to it.
+ * Both are removed on unmount — the suppression is opt-in and reversible.
  */
-export { SUPPRESS_DEFAULT_CHROME_CLASS, PAGE_PANEL_OPEN_CLASS } from "./NavBar";
+export {
+  SUPPRESS_DEFAULT_CHROME_CLASS,
+  PAGE_PANEL_OPEN_CLASS,
+} from "./FloatingBar";
 
-/** The left page rail. Wraps `goodnotes/pages`' `PageSidebar`. */
+// ---------------------------------------------------------------------------
+// The page overlay
+// ---------------------------------------------------------------------------
+
+/**
+ * The page rail, as a slide-over dialog. Renders `null` when `open` is false —
+ * no scrim, no panel, no reserved column. `PAGE_PANEL_WIDTH` is its default
+ * open width (248px), which the host only needs if it wants to override it.
+ */
 export { PagePanel, PAGE_PANEL_WIDTH } from "./PagePanel";
 export type { PagePanelProps } from "./PagePanel";
+
+// ---------------------------------------------------------------------------
+// Editor plumbing
+// ---------------------------------------------------------------------------
 
 /**
  * Drive the editor without the UI — the same code path the bar's buttons use,
@@ -99,16 +175,10 @@ export type { ActivateToolOptions, StrokeWidthKey } from "../taskbar/tools";
 export type {
   TaskbarToolId as ShellToolId,
   TaskbarShapeId as ShellShapeId,
-  TaskbarGroupId as ShellGroupId,
-  TaskbarControl as ShellControl,
   TaskbarMenuItem as ShellMenuItem,
 } from "../taskbar/model";
 
-/** The pure overflow solver behind the centre cluster, and its constants. */
-export { planOverflow, LAYOUT, GROUP_ORDER } from "../taskbar/model";
-export type { OverflowPlan } from "../taskbar/model";
-
-/** The shared popover used by the Shapes, overflow and "…" controls. */
+/** The shared popover used by the "+" and "…" controls. */
 export { TaskbarMenu as ShellMenu } from "../taskbar/Menu";
 export type {
   TaskbarMenuProps as ShellMenuProps,
