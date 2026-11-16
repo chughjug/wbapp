@@ -60,6 +60,20 @@ export type ToolMenuShapeId = (typeof SHAPE_TOOL_TYPES)[number];
 
 const SHAPE_TOOL_SET: ReadonlySet<string> = new Set(SHAPE_TOOL_TYPES);
 
+/**
+ * `updateScene`'s `appState` parameter is typed `Pick<AppState, K>`, which
+ * cannot express "some of these keys" when the key set is decided at runtime.
+ * The editor merges whatever it is handed (`this.setState(appState)` — see
+ * `App.updateScene`), so a partial is correct at runtime. This is the only
+ * cast in the module and the only place it is needed.
+ */
+const mergeAppState = (
+  api: ExcalidrawImperativeAPI,
+  patch: Partial<AppState>,
+): void => {
+  api.updateScene({ appState: patch as Pick<AppState, keyof AppState> });
+};
+
 const isUsable = (
   api: ExcalidrawImperativeAPI | null,
 ): api is ExcalidrawImperativeAPI => !!api && !api.isDestroyed;
@@ -140,7 +154,7 @@ export const applyInk = (
   if (patch.variability !== undefined) {
     appState.currentItemStrokeVariability = patch.variability;
   }
-  api.updateScene({ appState });
+  mergeAppState(api, appState);
 };
 
 /** Styling that only applies to shapes. */
@@ -181,7 +195,7 @@ export const applyShapeStyle = (
       Math.min(100, Math.max(0, patch.opacity)),
     );
   }
-  api.updateScene({ appState });
+  mergeAppState(api, appState);
 };
 
 /** Styling that only applies to text. */
@@ -214,7 +228,7 @@ export const applyTextStyle = (
       Math.min(100, Math.max(0, patch.opacity)),
     );
   }
-  api.updateScene({ appState });
+  mergeAppState(api, appState);
 };
 
 /**

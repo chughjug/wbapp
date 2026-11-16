@@ -1,0 +1,131 @@
+/**
+ * DarkModeToggle styles.
+ *
+ * Colours are driven by Excalidraw's own theme variables where possible, so
+ * the control is correct in both themes without a second palette. Motion is
+ * gated on `prefers-reduced-motion`.
+ */
+
+.goodnotes-dark-toggle {
+  --gn-dark-toggle-radius: 0.625rem;
+  --gn-dark-toggle-fg: var(--color-on-surface, #1b1b1f);
+  --gn-dark-toggle-bg: var(--island-bg-color, #ffffff);
+  --gn-dark-toggle-border: var(--default-border-color, rgba(0, 0, 0, 0.12));
+  --gn-dark-toggle-active-bg: var(--color-primary, #6965db);
+  --gn-dark-toggle-active-fg: #ffffff;
+  --gn-dark-toggle-transition: 140ms ease;
+
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.1875rem;
+  border: 1px solid var(--gn-dark-toggle-border);
+  border-radius: var(--gn-dark-toggle-radius);
+  background: var(--gn-dark-toggle-bg);
+  color: var(--gn-dark-toggle-fg);
+  font-family: inherit;
+
+  &.is-icon {
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+
+  svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linejoin: round;
+  }
+
+  // moon is a filled glyph, so it reads at small sizes
+  .is-active svg path[d^="M20 14.2"],
+  &.is-icon svg path[d^="M20 14.2"] {
+    fill: currentColor;
+  }
+
+  &__option,
+  &.is-icon > button,
+  &.is-icon {
+    appearance: none;
+    cursor: pointer;
+  }
+
+  &__option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.3125rem 0.5625rem;
+    border: none;
+    border-radius: calc(var(--gn-dark-toggle-radius) - 0.25rem);
+    background: transparent;
+    color: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    transition: background-color var(--gn-dark-toggle-transition),
+      color var(--gn-dark-toggle-transition);
+
+    &:hover {
+      background: var(--button-hover-bg, rgba(0, 0, 0, 0.06));
+    }
+
+    &.is-active {
+      background: var(--gn-dark-toggle-active-bg);
+      color: var(--gn-dark-toggle-active-fg);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4b8bf4);
+      outline-offset: 1px;
+    }
+  }
+
+  &.is-compact &__option {
+    padding: 0.3125rem;
+  }
+
+  &.is-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--gn-dark-toggle-radius);
+    color: var(--gn-dark-toggle-fg);
+    transition: background-color var(--gn-dark-toggle-transition);
+
+    &:hover {
+      background: var(--button-hover-bg, rgba(0, 0, 0, 0.06));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4b8bf4);
+      outline-offset: 1px;
+    }
+  }
+
+  &__icon {
+    display: inline-flex;
+  }
+}
+
+/**
+ * The page-level cross-fade a host may opt into when the theme flips
+ * (add `data-goodnotes-theme-transition` to the editor wrapper).
+ */
+[data-goodnotes-theme-transition] canvas {
+  transition: filter 160ms ease, background-color 160ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goodnotes-dark-toggle,
+  .goodnotes-dark-toggle__option,
+  .goodnotes-dark-toggle.is-icon,
+  [data-goodnotes-theme-transition] canvas {
+    transition: none !important;
+  }
+}

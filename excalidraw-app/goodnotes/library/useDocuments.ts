@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import * as store from "./store";
+import { FAVOURITE_TAG, isFavourite } from "./filters";
 
 import type { DocMeta } from "../types";
 
@@ -27,6 +28,9 @@ export interface DocumentActions {
   /** No-op when the tag is blank or already present (case-insensitive). */
   addTag: (id: string, tag: string) => Promise<DocMeta>;
   removeTag: (id: string, tag: string) => Promise<DocMeta>;
+  /** Star/unstar. Stored as the reserved `FAVOURITE_TAG` (see filters.ts). */
+  setFavourite: (id: string, favourite: boolean) => Promise<DocMeta>;
+  toggleFavourite: (id: string) => Promise<DocMeta>;
   setThumbnail: (id: string, dataUrl: string) => Promise<void>;
   /** Stamp `lastOpenedAt`; call this when routing into the editor. */
   touch: (id: string) => Promise<void>;
@@ -120,6 +124,32 @@ export const useDocuments = (): UseDocumentsResult => {
           tags: doc.tags.filter(
             (it) => it.toLowerCase() !== tag.trim().toLowerCase(),
           ),
+        });
+      },
+      setFavourite: async (id: string, favourite: boolean) => {
+        const doc = await store.getDoc(id);
+        if (!doc) {
+          throw new Error(`goodnotes/library: no such document "${id}"`);
+        }
+        const without = doc.tags.filter(
+          (it) => it.trim().toLowerCase() !== FAVOURITE_TAG,
+        );
+        const next = favourite ? [...without, FAVOURITE_TAG] : without;
+        if (next.length === doc.tags.length && favourite === isFavourite(doc)) {
+          return doc;
+        }
+        return store.updateDocMeta(id, { tags: next });
+      },
+      toggleFavourite: async (id: string) => {
+        const doc = await store.getDoc(id);
+        if (!doc) {
+          throw new Error(`goodnotes/library: no such document "${id}"`);
+        }
+        const starred = isFavourite(doc);
+        return store.updateDocMeta(id, {
+          tags: starred
+            ? doc.tags.filter((it) => it.trim().toLowerCase() !== FAVOURITE_TAG)
+            : [...doc.tags, FAVOURITE_TAG],
         });
       },
       setThumbnail: async (id: string, dataUrl: string) => {

@@ -1,15 +1,21 @@
 /**
- * The home shelf: browse, search, sort, filter and manage documents.
+ * The home library: a document *manager*, not a flat grid.
  *
- * Rendered *instead of* the Excalidraw editor (see INTEGRATION.md) — it is a
- * full-viewport screen, not an overlay.
+ * Layout
+ *   [ sidebar ][ header: title + search + sort + view toggle + new ]
+ *              [ course folders                                   ]
+ *              [ grid of cover cards  |  dense list of rows       ]
  *
  * Accessibility contract honoured here:
- *  - every card is a real <button> with a descriptive aria-label
- *  - roving tabindex across the card grid, with Arrow/Home/End navigation
+ *  - the sidebar is a real list of buttons; the active one has aria-current
+ *  - folder cards and document cards/rows are real focusable controls with
+ *    composed accessible names; colour is never the only signal
+ *  - roving tabindex across the document container, with Arrow/Home/End
+ *    navigation whose row step is MEASURED from the live responsive layout
+ *    (so it is correct in both grid and list, where the step is 1)
  *  - every icon-only button carries an accessible name
- *  - visible focus rings (never `outline: none` without a replacement)
- *  - `prefers-reduced-motion: reduce` disables transitions (in Shelf.scss)
+ *  - visible focus rings; `prefers-reduced-motion: reduce` honoured in SCSS
+ *  - delete goes through an in-app modal, never `window.confirm`
  */
 
 import React, {
@@ -22,17 +28,48 @@ import React, {
 } from "react";
 
 import { useDocuments } from "./useDocuments";
+import { useCourseStyles } from "./courses";
+import {
+  FILTER_ALL,
+  filterLabel,
+  isDueThisWeek,
+  isFavourite,
+  isRecent,
+  matchesFilter,
+  matchesQuery,
+} from "./filters";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { CourseFolders } from "./CourseFolders";
+import { DocumentCard } from "./DocumentCard";
+import { DocumentRow } from "./DocumentRow";
+import { Sidebar } from "./Sidebar";
+import {
+  Icon,
+  ICON_CLOSE,
+  ICON_GRID,
+  ICON_LIST,
+  ICON_PLUS,
+  ICON_SEARCH,
+} from "./icons";
 
 import "./Shelf.scss";
 
+import type { CourseFolder } from "./CourseFolders";
+import type { LibraryFilter } from "./filters";
+import type { SidebarCourse } from "./Sidebar";
 import type { DocMeta, SortKey } from "../types";
 
-const HOUR = 60 * 60 * 1000;
-const DAY = 24 * HOUR;
-/** "Due soon" window. */
-const SOON_MS = 48 * HOUR;
+// re-exported for API compatibility with the previous Shelf module
+export {
+  getDueUrgency,
+  formatDueDate,
+  formatUpdatedAt,
+} from "./format";
+export type { DueUrgency } from "./format";
 
-export type DueUrgency = "overdue" | "soon" | "upcoming" | "none";
+export type LibraryView = "grid" | "list";
+
+const VIEW_STORAGE_KEY = "goodnotes-library-view";
 
 export interface ShelfProps {
   /** Called when the user activates a card or creates a document. */
@@ -42,6 +79,8 @@ export interface ShelfProps {
   /** Optional slot rendered at the far right of the header (e.g. a menu). */
   headerExtra?: React.ReactNode;
   className?: string;
+  /** Initial view. Otherwise the last used view is restored. */
+  defaultView?: LibraryView;
 }
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -50,108 +89,6 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "title", label: "Title" },
   { value: "course", label: "Course" },
 ];
-
-// ---------------------------------------------------------------------------
-// pure helpers (exported for reuse/testing)
-// ---------------------------------------------------------------------------
-
-export const getDueUrgency = (
-  dueDate: number | null,
-  now: number = Date.now(),
-): DueUrgency => {
-  if (dueDate == null) {
-    return "none";
-  }
-  if (dueDate < now) {
-    return "overdue";
-  }
-  if (dueDate - now <= SOON_MS) {
-    return "soon";
-  }
-  return "upcoming";
-};
-
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  day: "numeric",
-});
-
-export const formatDueDate = (
-  dueDate: number | null,
-  now: number = Date.now(),
-): string => {
-  if (dueDate == null) {
-    return "No due date";
-  }
-  const startOfToday = new Date(now).setHours(0, 0, 0, 0);
-  const startOfDue = new Date(dueDate).setHours(0, 0, 0, 0);
-  const days = Math.round((startOfDue - startOfToday) / DAY);
-  if (days === 0) {
-    return "Due today";
-  }
-  if (days === 1) {
-    return "Due tomorrow";
-  }
-  if (days === -1) {
-    return "Due yesterday";
-  }
-  if (days < 0) {
-    return `${Math.abs(days)} days overdue`;
-  }
-  if (days <= 7) {
-    return `Due in ${days} days`;
-  }
-  return `Due ${dateFormatter.format(dueDate)}`;
-};
-
-export const formatUpdatedAt = (
-  updatedAt: number,
-  now: number = Date.now(),
-): string => {
-  const diff = Math.max(0, now - updatedAt);
-  if (diff < HOUR) {
-    const minutes = Math.floor(diff / 60000);
-    return minutes <= 1 ? "Edited just now" : `Edited ${minutes} min ago`;
-  }
-  if (diff < DAY) {
-    const hours = Math.floor(diff / HOUR);
-    return `Edited ${hours} ${hours === 1 ? "hour" : "hours"} ago`;
-  }
-  if (diff < 7 * DAY) {
-    const days = Math.floor(diff / DAY);
-    return `Edited ${days} ${days === 1 ? "day" : "days"} ago`;
-  }
-  return `Edited ${dateFormatter.format(updatedAt)}`;
-};
-
-/** Stable 0-359 hue from a document id, for the placeholder cover. */
-const hueFromId = (id: string): number => {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) % 360000;
-  }
-  return hash % 360;
-};
-
-const initialsOf = (title: string): string =>
-  title
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]!.toUpperCase())
-    .join("") || "?";
-
-const matchesQuery = (doc: DocMeta, query: string): boolean => {
-  if (!query) {
-    return true;
-  }
-  const needle = query.toLowerCase();
-  return (
-    doc.title.toLowerCase().includes(needle) ||
-    (doc.course ?? "").toLowerCase().includes(needle) ||
-    doc.tags.some((tag) => tag.toLowerCase().includes(needle))
-  );
-};
 
 const compareDocs = (a: DocMeta, b: DocMeta, sortKey: SortKey): number => {
   switch (sortKey) {
@@ -190,326 +127,15 @@ const compareDocs = (a: DocMeta, b: DocMeta, sortKey: SortKey): number => {
   }
 };
 
-const toDateInputValue = (timestamp: number | null): string => {
-  if (timestamp == null) {
-    return "";
+const readStoredView = (fallback: LibraryView): LibraryView => {
+  try {
+    const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    return stored === "grid" || stored === "list" ? stored : fallback;
+  } catch {
+    return fallback;
   }
-  const date = new Date(timestamp);
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
 };
 
-const fromDateInputValue = (value: string): number | null => {
-  if (!value) {
-    return null;
-  }
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) {
-    return null;
-  }
-  // end of the chosen day, local time — "due Friday" means Friday night
-  return new Date(year, month - 1, day, 23, 59, 59, 999).getTime();
-};
-
-// ---------------------------------------------------------------------------
-// icons (decorative — every button has a text/aria label of its own)
-// ---------------------------------------------------------------------------
-
-const Icon = ({ path }: { path: string }) => (
-  <svg
-    className="gn-icon"
-    viewBox="0 0 24 24"
-    width="16"
-    height="16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    focusable="false"
-  >
-    <path d={path} />
-  </svg>
-);
-
-const ICON_PLUS = "M12 5v14M5 12h14";
-const ICON_PENCIL = "M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z";
-const ICON_COPY =
-  "M9 9h10v10a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V9zM5 15V5a2 2 0 0 1 2-2h10";
-const ICON_TRASH = "M4 7h16M10 7V5h4v2m-7 0 1 13h8l1-13";
-const ICON_SEARCH = "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4";
-const ICON_CLOSE = "M6 6l12 12M18 6L6 18";
-const ICON_CHECK = "M5 13l4 4L19 7";
-
-// ---------------------------------------------------------------------------
-// card
-// ---------------------------------------------------------------------------
-
-interface ShelfCardProps {
-  doc: DocMeta;
-  now: number;
-  tabIndex: number;
-  isEditing: boolean;
-  onOpen: (doc: DocMeta) => void;
-  onStartEdit: (id: string) => void;
-  onStopEdit: () => void;
-  onDuplicate: (doc: DocMeta) => void;
-  onDelete: (doc: DocMeta) => void;
-  onRename: (id: string, title: string) => void;
-  onSetCourse: (id: string, course: string | null) => void;
-  onSetDueDate: (id: string, dueDate: number | null) => void;
-  onAddTag: (id: string, tag: string) => void;
-  onRemoveTag: (id: string, tag: string) => void;
-  onFocusCard: (id: string) => void;
-  registerRef: (id: string, node: HTMLButtonElement | null) => void;
-}
-
-const ShelfCard = React.memo((props: ShelfCardProps) => {
-  const {
-    doc,
-    now,
-    tabIndex,
-    isEditing,
-    onOpen,
-    onStartEdit,
-    onStopEdit,
-    onDuplicate,
-    onDelete,
-    onRename,
-    onSetCourse,
-    onSetDueDate,
-    onAddTag,
-    onRemoveTag,
-    onFocusCard,
-    registerRef,
-  } = props;
-
-  const urgency = getDueUrgency(doc.dueDate, now);
-  const dueLabel = formatDueDate(doc.dueDate, now);
-  const updatedLabel = formatUpdatedAt(doc.updatedAt, now);
-  const fieldId = useId();
-  const [tagDraft, setTagDraft] = useState("");
-
-  const ariaLabel = [
-    `Open ${doc.title}`,
-    doc.course ? `course ${doc.course}` : null,
-    doc.dueDate != null ? dueLabel.toLowerCase() : "no due date",
-    `${doc.pageCount} ${doc.pageCount === 1 ? "page" : "pages"}`,
-    doc.tags.length ? `tags ${doc.tags.join(", ")}` : null,
-    updatedLabel.toLowerCase(),
-  ]
-    .filter(Boolean)
-    .join(", ");
-
-  return (
-    <li className="gn-card-wrapper">
-      <div className={`gn-card${isEditing ? " gn-card--editing" : ""}`}>
-        <button
-          type="button"
-          className="gn-card__open"
-          ref={(node) => registerRef(doc.id, node)}
-          tabIndex={tabIndex}
-          aria-label={ariaLabel}
-          onFocus={() => onFocusCard(doc.id)}
-          onClick={() => onOpen(doc)}
-        >
-          <span className="gn-card__cover" aria-hidden="true">
-            {doc.thumbnail ? (
-              <img
-                className="gn-card__thumb"
-                src={doc.thumbnail}
-                alt=""
-                draggable={false}
-              />
-            ) : (
-              <span
-                className="gn-card__placeholder"
-                style={
-                  {
-                    "--gn-hue": `${hueFromId(doc.id)}`,
-                  } as React.CSSProperties
-                }
-              >
-                <span className="gn-card__placeholder-initials">
-                  {initialsOf(doc.title)}
-                </span>
-              </span>
-            )}
-            <span className="gn-card__pages">
-              {doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"}
-            </span>
-          </span>
-
-          <span className="gn-card__body">
-            <span className="gn-card__title">{doc.title}</span>
-            <span className="gn-card__course">{doc.course || "No course"}</span>
-            <span className={`gn-due gn-due--${urgency}`}>
-              <span className="gn-due__dot" aria-hidden="true" />
-              {dueLabel}
-            </span>
-            {doc.tags.length > 0 && (
-              <span className="gn-card__tags">
-                {doc.tags.slice(0, 4).map((tag) => (
-                  <span className="gn-chip" key={tag}>
-                    {tag}
-                  </span>
-                ))}
-                {doc.tags.length > 4 && (
-                  <span className="gn-chip gn-chip--more">
-                    +{doc.tags.length - 4}
-                  </span>
-                )}
-              </span>
-            )}
-            <span className="gn-card__updated">{updatedLabel}</span>
-          </span>
-        </button>
-
-        <div className="gn-card__actions">
-          <button
-            type="button"
-            className="gn-icon-button"
-            tabIndex={tabIndex}
-            aria-expanded={isEditing}
-            aria-label={
-              isEditing
-                ? `Close details for ${doc.title}`
-                : `Edit details for ${doc.title}`
-            }
-            onClick={() => (isEditing ? onStopEdit() : onStartEdit(doc.id))}
-          >
-            <Icon path={isEditing ? ICON_CLOSE : ICON_PENCIL} />
-          </button>
-          <button
-            type="button"
-            className="gn-icon-button"
-            tabIndex={tabIndex}
-            aria-label={`Duplicate ${doc.title}`}
-            onClick={() => onDuplicate(doc)}
-          >
-            <Icon path={ICON_COPY} />
-          </button>
-          <button
-            type="button"
-            className="gn-icon-button gn-icon-button--danger"
-            tabIndex={tabIndex}
-            aria-label={`Delete ${doc.title}`}
-            onClick={() => onDelete(doc)}
-          >
-            <Icon path={ICON_TRASH} />
-          </button>
-        </div>
-
-        {isEditing && (
-          <div className="gn-card__editor">
-            <label className="gn-field" htmlFor={`${fieldId}-title`}>
-              <span className="gn-field__label">Title</span>
-              <input
-                id={`${fieldId}-title`}
-                className="gn-input"
-                type="text"
-                defaultValue={doc.title}
-                onBlur={(event) => onRename(doc.id, event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    onRename(doc.id, event.currentTarget.value);
-                    onStopEdit();
-                  }
-                }}
-              />
-            </label>
-
-            <label className="gn-field" htmlFor={`${fieldId}-course`}>
-              <span className="gn-field__label">Course</span>
-              <input
-                id={`${fieldId}-course`}
-                className="gn-input"
-                type="text"
-                defaultValue={doc.course ?? ""}
-                placeholder="e.g. Biology 201"
-                onBlur={(event) => onSetCourse(doc.id, event.target.value)}
-              />
-            </label>
-
-            <label className="gn-field" htmlFor={`${fieldId}-due`}>
-              <span className="gn-field__label">Due date</span>
-              <input
-                id={`${fieldId}-due`}
-                className="gn-input"
-                type="date"
-                defaultValue={toDateInputValue(doc.dueDate)}
-                onChange={(event) =>
-                  onSetDueDate(doc.id, fromDateInputValue(event.target.value))
-                }
-              />
-            </label>
-
-            <div className="gn-field">
-              <span className="gn-field__label" id={`${fieldId}-tags-label`}>
-                Tags
-              </span>
-              <ul
-                className="gn-card__tag-editor"
-                aria-labelledby={`${fieldId}-tags-label`}
-              >
-                {doc.tags.map((tag) => (
-                  <li key={tag}>
-                    <span className="gn-chip gn-chip--editable">
-                      {tag}
-                      <button
-                        type="button"
-                        className="gn-chip__remove"
-                        aria-label={`Remove tag ${tag} from ${doc.title}`}
-                        onClick={() => onRemoveTag(doc.id, tag)}
-                      >
-                        <Icon path={ICON_CLOSE} />
-                      </button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className="gn-card__tag-add">
-                <input
-                  className="gn-input"
-                  type="text"
-                  value={tagDraft}
-                  placeholder="Add a tag"
-                  aria-label={`Add a tag to ${doc.title}`}
-                  onChange={(event) => setTagDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && tagDraft.trim()) {
-                      event.preventDefault();
-                      onAddTag(doc.id, tagDraft);
-                      setTagDraft("");
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="gn-icon-button"
-                  aria-label={`Add tag to ${doc.title}`}
-                  disabled={!tagDraft.trim()}
-                  onClick={() => {
-                    onAddTag(doc.id, tagDraft);
-                    setTagDraft("");
-                  }}
-                >
-                  <Icon path={ICON_CHECK} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </li>
-  );
-});
-ShelfCard.displayName = "ShelfCard";
-
-// ---------------------------------------------------------------------------
-// shelf
 // ---------------------------------------------------------------------------
 
 export const Shelf = ({
@@ -517,14 +143,18 @@ export const Shelf = ({
   theme = "light",
   headerExtra,
   className,
+  defaultView = "grid",
 }: ShelfProps) => {
   const { documents, loading, error, courses, actions } = useDocuments();
+  const courseStyles = useCourseStyles();
 
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("updatedAt");
-  const [courseFilter, setCourseFilter] = useState<string>("");
+  const [filter, setFilter] = useState<LibraryFilter>(FILTER_ALL);
+  const [view, setView] = useState<LibraryView>(() => readStoredView(defaultView));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<DocMeta | null>(null);
 
   const controlsId = useId();
   const gridRef = useRef<HTMLUListElement | null>(null);
@@ -532,19 +162,58 @@ export const Shelf = ({
   // id of a card that should take DOM focus once it renders
   const pendingFocusRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, view);
+    } catch {
+      /* private mode: the view simply does not persist */
+    }
+  }, [view]);
+
   // one clock read per documents-change keeps every badge mutually consistent
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const now = useMemo(() => Date.now(), [documents]);
+
+  const counts = useMemo(
+    () => ({
+      all: documents.length,
+      favourites: documents.filter(isFavourite).length,
+      recent: documents.filter((doc) => isRecent(doc, now)).length,
+      dueWeek: documents.filter((doc) => isDueThisWeek(doc, now)).length,
+    }),
+    [documents, now],
+  );
+
+  const courseRows = useMemo(() => {
+    return courses.map((name) => {
+      const docs = documents.filter((doc) => doc.course === name);
+      return {
+        name,
+        count: docs.length,
+        dueSoonCount: docs.filter((doc) => isDueThisWeek(doc, now)).length,
+        style: courseStyles.styleOf(name),
+      };
+    });
+  }, [courses, documents, now, courseStyles]);
+
+  const sidebarCourses: SidebarCourse[] = courseRows;
+  const folders: CourseFolder[] = courseRows;
+
+  // a filter whose course disappeared (last document moved/deleted) resets
+  useEffect(() => {
+    if (filter.kind === "course" && !courses.includes(filter.course)) {
+      setFilter(FILTER_ALL);
+    }
+  }, [filter, courses]);
 
   const visible = useMemo(() => {
     return documents
       .filter(
         (doc) =>
-          matchesQuery(doc, query.trim()) &&
-          (!courseFilter || doc.course === courseFilter),
+          matchesQuery(doc, query.trim()) && matchesFilter(doc, filter, now),
       )
       .sort((a, b) => compareDocs(a, b, sortKey));
-  }, [documents, query, courseFilter, sortKey]);
+  }, [documents, query, filter, sortKey, now]);
 
   // keep the roving-tabindex anchor pointing at something that still exists
   useEffect(() => {
@@ -591,7 +260,11 @@ export const Shelf = ({
     [visible],
   );
 
-  /** Columns actually rendered, read back from layout (grid is responsive). */
+  /**
+   * Columns actually rendered, read back from layout. The grid is responsive
+   * (`auto-fill`) and the list is a single column, so this one measurement
+   * gives the correct ArrowUp/ArrowDown step in both views.
+   */
   const getColumnCount = useCallback((): number => {
     const grid = gridRef.current;
     if (!grid) {
@@ -663,10 +336,12 @@ export const Shelf = ({
   );
 
   const handleCreate = useCallback(async () => {
-    const doc = await actions.create({});
+    const init: Partial<DocMeta> =
+      filter.kind === "course" ? { course: filter.course } : {};
+    const doc = await actions.create(init);
     await actions.touch(doc.id);
     onOpenDocument(doc);
-  }, [actions, onOpenDocument]);
+  }, [actions, onOpenDocument, filter]);
 
   const handleOpen = useCallback(
     (doc: DocMeta) => {
@@ -686,26 +361,28 @@ export const Shelf = ({
     [actions],
   );
 
-  const handleDelete = useCallback(
-    (doc: DocMeta) => {
-      // eslint-disable-next-line no-alert
-      if (!window.confirm(`Delete “${doc.title}”? This cannot be undone.`)) {
-        return;
+  const handleRequestDelete = useCallback((doc: DocMeta) => {
+    setPendingDelete(doc);
+  }, []);
+
+  const handleConfirmDelete = useCallback(() => {
+    const doc = pendingDelete;
+    setPendingDelete(null);
+    if (!doc) {
+      return;
+    }
+    const index = visible.findIndex((it) => it.id === doc.id);
+    const neighbour = visible[index + 1] ?? visible[index - 1] ?? null;
+    void actions.remove(doc.id).then(() => {
+      if (neighbour) {
+        pendingFocusRef.current = neighbour.id;
+        setActiveId(neighbour.id);
       }
-      const index = visible.findIndex((it) => it.id === doc.id);
-      const neighbour = visible[index + 1] ?? visible[index - 1] ?? null;
-      void actions.remove(doc.id).then(() => {
-        if (neighbour) {
-          pendingFocusRef.current = neighbour.id;
-          setActiveId(neighbour.id);
-        }
-      });
-      if (editingId === doc.id) {
-        setEditingId(null);
-      }
-    },
-    [actions, visible, editingId],
-  );
+    });
+    if (editingId === doc.id) {
+      setEditingId(null);
+    }
+  }, [actions, visible, editingId, pendingDelete]);
 
   const handleRename = useCallback(
     (id: string, title: string) => {
@@ -737,12 +414,62 @@ export const Shelf = ({
     },
     [actions],
   );
+  const handleToggleFavourite = useCallback(
+    (doc: DocMeta) => {
+      void actions.toggleFavourite(doc.id);
+    },
+    [actions],
+  );
   const handleFocusCard = useCallback((id: string) => {
     setActiveId(id);
   }, []);
   const handleStopEdit = useCallback(() => setEditingId(null), []);
 
+  const handleSetCourseColor = useCallback(
+    (course: string, color: string) => {
+      void courseStyles.setColor(course, color);
+    },
+    [courseStyles],
+  );
+  const handleSetCourseEmoji = useCallback(
+    (course: string, emoji: string | null) => {
+      void courseStyles.setEmoji(course, emoji);
+    },
+    [courseStyles],
+  );
+  const handleOpenCourse = useCallback((course: string) => {
+    setFilter((current) =>
+      current.kind === "course" && current.course === course
+        ? FILTER_ALL
+        : { kind: "course", course },
+    );
+  }, []);
+
   const hasAnyDocuments = documents.length > 0;
+  const heading = filterLabel(filter);
+  const Item = view === "grid" ? DocumentCard : DocumentRow;
+
+  const itemProps = (doc: DocMeta) => ({
+    doc,
+    now,
+    tabIndex: doc.id === activeId ? 0 : -1,
+    isEditing: editingId === doc.id,
+    isFavourite: isFavourite(doc),
+    courseStyle: doc.course ? courseStyles.styleOf(doc.course) : null,
+    onOpen: handleOpen,
+    onStartEdit: setEditingId,
+    onStopEdit: handleStopEdit,
+    onDuplicate: handleDuplicate,
+    onDelete: handleRequestDelete,
+    onRename: handleRename,
+    onSetCourse: handleSetCourse,
+    onSetDueDate: handleSetDueDate,
+    onAddTag: handleAddTag,
+    onRemoveTag: handleRemoveTag,
+    onToggleFavourite: handleToggleFavourite,
+    onFocusCard: handleFocusCard,
+    registerRef,
+  });
 
   return (
     <div
@@ -750,171 +477,236 @@ export const Shelf = ({
         className ? ` ${className}` : ""
       }`}
     >
-      <header className="gn-shelf__header">
-        <div className="gn-shelf__header-row">
-          <h1 className="gn-shelf__heading">My documents</h1>
-          <div className="gn-shelf__header-end">
-            {headerExtra}
-            <button
-              type="button"
-              className="gn-button gn-button--primary"
-              onClick={() => void handleCreate()}
-            >
-              <Icon path={ICON_PLUS} />
-              New document
-            </button>
-          </div>
-        </div>
+      <Sidebar
+        filter={filter}
+        onSelectFilter={setFilter}
+        counts={counts}
+        courses={sidebarCourses}
+        revision={documents.length}
+      />
 
-        <div className="gn-toolbar" role="search">
-          <div className="gn-search">
-            <span className="gn-search__icon" aria-hidden="true">
-              <Icon path={ICON_SEARCH} />
-            </span>
-            <input
-              id={`${controlsId}-search`}
-              className="gn-input gn-search__input"
-              type="search"
-              value={query}
-              placeholder="Search title, course or tag"
-              aria-label="Search documents by title, course or tag"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            {query && (
+      <div className="gn-shelf__main">
+        <header className="gn-shelf__header">
+          <div className="gn-shelf__header-row">
+            <h1 className="gn-shelf__heading">{heading}</h1>
+            <div className="gn-shelf__header-end">
+              {headerExtra}
+              <div
+                className="gn-viewtoggle"
+                role="group"
+                aria-label="Document view"
+              >
+                <button
+                  type="button"
+                  className={`gn-icon-button${
+                    view === "grid" ? " gn-icon-button--on" : ""
+                  }`}
+                  aria-pressed={view === "grid"}
+                  aria-label="Grid view"
+                  onClick={() => setView("grid")}
+                >
+                  <Icon path={ICON_GRID} />
+                </button>
+                <button
+                  type="button"
+                  className={`gn-icon-button${
+                    view === "list" ? " gn-icon-button--on" : ""
+                  }`}
+                  aria-pressed={view === "list"}
+                  aria-label="List view"
+                  onClick={() => setView("list")}
+                >
+                  <Icon path={ICON_LIST} />
+                </button>
+              </div>
               <button
                 type="button"
-                className="gn-icon-button gn-search__clear"
-                aria-label="Clear search"
-                onClick={() => setQuery("")}
+                className="gn-button gn-button--primary"
+                onClick={() => void handleCreate()}
               >
-                <Icon path={ICON_CLOSE} />
+                <Icon path={ICON_PLUS} />
+                New document
               </button>
-            )}
-          </div>
-
-          <label className="gn-select-field" htmlFor={`${controlsId}-sort`}>
-            <span className="gn-field__label">Sort by</span>
-            <select
-              id={`${controlsId}-sort`}
-              className="gn-select"
-              value={sortKey}
-              onChange={(event) => setSortKey(event.target.value as SortKey)}
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="gn-select-field" htmlFor={`${controlsId}-course`}>
-            <span className="gn-field__label">Course</span>
-            <select
-              id={`${controlsId}-course`}
-              className="gn-select"
-              value={courseFilter}
-              onChange={(event) => setCourseFilter(event.target.value)}
-            >
-              <option value="">All courses</option>
-              {courses.map((course) => (
-                <option key={course} value={course}>
-                  {course}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </header>
-
-      <div className="gn-shelf__content">
-        <p className="gn-sr-only" role="status" aria-live="polite">
-          {loading
-            ? "Loading documents"
-            : `${visible.length} ${
-                visible.length === 1 ? "document" : "documents"
-              } shown`}
-        </p>
-
-        {error && (
-          <div className="gn-notice gn-notice--error" role="alert">
-            Could not read your document library: {error.message}
-          </div>
-        )}
-
-        {loading ? (
-          <div className="gn-empty" aria-hidden="true">
-            <p className="gn-empty__title">Loading your shelf…</p>
-          </div>
-        ) : !hasAnyDocuments ? (
-          <div className="gn-empty">
-            <div className="gn-empty__art" aria-hidden="true">
-              <span className="gn-empty__sheet" />
-              <span className="gn-empty__sheet" />
-              <span className="gn-empty__sheet" />
             </div>
-            <h2 className="gn-empty__title">Your shelf is empty</h2>
-            <p className="gn-empty__text">
-              Create your first notebook or assignment. Everything stays on this
-              device until you share it.
-            </p>
-            <button
-              type="button"
-              className="gn-button gn-button--primary"
-              onClick={() => void handleCreate()}
-            >
-              <Icon path={ICON_PLUS} />
-              New document
-            </button>
           </div>
-        ) : visible.length === 0 ? (
-          <div className="gn-empty">
-            <h2 className="gn-empty__title">No matching documents</h2>
-            <p className="gn-empty__text">
-              Nothing matches your search and filters.
-            </p>
-            <button
-              type="button"
-              className="gn-button"
-              onClick={() => {
-                setQuery("");
-                setCourseFilter("");
-              }}
-            >
-              Clear search and filters
-            </button>
-          </div>
-        ) : (
-          <ul
-            className="gn-grid"
-            ref={gridRef}
-            aria-label="Documents"
-            onKeyDown={onGridKeyDown}
-          >
-            {visible.map((doc) => (
-              <ShelfCard
-                key={doc.id}
-                doc={doc}
-                now={now}
-                tabIndex={doc.id === activeId ? 0 : -1}
-                isEditing={editingId === doc.id}
-                onOpen={handleOpen}
-                onStartEdit={setEditingId}
-                onStopEdit={handleStopEdit}
-                onDuplicate={handleDuplicate}
-                onDelete={handleDelete}
-                onRename={handleRename}
-                onSetCourse={handleSetCourse}
-                onSetDueDate={handleSetDueDate}
-                onAddTag={handleAddTag}
-                onRemoveTag={handleRemoveTag}
-                onFocusCard={handleFocusCard}
-                registerRef={registerRef}
+
+          <div className="gn-toolbar" role="search">
+            <div className="gn-search">
+              <span className="gn-search__icon" aria-hidden="true">
+                <Icon path={ICON_SEARCH} />
+              </span>
+              <input
+                id={`${controlsId}-search`}
+                className="gn-input gn-search__input"
+                type="search"
+                value={query}
+                placeholder="Search title, course or tag"
+                aria-label="Search documents by title, course or tag"
+                onChange={(event) => setQuery(event.target.value)}
               />
-            ))}
-          </ul>
-        )}
+              {query && (
+                <button
+                  type="button"
+                  className="gn-icon-button gn-search__clear"
+                  aria-label="Clear search"
+                  onClick={() => setQuery("")}
+                >
+                  <Icon path={ICON_CLOSE} />
+                </button>
+              )}
+            </div>
+
+            <label className="gn-select-field" htmlFor={`${controlsId}-sort`}>
+              <span className="gn-field__label">Sort by</span>
+              <select
+                id={`${controlsId}-sort`}
+                className="gn-select"
+                value={sortKey}
+                onChange={(event) => setSortKey(event.target.value as SortKey)}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="gn-select-field" htmlFor={`${controlsId}-course`}>
+              <span className="gn-field__label">Course</span>
+              <select
+                id={`${controlsId}-course`}
+                className="gn-select"
+                value={filter.kind === "course" ? filter.course : ""}
+                onChange={(event) =>
+                  setFilter(
+                    event.target.value
+                      ? { kind: "course", course: event.target.value }
+                      : FILTER_ALL,
+                  )
+                }
+              >
+                <option value="">All courses</option>
+                {courses.map((course) => (
+                  <option key={course} value={course}>
+                    {course}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </header>
+
+        <div className="gn-shelf__content">
+          <p className="gn-sr-only" role="status" aria-live="polite">
+            {loading
+              ? "Loading documents"
+              : `${heading}: ${visible.length} ${
+                  visible.length === 1 ? "document" : "documents"
+                } shown`}
+          </p>
+
+          {error && (
+            <div className="gn-notice gn-notice--error" role="alert">
+              Could not read your document library: {error.message}
+            </div>
+          )}
+
+          {!loading && hasAnyDocuments && (
+            <CourseFolders
+              folders={folders}
+              activeCourse={filter.kind === "course" ? filter.course : null}
+              onOpenCourse={handleOpenCourse}
+              onSetColor={handleSetCourseColor}
+              onSetEmoji={handleSetCourseEmoji}
+            />
+          )}
+
+          {loading ? (
+            <div className="gn-empty" aria-hidden="true">
+              <p className="gn-empty__title">Loading your shelf…</p>
+            </div>
+          ) : !hasAnyDocuments ? (
+            <div className="gn-empty">
+              <div className="gn-empty__art" aria-hidden="true">
+                <span className="gn-empty__sheet" />
+                <span className="gn-empty__sheet" />
+                <span className="gn-empty__sheet" />
+              </div>
+              <h2 className="gn-empty__title">Your shelf is empty</h2>
+              <p className="gn-empty__text">
+                Create your first notebook or assignment. Everything stays on
+                this device until you share it.
+              </p>
+              <button
+                type="button"
+                className="gn-button gn-button--primary"
+                onClick={() => void handleCreate()}
+              >
+                <Icon path={ICON_PLUS} />
+                New document
+              </button>
+            </div>
+          ) : visible.length === 0 ? (
+            <div className="gn-empty">
+              <h2 className="gn-empty__title">No matching documents</h2>
+              <p className="gn-empty__text">
+                Nothing in {heading} matches your search.
+              </p>
+              <button
+                type="button"
+                className="gn-button"
+                onClick={() => {
+                  setQuery("");
+                  setFilter(FILTER_ALL);
+                }}
+              >
+                Clear search and filters
+              </button>
+            </div>
+          ) : (
+            <>
+              {view === "list" && (
+                <div className="gn-list__head" aria-hidden="true">
+                  <span className="gn-list__head-thumb" />
+                  <span>Title</span>
+                  <span>Course</span>
+                  <span>Due</span>
+                  <span>Edited</span>
+                </div>
+              )}
+              <ul
+                className={view === "grid" ? "gn-grid" : "gn-list"}
+                ref={gridRef}
+                aria-label={`${heading}, ${
+                  view === "grid" ? "grid" : "list"
+                } view`}
+                onKeyDown={onGridKeyDown}
+              >
+                {visible.map((doc) => (
+                  <Item key={doc.id} {...itemProps(doc)} />
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
       </div>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={`Delete “${pendingDelete.title}”?`}
+          body={
+            <>
+              This removes the document and all {pendingDelete.pageCount}{" "}
+              {pendingDelete.pageCount === 1 ? "page" : "pages"} of its contents
+              from this device. It cannot be undone.
+            </>
+          }
+          confirmLabel="Delete document"
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
     </div>
   );
 };

@@ -1,0 +1,416 @@
+/**
+ * Active Tool Menu styling.
+ *
+ * Colour comes only from Excalidraw's own custom properties (declared on
+ * `.excalidraw` in `packages/excalidraw/css/theme.scss`), so the panel is
+ * correct in both themes without a second palette. Every value carries a
+ * literal fallback for the case where the panel is mounted outside the editor
+ * and `scopeTheme={false}` was passed.
+ *
+ * Deliberately NOT used: `--color-muted`. Despite the name it is a *background*
+ * grey (`--color-gray-30` light / `--color-gray-80` dark) and fails contrast as
+ * text. De-emphasised text uses `--input-label-color` / `--color-on-surface`.
+ */
+
+// The scope root is a full-viewport, click-through layer: it both brings the
+// theme custom properties into scope (when it carries `.excalidraw`) and gives
+// the panel a stable fixed-position container. The `.excalidraw` base rule is
+// a full-size flex container, which is undone here.
+.gn-tool-menu-scope.gn-tool-menu-scope {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  background: none;
+  pointer-events: none;
+  // above Excalidraw's UI layers (library 120 / main menu 110 / top 100) and
+  // above the GoodNotes taskbar (125), but below the modal layer (1000)
+  z-index: 130;
+}
+
+.gn-tool-menu {
+  position: absolute;
+  pointer-events: auto;
+  box-sizing: border-box;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  width: 16.5rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.5rem 0.625rem 0.625rem;
+  overflow-y: auto;
+
+  border: 1px solid var(--color-border-outline-variant, #c5c5d0);
+  border-radius: var(--border-radius-lg, 0.5rem);
+  background-color: var(--island-bg-color, #fff);
+  box-shadow: var(
+    --shadow-island-stronger,
+    0 0 1px rgba(0, 0, 0, 0.17),
+    0 7px 14px rgba(0, 0, 0, 0.18)
+  );
+
+  color: var(--color-on-surface, #1b1b1f);
+  font-family: var(--ui-font, system-ui, sans-serif);
+  font-size: 0.75rem;
+  line-height: 1.35;
+
+  transition: left 160ms ease, top 160ms ease;
+
+  &[data-dragging="true"] {
+    transition: none;
+    box-shadow: var(
+      --shadow-island-stronger,
+      0 10px 28px rgba(0, 0, 0, 0.28)
+    );
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-highlight-color, #a5d8ff);
+    outline-offset: 2px;
+  }
+
+  /* ----------------------------- header ------------------------------- */
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  &__handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex: 0 0 auto;
+    padding: 0;
+    border: none;
+    border-radius: var(--border-radius-md, 0.375rem);
+    background-color: transparent;
+    color: inherit;
+    cursor: grab;
+    touch-action: none;
+
+    &:hover {
+      background-color: var(--button-hover-bg, #f1f0ff);
+    }
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &__grip {
+    width: 0.75rem;
+    height: 0.75rem;
+    background-image: radial-gradient(
+      currentColor 1px,
+      transparent 1.2px
+    );
+    background-size: 4px 4px;
+    opacity: 0.75;
+  }
+
+  &__title {
+    flex: 1 1 auto;
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-on-surface, #1b1b1f);
+  }
+
+  &__close {
+    width: 1.75rem;
+    height: 1.75rem;
+    flex: 0 0 auto;
+    padding: 0;
+    border: none;
+    border-radius: var(--border-radius-md, 0.375rem);
+    background-color: transparent;
+    color: inherit;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--button-hover-bg, #f1f0ff);
+    }
+  }
+
+  /* ------------------------------ body -------------------------------- */
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  &__group {
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+
+  &__legend,
+  legend {
+    padding: 0 0 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    // a real text token: ~8:1 on the island in both themes
+    color: var(--input-label-color, #495057);
+  }
+
+  &__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  /* ------------------------- radios & swatches ------------------------- */
+
+  &__radio {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.75rem;
+    padding: 0.1875rem 0.5rem;
+    border: 1px solid var(--color-border-outline-variant, #c5c5d0);
+    border-radius: var(--border-radius-md, 0.375rem);
+    background-color: transparent;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+
+    &:hover {
+      background-color: var(--button-hover-bg, #f1f0ff);
+    }
+
+    // the native control stays in the a11y tree and keeps arrow-key roving;
+    // it is only visually replaced by the swatch / label next to it
+    &:has(.gn-tool-menu__radio-input:checked) {
+      border-color: var(--color-primary, #6965db);
+      background-color: var(--color-surface-primary-container, #e0dfff);
+      color: var(--color-on-primary-container, #030064);
+    }
+
+    &:has(:focus-visible) {
+      outline: 2px solid var(--focus-highlight-color, #a5d8ff);
+      outline-offset: 2px;
+    }
+
+    &--swatch {
+      width: 1.875rem;
+      padding: 0.1875rem;
+    }
+
+    &--width {
+      width: 2.5rem;
+      padding: 0.1875rem;
+    }
+  }
+
+  &__radio-input,
+  &__color-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    inset: 0;
+    cursor: pointer;
+  }
+
+  &__color-input {
+    width: 100%;
+    height: 100%;
+  }
+
+  &__radio-text {
+    white-space: nowrap;
+  }
+
+  &__swatch {
+    display: block;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 999px;
+    background-color: var(--gn-swatch, #1e1e1e);
+    // keeps a white / transparent swatch visible on the island
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+
+    &[data-transparent] {
+      background-image: linear-gradient(
+          45deg,
+          var(--color-border-outline-variant, #c5c5d0) 25%,
+          transparent 25% 75%,
+          var(--color-border-outline-variant, #c5c5d0) 75%
+        ),
+        linear-gradient(
+          45deg,
+          var(--color-border-outline-variant, #c5c5d0) 25%,
+          transparent 25% 75%,
+          var(--color-border-outline-variant, #c5c5d0) 75%
+        );
+      background-size: 8px 8px;
+      background-position: 0 0, 4px 4px;
+    }
+
+    &--custom {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--color-on-surface, #1b1b1f);
+      background-color: var(--gn-swatch, transparent);
+      box-shadow: inset 0 0 0 1px var(--color-border-outline, #767680);
+    }
+  }
+
+  &__custom[data-active] &__swatch--custom {
+    box-shadow: inset 0 0 0 2px var(--color-primary, #6965db);
+  }
+
+  &__width-dot {
+    display: block;
+    width: 1.5rem;
+    border-radius: 999px;
+    background-color: currentColor;
+
+    &[data-width="thin"] {
+      height: 2px;
+    }
+    &[data-width="medium"] {
+      height: 4px;
+    }
+    &[data-width="bold"] {
+      height: 7px;
+    }
+  }
+
+  /* ------------------------------ chips -------------------------------- */
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    min-height: 1.75rem;
+    padding: 0.1875rem 0.5rem;
+    border: 1px solid var(--color-border-outline-variant, #c5c5d0);
+    border-radius: 999px;
+    background-color: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+
+    &:hover {
+      background-color: var(--button-hover-bg, #f1f0ff);
+    }
+
+    &[aria-pressed="true"] {
+      border-color: var(--color-primary, #6965db);
+      background-color: var(--color-surface-primary-container, #e0dfff);
+      color: var(--color-on-primary-container, #030064);
+    }
+  }
+
+  &__chip-dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 999px;
+    background-color: var(--gn-swatch, #1e1e1e);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  }
+
+  &__text-button {
+    padding: 0.1875rem 0.375rem;
+    border: none;
+    border-radius: var(--border-radius-md, 0.375rem);
+    background: none;
+    color: var(--input-label-color, #495057);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--color-on-surface, #1b1b1f);
+    }
+  }
+
+  /* --------------------------- misc fields ----------------------------- */
+
+  &__field {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: 0.5rem;
+  }
+
+  &__range {
+    grid-column: 1 / 2;
+    width: 100%;
+    accent-color: var(--color-primary, #6965db);
+  }
+
+  &__output {
+    grid-column: 2 / 3;
+    font-variant-numeric: tabular-nums;
+    color: var(--input-label-color, #495057);
+  }
+
+  &__note {
+    margin: 0;
+    color: var(--input-label-color, #495057);
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.375rem;
+    border-top: 1px solid var(--color-border-outline-variant, #c5c5d0);
+  }
+
+  &__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    cursor: pointer;
+
+    input {
+      accent-color: var(--color-primary, #6965db);
+    }
+  }
+
+  &__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-tool-menu,
+  .gn-tool-menu__radio,
+  .gn-tool-menu__chip {
+    transition: none;
+  }
+}

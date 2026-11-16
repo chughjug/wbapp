@@ -1059,6 +1059,17 @@ export interface ExcalidrawProps {
   objectsSnapModeEnabled?: boolean;
   libraryReturnUrl?: string;
   theme?: Theme;
+  /**
+   * Theme used for image exports (PNG/SVG/clipboard) when the user has not
+   * picked one themselves in the export dialog.
+   *
+   * Defaults to `theme`, i.e. exports follow the screen. Hosts whose dark
+   * mode is a *viewing* mode — e.g. a note-taking app where a dark page must
+   * still print as white paper with black ink — pass `exportTheme="light"`
+   * so a dark screen can never produce a black-background export. An
+   * explicit user choice in the export dialog still wins over this.
+   */
+  exportTheme?: Theme;
   // @TODO come with better API before v0.18.0
   name?: string;
   renderCustomStats?: (

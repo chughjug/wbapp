@@ -873,7 +873,10 @@ class App extends React.Component<AppProps, AppState> {
     this.state = {
       ...defaultAppState,
       theme,
-      exportWithDarkMode: theme === THEME.DARK,
+      // exports follow the view theme unless the host pins them (see the
+      // `exportTheme` prop): a dark *viewing* mode must not produce
+      // black-background exports.
+      exportWithDarkMode: (props.exportTheme ?? theme) === THEME.DARK,
       isLoading: true,
       ...this.getCanvasOffsets(),
       // non-interactive editor implies view mode so that all edit-mode
@@ -4349,8 +4352,12 @@ class App extends React.Component<AppProps, AppState> {
     const elements = this.scene.getElementsIncludingDeleted();
     const elementsMap = this.scene.getElementsMapIncludingDeleted();
 
+    // precedence: the user's explicit choice in the export dialog >
+    // the host's pinned `exportTheme` > the view theme.
     const shouldExportWithDarkMode =
-      (this.sessionExportThemeOverride ?? this.state.theme) === THEME.DARK;
+      (this.sessionExportThemeOverride ??
+        this.props.exportTheme ??
+        this.state.theme) === THEME.DARK;
 
     if (this.state.exportWithDarkMode !== shouldExportWithDarkMode) {
       this.setState({ exportWithDarkMode: shouldExportWithDarkMode });

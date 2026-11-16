@@ -529,9 +529,16 @@ const drawElementOnCanvas = (
 
         for (const shape of shapes) {
           if (typeof shape === "string") {
+            // TRUE DARK MODE: a highlighter keeps its real hue on screen.
+            // `applyDarkModeFilter` would map a light marker colour
+            // (#ffd43b) to a dark navy, which `screen`-composites to
+            // nothing over dark paper. Desaturation/dimming is done by the
+            // alpha scale in `renderElement`, so the hue survives.
+            // Exports are unaffected: `isDarkViewing()` is false there.
             context.fillStyle = applyDarkModeFilter(
               element.strokeColor,
-              renderConfig.theme === THEME.DARK,
+              renderConfig.theme === THEME.DARK &&
+                !(isDarkViewing(renderConfig) && isHighlighterElement(element)),
             );
             context.fill(createPath(shape));
           } else {
@@ -1033,6 +1040,29 @@ export const renderSelectionElement = (
 export const isHighlighterElement = (element: ExcalidrawElement): boolean =>
   element.customData?.goodnotes?.highlighter === true;
 
+/**
+ * GoodNotes TRUE DARK MODE.
+ *
+ * True when we are painting the dark *viewing* theme to the screen — i.e.
+ * never during an export. Every dark-mode-only rendering tweak MUST be gated
+ * on this, so exports keep rendering standard white paper with black ink no
+ * matter what the screen looks like. (`renderConfig.theme` is already
+ * export-independent: `scene/export.ts` builds it from
+ * `appState.exportWithDarkMode`, not from the view theme — the
+ * `!isExporting` here is belt and braces for hosts that export with
+ * `theme: "dark"` on purpose, where honouring their request is correct.)
+ */
+export const isDarkViewing = (
+  renderConfig: Pick<StaticCanvasRenderConfig, "theme" | "isExporting">,
+): boolean => renderConfig.theme === THEME.DARK && !renderConfig.isExporting;
+
+/**
+ * Highlighter alpha is scaled by this in dark viewing mode: `screen` over a
+ * near-black page is the brightest compositing we do, and an unattenuated
+ * marker glares. Purely cosmetic, view-only.
+ */
+const DARK_MODE_HIGHLIGHTER_ALPHA_SCALE = 0.8;
+
 export const renderElement = (
   element: NonDeletedExcalidrawElement,
   elementsMap: RenderableElementsMap,
@@ -1062,8 +1092,19 @@ export const renderElement = (
   // them out. Freedraw is blitted from a per-element cached bitmap, so the
   // stroke composites as one unit and self-intersections never darken.
   // Restored by the `context.restore()` in the `finally` below.
+  //
+  // TRUE DARK MODE: on a dark page `multiply` would drive the stroke to
+  // near-black and the highlighter would simply disappear. Real marker over
+  // dark paper reads as a glow, so we `screen` instead (lighten-only, so the
+  // light ink underneath stays legible) and take the alpha down a notch so it
+  // doesn't glare. View-only — `isDarkViewing()` is false while exporting.
   if (isHighlighterElement(element)) {
-    context.globalCompositeOperation = "multiply";
+    if (isDarkViewing(renderConfig)) {
+      context.globalCompositeOperation = "screen";
+      context.globalAlpha *= DARK_MODE_HIGHLIGHTER_ALPHA_SCALE;
+    } else {
+      context.globalCompositeOperation = "multiply";
+    }
   }
   // Cached bitmaps apply the offset before pixel snapping. Moving it into
   // the canvas transform first loses precision at half-device-pixel ties.

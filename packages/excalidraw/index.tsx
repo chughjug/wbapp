@@ -93,6 +93,7 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
     gridModeEnabled,
     libraryReturnUrl,
     theme,
+    exportTheme,
     name,
     renderCustomStats,
     onPaste,
@@ -236,6 +237,7 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
           gridModeEnabled={gridModeEnabled}
           libraryReturnUrl={libraryReturnUrl}
           theme={theme}
+          exportTheme={exportTheme}
           name={name}
           renderCustomStats={renderCustomStats}
           UIOptions={UIOptions}
