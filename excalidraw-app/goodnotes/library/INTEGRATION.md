@@ -430,6 +430,7 @@ Two incidental notes for whoever owns `goodnotes/share-target`:
 ```
 
 - **No resident sidebar.** `Sidebar` is unchanged and now renders inside `BrowseDrawer`, a modal left drawer opened by the rail's **Browse** chip or by **Browse courses and tags…** in the ⋯ popover.
+- **The rail only renders when it can make a distinction.** A chip must select a set _different from what is already on screen_: Favourites / Due this week / Archived need a non-zero count, courses need to exist, and Recent needs to be a **proper** subset (`0 < recent < all`). If nothing survives that test the whole rail — All and Browse included — is not rendered, because a picker that can only pick what you are already looking at is noise. On a first run (one notebook, created and opened) the rail is therefore absent, and Browse stays reachable through the ⋯ popover.
 - **No resident course-folder row.** `CourseFolders` is unchanged and now renders at the foot of the same drawer, re-labelled "Course colour and icon" — it is the only place colour/emoji are editable, so it had to travel with the sidebar.
 - **No resident Sort or Course `<select>`.** Sort is a `menuitemradio` group in the ⋯ popover. The Course select was **removed as a duplicate** — the course chips in the rail and the course tree in the drawer both do the same job and do it better (the select could not express nesting).
 - **No resident grid/list toggle.** It is a `menuitemradio` pair in the ⋯ popover.

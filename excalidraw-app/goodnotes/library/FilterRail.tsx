@@ -2,13 +2,25 @@
  * The horizontal filter rail: one scrollable row of chips that replaces the
  * permanently resident left sidebar.
  *
- * THE RULE THAT MAKES IT MINIMAL: a chip only exists when it would select
- * something. No favourites yet means no Favourites chip; no courses means no
- * course chips; nothing archived means no Archived chip. On a first run the
- * rail therefore renders *nothing at all* — the screen is the toolbar and the
+ * THE RULE THAT MAKES IT MINIMAL: a chip only exists when it would select a
+ * set *different from the one already on screen*. "Selects something" is too
+ * weak a test — with one notebook, "All 1" and "Recent 1" both select that
+ * same single card, so a rail of All / Recent / Browse would be three
+ * controls that do nothing a student could want. So: no favourites yet means
+ * no Favourites chip; no courses means no course chips; nothing archived
+ * means no Archived chip; and Recent only appears once it is a *proper*
+ * subset (`0 < recent < all`). If none of those survive, the whole rail —
+ * including All and Browse — does not render, because a one-row picker that
+ * can only pick what you are already looking at is noise.
+ *
+ * On a first run the rail is therefore absent: the screen is the bar and the
  * notebooks, and not one pixel explains a feature the student has not used.
- * As they start giving notebooks courses and stars, the rail grows into the
- * thing they need, in the order they will reach for it.
+ * As they give notebooks courses and stars, the rail grows into the thing
+ * they need, in the order they will reach for it.
+ *
+ * Browse is the rail's trailing chip and disappears with it, which costs
+ * nothing: the drawer is always reachable from the ⋯ popover ("Browse
+ * courses and tags…") whenever there is a document at all.
  *
  * Nothing is lost: the full index — every course (nested), every tag, their
  * rename/delete actions, archived, and the storage line — is one tap away in
@@ -65,7 +77,8 @@ export const FilterRail = ({
   const activeId = filterId(filter);
 
   const smart: LibraryFilter[] = [];
-  if (counts.recent > 0) {
+  // "Recent" is only a filter when some documents are *not* recent
+  if (counts.recent > 0 && counts.recent < counts.all) {
     smart.push({ kind: "recent" });
   }
   if (counts.favourites > 0) {
@@ -80,9 +93,9 @@ export const FilterRail = ({
     chips.push({ kind: "archived" });
   }
 
-  const hasAny = chips.length > 0 || courses.length > 0;
-  // the rail is not worth a row of the viewport until it can select something
-  if (!hasAny) {
+  // the rail is not worth a row of the viewport until one of its chips can
+  // show the student something other than what is already in front of them
+  if (chips.length === 0 && courses.length === 0) {
     return null;
   }
 
