@@ -87,6 +87,14 @@ export const GESTURE_GROUP: ReferenceGroup = {
       setting: "swipePages",
     },
     {
+      id: "one-finger-pan",
+      trigger: "One finger, drag",
+      effect:
+        "Moves the page — but only while the stylus is the drawing instrument (palm rejection has pen mode up, or pencil-only is on). Otherwise one finger draws, as it should. In paged view the drag stays inside the current page.",
+      alsoBy: "Two fingers always pan and pinch, whatever this is set to.",
+      setting: "oneFingerPan",
+    },
+    {
       id: "tap-undo",
       trigger: `${fingers(UNDO_TAP_POINTERS)}, tap`,
       effect: "Undo.",

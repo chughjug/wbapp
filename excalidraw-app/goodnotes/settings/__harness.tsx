@@ -5,7 +5,17 @@ import { createStore, set as idbSet, clear as idbClear, entries } from "idb-keyv
 
 import { SettingsScreen } from "./SettingsScreen";
 import { GesturesFirstRunHint } from "./FirstRunHint";
-import { exportBackup, importBackup, validateBundle, getStorageReport } from "./backup";
+import {
+  exportBackup,
+  importBackup,
+  validateBundle,
+  readBundleFile,
+  getStorageReport,
+  BACKED_UP_PREFERENCE_KEYS,
+} from "./backup";
+import { loadPenPresets } from "../pens";
+import { loadInputSettings, resetInputSettingsCache } from "../input";
+import { loadViewMode, resetViewModeCache } from "../paged";
 
 const metaStore = createStore("goodnotes", "docs");
 const sceneStore = createStore("goodnotes-scenes", "scenes");
@@ -15,6 +25,13 @@ const sceneStore = createStore("goodnotes-scenes", "scenes");
   importBackup,
   validateBundle,
   getStorageReport,
+  readBundleFile,
+  BACKED_UP_PREFERENCE_KEYS,
+  loadPenPresets,
+  loadInputSettings,
+  resetInputSettingsCache,
+  loadViewMode,
+  resetViewModeCache,
   seed: async (docs: any[]) => {
     for (const d of docs) {
       await idbSet(d.meta.id, d.meta, metaStore);

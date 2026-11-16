@@ -1,6 +1,6 @@
 /**
- * The tablet input layer: palm rejection, pencil-only drawing, two-finger
- * page flicks and multi-finger taps for undo/redo.
+ * The tablet input layer: palm rejection, pencil-only drawing, one-finger
+ * panning, two-finger page flicks and multi-finger taps for undo/redo.
  *
  * FRAMEWORK-FREE ON PURPOSE. `useInputGestures` is a thin wrapper around
  * {@link attachInputGestures}; keeping the recogniser out of React means it
@@ -25,6 +25,12 @@
  * Gestures are resolved when the last finger lifts, never mid-gesture, so an
  * ambiguous drag stays with the editor. A claimed page flick corrects the
  * stray pan the editor did in the meantime by scrolling to the page.
+ *
+ * ONE-FINGER PANNING is the exception to "resolved on lift" — a pan has to
+ * track the finger live. It stays within the same no-preventDefault rule by
+ * only running in the states where the editor has already decided to ignore
+ * the touch (pen mode + a drawing tool); see `pan.ts`. The moment a second
+ * finger lands the pan bows out and the editor's pinch/pan takes over.
  */
 
 import { getStrokeWidthByKey } from "@excalidraw/common";
@@ -59,6 +65,7 @@ import {
 } from "./constants";
 import { requestRedo, requestUndo } from "./history";
 import { createHoverPreview } from "./hoverPreview";
+import { canOneFingerPan, createOneFingerPan } from "./pan";
 import { DEFAULT_INPUT_SETTINGS } from "./settings";
 
 import type { InputSettings } from "./settings";
@@ -68,7 +75,8 @@ export type InputGestureEvent =
   | { type: "swipe"; direction: -1 | 1; from: number; to: number }
   | { type: "undo" }
   | { type: "redo" }
-  | { type: "palm-rejection"; active: boolean };
+  | { type: "palm-rejection"; active: boolean }
+  | { type: "one-finger-pan" };
 
 /** What this device has turned out to be able to do. */
 export interface InputCapabilities {
@@ -141,6 +149,10 @@ export const attachInputGestures = (
   const win = doc.defaultView ?? window;
   const getSettings = options.getSettings ?? (() => DEFAULT_INPUT_SETTINGS);
   const hover = createHoverPreview(doc);
+  const pan = createOneFingerPan(api, {
+    window: win,
+    onEngage: () => options.onGesture?.({ type: "one-finger-pan" }),
+  });
 
   const pointers = new Map<number, TrackedPointer>();
 
@@ -427,6 +439,9 @@ export const attachInputGestures = (
 
     if (event.pointerType === "pen") {
       hover.hide();
+      // the nib wins over a finger already on the glass: whatever that touch
+      // was doing (a pan, a resting palm) stops here
+      pan.cancel();
       notePenActivity();
       if (session) {
         session.sawPen = true;
@@ -455,6 +470,22 @@ export const attachInputGestures = (
       downAt: now,
       maxTravel: 0,
     });
+
+    if (pointers.size === 1) {
+      // a lone finger may become a pan — decided here (pen mode, active
+      // tool, settings), tracked from the first move past the slop
+      if (
+        getSettings().oneFingerPan &&
+        isOnCanvas(event.target) &&
+        canOneFingerPan(api.getAppState())
+      ) {
+        pan.start(event.clientX, event.clientY);
+      }
+    } else {
+      // a second finger: this is a pinch / two-finger pan / page flick, all
+      // of which belong to the editor and to the recognisers below
+      pan.cancel();
+    }
 
     if (session) {
       session.lastDownAt = now;
@@ -515,6 +546,9 @@ export const attachInputGestures = (
     if (session) {
       session.maxTravel = Math.max(session.maxTravel, tracked.maxTravel);
     }
+    if (pointers.size === 1) {
+      pan.move(event.clientX, event.clientY);
+    }
     pushSample(performance.now());
   };
 
@@ -561,6 +595,7 @@ export const attachInputGestures = (
       return;
     }
     if (pointers.size === 0) {
+      pan.end();
       endSession(performance.now());
     }
   };
@@ -568,6 +603,7 @@ export const attachInputGestures = (
   const onBlur = () => {
     pointers.clear();
     session = null;
+    pan.cancel();
     hover.hide();
   };
 
@@ -594,6 +630,7 @@ export const attachInputGestures = (
       doc.removeEventListener("pointerout", onPointerOut, capture);
       win.removeEventListener("blur", onBlur);
       win.clearTimeout(penReleaseTimer);
+      pan.destroy();
       hover.destroy();
     },
   };

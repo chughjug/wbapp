@@ -240,13 +240,13 @@
   border-radius: 0;
 
   .gn-input-settings__title {
-    // the Settings screen already has a heading for this section
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+    // The Settings screen already has an <h2> for this section, and the
+    // panel ships its own. `display: none` (rather than the usual clip
+    // technique) takes it out of the accessibility tree too, so the heading
+    // outline has one heading per section instead of two identical ones.
+    // The panel's `aria-labelledby` still resolves: name computation reads
+    // through a hidden target.
+    display: none;
   }
 }
 

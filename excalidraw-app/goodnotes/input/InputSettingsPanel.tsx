@@ -47,6 +47,11 @@ const ROWS: Row[] = [
     hint: "Only the stylus ever draws, even when it has been put down.",
   },
   {
+    key: "oneFingerPan",
+    label: "Drag the page with one finger",
+    hint: "While the stylus is in use (or pencil-only is on), a one-finger drag moves the page. Two fingers always pan and pinch.",
+  },
+  {
     key: "swipePages",
     label: "Swipe between pages",
     hint: "Flick sideways with two fingers for the previous or next page. The page panel does the same thing.",

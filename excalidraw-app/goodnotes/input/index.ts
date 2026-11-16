@@ -10,10 +10,15 @@
  *    pointers) — *not* by swallowing pointer events, which would break
  *    pinch-zoom.
  * 2. **Pencil-only drawing.** The same switch, pinned on.
- * 3. **Two-finger horizontal flick = previous/next page**, via
+ * 3. **One-finger panning.** While the finger is not the drawing instrument
+ *    (pen mode up, drawing tool active) a one-finger drag moves the page,
+ *    1:1 with the finger and clamped to the page lock in paged mode. Before
+ *    this, a finger in that state did *nothing at all* — it could not draw
+ *    (palm rejection) and the editor only pans with two pointers.
+ * 4. **Two-finger horizontal flick = previous/next page**, via
  *    `goodnotes/pages`' `scrollToPage`. Claimed only when the flick is fast
  *    and decisively sideways, so ordinary two-finger panning is untouched.
- * 4. **Two-finger tap = undo, three-finger tap = redo**, plus
+ * 5. **Two-finger tap = undo, three-finger tap = redo**, plus
  *    {@link requestUndo} / {@link requestRedo} for buttons — the imperative
  *    API exposes only `history.clear`, so these dispatch the editor's own
  *    Cmd/Ctrl+Z shortcut (see `history.ts` for why that is the supported
@@ -40,6 +45,13 @@ export type {
   UseInputGesturesOptions,
   UseInputGesturesResult,
 } from "./useInputGestures";
+
+/**
+ * One-finger panning, standalone: the rule that decides whether a lone
+ * finger may move the page, for hosts that want to mirror it in their UI.
+ */
+export { canOneFingerPan, createOneFingerPan } from "./pan";
+export type { OneFingerPanHandle } from "./pan";
 
 /** Framework-free entry point (same behaviour, no React). */
 export { attachInputGestures } from "./gestures";
@@ -84,6 +96,9 @@ export {
   SWIPE_PAGE_FIT,
   SWIPE_POINTER_COUNT,
   SWIPE_VELOCITY_WINDOW_MS,
+  ONE_FINGER_PAN_SLOP_PX,
+  OVERSCROLL_MAX_PX,
+  OVERSCROLL_SPRING_MS,
   TAP_COOLDOWN_MS,
   TAP_MAX_DURATION_MS,
   TAP_MAX_MOVEMENT_PX,

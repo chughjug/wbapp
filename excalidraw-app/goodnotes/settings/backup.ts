@@ -63,7 +63,11 @@
 
 import { clear, createStore, del, get, set } from "idb-keyval";
 
+import { DARK_MODE_STORAGE_KEY } from "../dark";
 import { listDocs, getScene } from "../library";
+import { INPUT_SETTINGS_STORAGE_KEY } from "../input";
+import { VIEW_MODE_STORAGE_KEY } from "../paged";
+import { PENS_STORAGE_KEY } from "../pens";
 
 import { DEFAULT_PAPER_STORAGE_KEY } from "./prefs";
 
@@ -110,16 +114,15 @@ export interface BackupBundle {
 /**
  * The preference keys a backup carries.
  *
- * Each is the storage key *the owning module exports*, not a copy of the
- * string, except where the module does not export one — `goodnotes/dark`'s key
- * is `DARK_MODE_STORAGE_KEY` but importing `goodnotes/dark` for a constant
- * would pull React in, so it is listed literally and noted here.
+ * Every entry is the storage key *the owning module exports*, never a copy of
+ * the string: `goodnotes/dark`'s key is `"excalidraw-theme"`, which is exactly
+ * the kind of thing a hand-copied literal gets wrong (and did, once).
  */
 export const BACKED_UP_PREFERENCE_KEYS: readonly string[] = [
-  "goodnotes:input-settings", // goodnotes/input INPUT_SETTINGS_STORAGE_KEY
-  "goodnotes:view-mode", // goodnotes/paged VIEW_MODE_STORAGE_KEY
-  "goodnotes-pens", // goodnotes/pens PENS_STORAGE_KEY
-  "theme", // goodnotes/dark DARK_MODE_STORAGE_KEY
+  INPUT_SETTINGS_STORAGE_KEY,
+  VIEW_MODE_STORAGE_KEY,
+  PENS_STORAGE_KEY,
+  DARK_MODE_STORAGE_KEY,
   DEFAULT_PAPER_STORAGE_KEY,
 ];
 

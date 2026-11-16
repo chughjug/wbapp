@@ -113,3 +113,31 @@ export const HOVER_PREVIEW_IDLE_HIDE_MS = 400;
 /** Floor/ceiling for the hover dot's on-screen diameter, in CSS px. */
 export const HOVER_PREVIEW_MIN_SIZE_PX = 6;
 export const HOVER_PREVIEW_MAX_SIZE_PX = 64;
+
+// ---------------------------------------------------------------------------
+// one-finger pan
+// ---------------------------------------------------------------------------
+
+/**
+ * How far a finger must travel before a one-finger drag becomes a pan, in
+ * CSS px.
+ *
+ * Small, because in the states where one-finger panning is allowed at all
+ * (see `canOneFingerPan`) the editor ignores the finger anyway, so there is
+ * no other gesture to disambiguate from — this only suppresses the jitter of
+ * a stationary fingertip and leaves a touch-and-hold alone.
+ */
+export const ONE_FINGER_PAN_SLOP_PX = 6;
+
+/**
+ * Hard ceiling on the rubberband give past the scroll lock, in CSS px.
+ *
+ * Deliberately small and asymptotic: enough to answer "yes, the app saw your
+ * finger — there is simply nothing further to scroll", never enough to show
+ * any of the neighbouring page (paged mode keeps `PAGE_GAP * 0.85 * zoom` of
+ * clearance, which is comfortably more than this).
+ */
+export const OVERSCROLL_MAX_PX = 28;
+
+/** How long the rubberband takes to spring back after release, in ms. */
+export const OVERSCROLL_SPRING_MS = 220;

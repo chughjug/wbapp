@@ -19,6 +19,14 @@ export interface InputSettings {
    * pinching and tapping). Put the pencil down and fingers ink again.
    */
   palmRejection: boolean;
+  /**
+   * One finger drags the page when the finger is not the drawing instrument
+   * — i.e. while palm rejection (or "pencil only") has pen mode up and a
+   * drawing tool is active. Clamped to the current page in paged mode. See
+   * `canOneFingerPan` in `pan.ts` for the full rule and why it is not
+   * "always".
+   */
+  oneFingerPan: boolean;
   /** Two-finger horizontal flick moves to the previous/next page. */
   swipePages: boolean;
   /** Two-finger tap = undo, three-finger tap = redo. */
@@ -30,6 +38,7 @@ export interface InputSettings {
 export const DEFAULT_INPUT_SETTINGS: InputSettings = {
   pencilOnly: false,
   palmRejection: true,
+  oneFingerPan: true,
   swipePages: true,
   tapGestures: true,
   hoverPreview: true,

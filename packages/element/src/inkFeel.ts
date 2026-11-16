@@ -103,13 +103,20 @@ export const resolveFreedrawStrokeOptions = ({
   variability: StrokeVariability;
 }): StrokeOptions => {
   const tuning = INK_FEEL_TUNING[currentInkFeel];
+  const defaults = INK_FEEL_TUNING[DEFAULT_INK_FEEL];
 
   return {
     variability,
     streamline:
       pointerType === "mouse" ? tuning.streamlineMouse : tuning.streamlinePen,
-    smoothing: tuning.smoothing,
-    thinning: tuning.thinning,
+    // only persisted when they differ from the renderer's own defaults, so
+    // the default preset serialises exactly as it did before this existed
+    ...(tuning.smoothing === defaults.smoothing
+      ? {}
+      : { smoothing: tuning.smoothing }),
+    ...(tuning.thinning === defaults.thinning
+      ? {}
+      : { thinning: tuning.thinning }),
   };
 };
 
