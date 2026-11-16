@@ -1262,7 +1262,7 @@ export const ToolMenu = ({
       type="button"
       className="gn-tool-menu__close"
       aria-label={`Close ${toolTitle.toLowerCase()} settings`}
-      onClick={onClose}
+      onClick={() => onClose()}
     >
       <span aria-hidden="true">&times;</span>
     </button>

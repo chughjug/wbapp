@@ -207,7 +207,6 @@ export const PagePanel = ({
         className ? ` ${className}` : ""
       }`}
       style={{ width: `${width}px` }}
-      style-width={undefined}
       role={isOverlay ? "dialog" : undefined}
       aria-modal={isOverlay ? true : undefined}
       aria-label={isOverlay ? `${title} panel` : undefined}
