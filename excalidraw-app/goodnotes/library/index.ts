@@ -45,6 +45,10 @@ export { DocumentRow } from "./DocumentRow";
 export type { DocumentItemProps } from "./DocumentEditor";
 export { ConfirmDialog } from "./ConfirmDialog";
 export type { ConfirmDialogProps } from "./ConfirmDialog";
+export { PromptDialog } from "./PromptDialog";
+export type { PromptDialogProps } from "./PromptDialog";
+export { SelectionBar } from "./SelectionBar";
+export type { SelectionBarProps } from "./SelectionBar";
 
 // ---------------------------------------------------------------------------
 // Filter model + the favourites convention
@@ -53,6 +57,19 @@ export type { ConfirmDialogProps } from "./ConfirmDialog";
 export {
   /** Reserved tag used as the starred flag (see filters.ts for the rationale). */
   FAVOURITE_TAG,
+  /** Reserved tag: hidden everywhere but the Archived filter. */
+  ARCHIVED_TAG,
+  /** Reserved tag: sorts to the top of the shelf. */
+  PINNED_TAG,
+  RESERVED_TAGS,
+  isReservedTag,
+  tagKey,
+  isArchived,
+  isPinned,
+  hasUserTag,
+  isHiddenByArchive,
+  /** filter + archive visibility: the single predicate the shelf applies. */
+  isInView,
   RECENT_WINDOW_MS,
   FILTER_ALL,
   isFavourite,
@@ -68,6 +85,51 @@ export {
   filtersEqual,
 } from "./filters";
 export type { LibraryFilter } from "./filters";
+
+// ---------------------------------------------------------------------------
+// Tags
+// ---------------------------------------------------------------------------
+
+export {
+  buildTagIndex,
+  countDocsWithTag,
+  suggestTags,
+  addTagToList,
+  removeTagFromList,
+  renameTagInList,
+} from "./tags";
+export type { TagCount } from "./tags";
+
+// ---------------------------------------------------------------------------
+// Nested courses (path-style, see coursePath.ts for the model rationale)
+// ---------------------------------------------------------------------------
+
+export {
+  COURSE_SEPARATOR,
+  COURSE_SEPARATOR_DISPLAY,
+  MAX_COURSE_DEPTH,
+  splitCoursePath,
+  joinCoursePath,
+  normalizeCoursePath,
+  formatCoursePath,
+  coursePathLabel,
+  coursePathParent,
+  coursePathDepth,
+  coursePathAncestors,
+  isDescendantCourse,
+  isInCourseTree,
+  rewriteCoursePath,
+  buildCourseTree,
+  flattenCourseTree,
+} from "./coursePath";
+export type { CourseNode } from "./coursePath";
+
+// ---------------------------------------------------------------------------
+// Multi-selection
+// ---------------------------------------------------------------------------
+
+export { useSelection } from "./selection";
+export type { UseSelectionResult } from "./selection";
 
 // ---------------------------------------------------------------------------
 // React state
@@ -91,6 +153,7 @@ export {
   describeColor,
   COURSE_COLOR_PRESETS,
   COURSE_EMOJI_PRESETS,
+  renameCourseStyleTree,
 } from "./courses";
 export type {
   CourseStyle,
@@ -129,6 +192,21 @@ export {
   deleteDoc,
   /** Subscribe to any library mutation. Returns an unsubscribe fn. */
   subscribe,
+  /** Coalesce many writes into one change notification. */
+  runBatched,
+  /** Bulk metadata patch across many documents (one notification). */
+  updateManyDocs,
+  deleteManyDocs,
+  duplicateManyDocs,
+  /** Add/remove one tag across many documents — also how flags are written. */
+  setTagOnMany,
+  /** Rename a tag across the whole library. */
+  renameTagEverywhere,
+  deleteTagEverywhere,
+  /** Rename a course node *and every course nested below it*. */
+  renameCourseTree,
+  clearCourseTree,
   DEFAULT_DOC_TITLE,
   SCENE_SAVE_DEBOUNCE_MS,
 } from "./store";
+export type { DocPatch } from "./store";

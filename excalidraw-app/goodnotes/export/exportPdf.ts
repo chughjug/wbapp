@@ -2,226 +2,37 @@
  * Multi-page PDF export for the GoodNotes-style document layer.
  *
  * Pages are Excalidraw `frame` elements whose `name` starts with
- * {@link PAGE_FRAME_PREFIX} (e.g. `"page:1"`). Each page frame is rendered to
- * its own raster image (clipped to the frame bounds by Excalidraw's own
- * `exportScene({ type: "canvas", config: { exportingFrame } })`) and then
- * placed on a correspondingly sized jsPDF page.
+ * {@link PAGE_FRAME_PREFIX} (e.g. `"page:1"`). Each page frame is rasterised
+ * by the shared renderer in `./renderPage` — paper composited under a
+ * transparent ink layer, always light theme — and placed on a
+ * correspondingly sized jsPDF page.
  */
 
-import {
-  exportScene,
-  getNonDeletedElements,
-  THEME,
-} from "@excalidraw/excalidraw";
 import { jsPDF } from "jspdf";
 
-import type {
-  ExcalidrawElement,
-  ExcalidrawFrameElement,
-  NonDeleted,
-} from "@excalidraw/element/types";
+import type { ExcalidrawElement } from "@excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 
-import {
-  getPaperPageRects,
-  preloadPageImages,
-  renderPaperForFrame,
-} from "../paper";
-import { PAGE_CUSTOM_DATA_KEY } from "../pages";
-import { PAGE_FRAME_PREFIX, PAGE_SIZES } from "../types";
+import { getOrderedPageFrames, pxToPt } from "./pageFrames";
+import { createPageRenderer, DEFAULT_SCALE } from "./renderPage";
 
-import type { PageSizeName, PaperTemplateId } from "../types";
+import type { PageRenderer } from "./renderPage";
+import type { PaperTemplateId } from "../types";
 
-// ---------------------------------------------------------------------------
-// Units
-// ---------------------------------------------------------------------------
+// Re-exported so this module's public surface is unchanged by the split.
+export {
+  PX_PER_INCH,
+  PT_PER_INCH,
+  pxToPt,
+  isPageFrame,
+  getOrderedPageFrames,
+  matchPageSizeName,
+  parsePageRange,
+  formatPageList,
+} from "./pageFrames";
+export type { ParsePageRangeResult } from "./pageFrames";
 
-/**
- * PAGE_SIZES are CSS px at 96dpi; PDF user space is points at 72dpi.
- * pt = px * 72 / 96 (i.e. px * 0.75).
- */
-export const PX_PER_INCH = 96;
-export const PT_PER_INCH = 72;
-
-/** Convert CSS px (96dpi) to PDF points (72dpi). */
-export const pxToPt = (px: number): number => (px * PT_PER_INCH) / PX_PER_INCH;
-
-// ---------------------------------------------------------------------------
-// Local page-frame helper
-//
-// Deliberately local (not imported from `goodnotes/pages/`) so this module has
-// no cross-feature dependency.
-// ---------------------------------------------------------------------------
-
-/** True if the element is a non-deleted frame acting as a document page. */
-export const isPageFrame = (
-  element: ExcalidrawElement,
-): element is NonDeleted<ExcalidrawFrameElement> =>
-  element.type === "frame" &&
-  !element.isDeleted &&
-  typeof element.name === "string" &&
-  element.name.startsWith(PAGE_FRAME_PREFIX);
-
-/**
- * Parses the trailing number out of a page frame name (`"page:3"` -> 3).
- * Returns `null` when the suffix isn't a plain positive integer.
- */
-const parsePageFrameIndex = (frame: ExcalidrawFrameElement): number | null => {
-  // name shapes: "page:", "page:3", "page:3:lined", "page:lined"
-  const parts = (frame.name ?? "")
-    .slice(PAGE_FRAME_PREFIX.length)
-    .split(":")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  for (const part of parts) {
-    if (/^\d+$/.test(part)) {
-      return Number(part);
-    }
-  }
-  return null;
-};
-
-/**
- * All page frames in document order.
- *
- * Ordered by the number embedded in the frame name when every frame has one
- * (so `page:10` sorts after `page:9`), otherwise by vertical position, which
- * is how pages are stacked on the canvas. Vertical position is always the
- * tie-breaker.
- */
-export const getOrderedPageFrames = (
-  elements: readonly ExcalidrawElement[],
-): NonDeleted<ExcalidrawFrameElement>[] => {
-  const frames = elements.filter(isPageFrame);
-
-  return frames.slice().sort((a, b) => {
-    const ai = parsePageFrameIndex(a);
-    const bi = parsePageFrameIndex(b);
-    if (ai !== null && bi !== null && ai !== bi) {
-      return ai - bi;
-    }
-    if (a.y !== b.y) {
-      return a.y - b.y;
-    }
-    return a.x - b.x;
-  });
-};
-
-/**
- * The named page-size preset matching these dimensions, if any (1px
- * tolerance). Purely informational — export always uses the frame's real
- * geometry.
- */
-export const matchPageSizeName = (
-  width: number,
-  height: number,
-): PageSizeName | null => {
-  for (const [name, size] of Object.entries(PAGE_SIZES) as [
-    PageSizeName,
-    { width: number; height: number },
-  ][]) {
-    if (
-      Math.abs(size.width - width) <= 1 &&
-      Math.abs(size.height - height) <= 1
-    ) {
-      return name;
-    }
-  }
-  return null;
-};
-
-// ---------------------------------------------------------------------------
-// Page range parsing
-// ---------------------------------------------------------------------------
-
-export type ParsePageRangeResult =
-  | { ok: true; pages: number[] }
-  | { ok: false; error: string };
-
-/**
- * Parses a human page range such as `"1-3,5"` into sorted, de-duplicated,
- * 1-based page numbers. Rejects malformed input with a human-readable message
- * rather than silently dropping tokens.
- */
-export const parsePageRange = (
-  input: string,
-  totalPages: number,
-): ParsePageRangeResult => {
-  const trimmed = input.trim();
-  if (!trimmed) {
-    return { ok: false, error: "Enter a page range, for example 1-3,5." };
-  }
-  if (totalPages <= 0) {
-    return { ok: false, error: "This document has no pages to export." };
-  }
-
-  const pages = new Set<number>();
-
-  for (const rawPart of trimmed.split(",")) {
-    const part = rawPart.trim();
-    if (!part) {
-      return {
-        ok: false,
-        error: `Empty entry in "${trimmed}" — remove the extra comma.`,
-      };
-    }
-
-    const rangeMatch = part.match(/^(\d+)\s*-\s*(\d+)$/);
-    if (rangeMatch) {
-      const from = Number(rangeMatch[1]);
-      const to = Number(rangeMatch[2]);
-      if (from < 1 || to < 1) {
-        return { ok: false, error: `Page numbers start at 1 ("${part}").` };
-      }
-      if (from > to) {
-        return {
-          ok: false,
-          error: `"${part}" counts backwards — write ${to}-${from} instead.`,
-        };
-      }
-      if (to > totalPages) {
-        return {
-          ok: false,
-          error: `"${part}" is out of range — this document has ${totalPages} page${
-            totalPages === 1 ? "" : "s"
-          }.`,
-        };
-      }
-      for (let page = from; page <= to; page++) {
-        pages.add(page);
-      }
-      continue;
-    }
-
-    if (!/^\d+$/.test(part)) {
-      return {
-        ok: false,
-        error: `"${part}" isn't a page number or range. Use numbers and ranges, for example 1-3,5.`,
-      };
-    }
-
-    const page = Number(part);
-    if (page < 1 || page > totalPages) {
-      return {
-        ok: false,
-        error: `Page ${page} is out of range — this document has ${totalPages} page${
-          totalPages === 1 ? "" : "s"
-        }.`,
-      };
-    }
-    pages.add(page);
-  }
-
-  if (pages.size === 0) {
-    return { ok: false, error: "No pages selected." };
-  }
-
-  return { ok: true, pages: [...pages].sort((a, b) => a - b) };
-};
-
-// ---------------------------------------------------------------------------
-// Export
-// ---------------------------------------------------------------------------
+export { DEFAULT_SCALE, MAX_SCALE, clampScale } from "./renderPage";
 
 /** Thrown when a specific page fails to render, so the UI can name it. */
 export class PdfExportError extends Error {
@@ -271,17 +82,58 @@ export interface ExportDocumentToPdfOptions {
   onProgress?: (completed: number, total: number) => void;
   /** Abort cooperatively between pages. */
   signal?: AbortSignal;
+  /**
+   * Reuse a renderer already built for this scene (the dialog builds one for
+   * its preview thumbnails). Optional — omit and one is created.
+   */
+  renderer?: PageRenderer;
 }
 
-const DEFAULT_SCALE = 2;
-/** Guard against absurd canvases (browser canvas limits are ~16k px/side). */
-const MAX_SCALE = 8;
-
 /** Let the browser paint progress UI between pages. */
-const yieldToUi = () =>
+export const yieldToUi = (): Promise<void> =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, 0);
   });
+
+/**
+ * Resolves a 1-based page range against a scene's page frames.
+ *
+ * @throws PdfExportError when the document has no pages, or a requested page
+ * number doesn't exist.
+ */
+export const selectPages = <T extends { id: string }>(
+  frames: readonly T[],
+  pageRange: readonly number[] | null | undefined,
+): { pageNumber: number; frame: T }[] => {
+  if (frames.length === 0) {
+    throw new PdfExportError(
+      "This document has no pages to export. Add a page first.",
+      null,
+    );
+  }
+
+  const selected =
+    pageRange && pageRange.length > 0
+      ? [...new Set(pageRange)]
+          .sort((a, b) => a - b)
+          .map((pageNumber) => {
+            const frame = frames[pageNumber - 1];
+            if (!frame) {
+              throw new PdfExportError(
+                `Page ${pageNumber} doesn't exist — this document has ${frames.length} page(s).`,
+                pageNumber,
+              );
+            }
+            return { pageNumber, frame };
+          })
+      : frames.map((frame, index) => ({ pageNumber: index + 1, frame }));
+
+  if (selected.length === 0) {
+    throw new PdfExportError("No pages selected for export.", null);
+  }
+
+  return selected;
+};
 
 /**
  * Renders every selected page frame and assembles them into a single PDF.
@@ -302,68 +154,18 @@ export const exportDocumentToPdf = async ({
   fileName,
   onProgress,
   signal,
+  renderer,
 }: ExportDocumentToPdfOptions): Promise<Blob> => {
-  const sceneElements = getNonDeletedElements(elements);
-  const allPageFrames = getOrderedPageFrames(sceneElements);
+  const pageRenderer =
+    renderer ??
+    (await createPageRenderer({
+      elements,
+      files,
+      appState,
+      defaultPaperTemplate,
+    }));
 
-  // Per-frame paper template, in precedence order:
-  //   1. the pages module's `customData` (canonical; frame names stay plain)
-  //   2. a template encoded in the frame name ("page:3:lined"), which the
-  //      paper module also understands
-  //   3. the caller's document default
-  const templateByFrameId = new Map<string, PaperTemplateId>();
-  for (const rect of getPaperPageRects(sceneElements)) {
-    if (rect.template) {
-      templateByFrameId.set(rect.id, rect.template);
-    }
-  }
-  // page background pictures decode asynchronously; renderPaperForFrame
-  // is synchronous, so prime the decode cache before rendering any page.
-  await preloadPageImages(elements, files ?? null);
-
-  for (const frame of allPageFrames) {
-    const stored = (frame.customData as Record<string, unknown> | undefined)?.[
-      PAGE_CUSTOM_DATA_KEY
-    ] as { template?: PaperTemplateId } | undefined;
-    if (stored?.template) {
-      templateByFrameId.set(frame.id, stored.template);
-    }
-  }
-
-  if (allPageFrames.length === 0) {
-    throw new PdfExportError(
-      "This document has no pages to export. Add a page first.",
-      null,
-    );
-  }
-
-  const selected =
-    pageRange && pageRange.length > 0
-      ? [...new Set(pageRange)]
-          .sort((a, b) => a - b)
-          .map((pageNumber) => {
-            const frame = allPageFrames[pageNumber - 1];
-            if (!frame) {
-              throw new PdfExportError(
-                `Page ${pageNumber} doesn't exist — this document has ${allPageFrames.length} page(s).`,
-                pageNumber,
-              );
-            }
-            return { pageNumber, frame };
-          })
-      : allPageFrames.map((frame, index) => ({
-          pageNumber: index + 1,
-          frame,
-        }));
-
-  if (selected.length === 0) {
-    throw new PdfExportError("No pages selected for export.", null);
-  }
-
-  const effectiveScale = Math.min(
-    MAX_SCALE,
-    Math.max(0.1, Number.isFinite(scale) ? scale : DEFAULT_SCALE),
-  );
+  const selected = selectPages(pageRenderer.frames, pageRange);
 
   const total = selected.length;
   let doc: jsPDF | null = null;
@@ -382,56 +184,10 @@ export const exportDocumentToPdf = async ({
     const format: [number, number] = [widthPt, heightPt];
 
     try {
-      // Ink layer: always transparent, so the paper drawn underneath shows
-      // through. Excalidraw clips this to exactly the frame's bounds, with
-      // zero padding, and hides the frame's own name/outline.
-      const inkCanvas = await exportScene({
-        type: "canvas",
-        data: {
-          elements: sceneElements,
-          appState,
-          files: files ?? undefined,
-        },
-        config: {
-          exportingFrame: frame,
-          // print output is always light theme
-          theme: THEME.LIGHT,
-          canvasBackgroundColor: false,
-          scale: effectiveScale,
-        },
+      const pageCanvas = await pageRenderer.renderPage(frame, {
+        scale,
+        includeBackground,
       });
-
-      let pageCanvas: HTMLCanvasElement = inkCanvas;
-
-      if (includeBackground) {
-        // Paper (sheet fill + rulings + border) is a DOM overlay in the app,
-        // not part of the scene, so it has to be redrawn here as the bottom
-        // layer of the page.
-        const composite = document.createElement("canvas");
-        composite.width = inkCanvas.width;
-        composite.height = inkCanvas.height;
-        const ctx = composite.getContext("2d");
-        if (!ctx) {
-          throw new Error("could not get a 2d canvas context");
-        }
-        const sx = inkCanvas.width / frame.width;
-        const sy = inkCanvas.height / frame.height;
-        ctx.save();
-        ctx.scale(sx, sy);
-        // renderPaperForFrame, not renderPaper: a page's background picture
-        // hangs off the frame, so passing only a template id gave the image
-        // no channel and image pages exported blank.
-        renderPaperForFrame(ctx, frame, {
-          theme: "light",
-          sheet: true,
-          defaultTemplate:
-            templateByFrameId.get(frame.id) ?? defaultPaperTemplate,
-        });
-        ctx.restore();
-        ctx.drawImage(inkCanvas, 0, 0);
-        pageCanvas = composite;
-      }
-
       const dataUrl = pageCanvas.toDataURL("image/png");
 
       if (doc === null) {
@@ -481,25 +237,35 @@ export const exportDocumentToPdf = async ({
     throw new PdfExportError("Nothing was rendered.", null);
   }
 
+  if (signal?.aborted) {
+    throw new PdfExportError("Export cancelled.", null);
+  }
+
   return doc.output("blob");
 };
 
-/** Normalises a user-supplied name into a `.pdf` filename. */
-export const toPdfFileName = (name: string): string => {
-  const base = (name || "document").trim().replace(/\.pdf$/i, "") || "document";
-  // strip characters that browsers/OSes dislike in download names
-  return `${base.replace(/[\\/:*?"<>|]+/g, "-")}.pdf`;
-};
+/** Strips characters browsers/OSes dislike in download names. */
+export const sanitiseFileName = (name: string): string =>
+  ((name || "document").trim() || "document").replace(/[\\/:*?"<>|]+/g, "-");
 
-/** Triggers a browser download of an exported PDF blob. */
-export const downloadPdfBlob = (blob: Blob, fileName: string): void => {
+/** Normalises a user-supplied name into a `.pdf` filename. */
+export const toPdfFileName = (name: string): string =>
+  `${sanitiseFileName((name || "document").replace(/\.pdf$/i, ""))}.pdf`;
+
+/** Triggers a browser download of a blob under the given file name. */
+export const downloadBlob = (blob: Blob, fileName: string): void => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = toPdfFileName(fileName);
+  anchor.download = fileName;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
   // revoke on the next tick so the download has picked up the URL
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+/** Triggers a browser download of an exported PDF blob. */
+export const downloadPdfBlob = (blob: Blob, fileName: string): void => {
+  downloadBlob(blob, toPdfFileName(fileName));
 };
