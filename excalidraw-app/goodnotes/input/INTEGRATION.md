@@ -184,7 +184,7 @@ A user with no stylus who still wants finger panning turns on **Pencil-only draw
 
 **Clamping.** The pan does not go through the editor's internal `viewport.translate()` (not on the imperative API), so it applies the same clamp itself via `goodnotes/paged`'s `clampViewport`, fed from `appState.scrollConstraints`. Measured: one-finger panning stops at scene `y = 2201.2 … 3270.8` for a page occupying `2208 … 3264` with 6.8 scene px of inset slack — i.e. bit-for-bit the limit the editor's own two-finger pan reaches. A neighbouring page is never reachable. With no constraints installed (continuous mode) the pan is free.
 
-**Rubberband.** Paged mode installs `overscroll: false`, so when the page already fits there is genuinely nowhere to go. Rather than feel dead, the pan applies its own asymptotic give — at most `OVERSCROLL_MAX_PX` (28 px, measured peak 25.5 px for a 300 px drag) — and springs back to the clamp over `OVERSCROLL_SPRING_MS`. It is a _hint_, never navigation: it is far smaller than the page-gap clearance paged mode keeps, so no neighbouring page edge is ever exposed, and the gesture always ends exactly on the clamp (net `Δ 0.00`).
+**Rubberband.** When the page already fits there is genuinely nowhere to go. Rather than feel dead, the pan applies its own asymptotic give — at most `OVERSCROLL_MAX_PX` (28 px, measured peak 25.5 px for a 300 px drag) — and springs back to the clamp over `OVERSCROLL_SPRING_MS`. It is a _hint_, never navigation: it is far smaller than the page-gap clearance paged mode keeps, so no neighbouring page edge is ever exposed, and the gesture always ends exactly on the clamp (net `Δ 0.00`).
 
 ### Paged view
 
@@ -209,3 +209,54 @@ The recogniser itself is unchanged, so the thresholds below still describe what 
 - **One-finger panning is measured with CDP-synthesised touch**, which has no inertia, no palm contact geometry and no Safari rubberband of its own. On iPadOS, Safari's own overscroll on the page body is a separate thing from the canvas rubberband here; the canvas has `touch-action: none`, so it should not fire, but that is unverified on hardware.
 - **Pencil-only used to be lost on document open.** The app pushes a restored `appState` when a document loads, which resets `penMode` to `false`; the stale `penModeRequested` guard then read "already asked for" forever, so "pencil only" silently did nothing for the rest of the session. The layer now watches `api.onChange` for a `penMode` it did not write and re-asserts the setting.
 - Palm rejection is coarse-grained by design: it is "fingers don't ink while the pen is in use", not contact-geometry analysis (the web exposes no touch radius on `PointerEvent` reliably enough to do better).
+
+---
+
+## 8. The hand tool, and how it coexists with paged mode (`handPan.ts`)
+
+The hand tool used to be a **dead control** in this app, and was correctly left out of the bar for it. Measured in the running app at an iPad Pro 11" viewport, with a Letter page fitted:
+
+```
+                       scrollX / scrollY before   after    content moved
+  wheel scroll            378.07 /  21.07        378.07 /  21.07     0.00 px
+  space-drag              378.07 /  21.07        378.07 /  21.07     0.00 px
+  hand-tool drag          378.07 /  21.07        378.07 /  21.07     0.00 px
+```
+
+Nothing was broken: at the fit zoom the page box is *smaller* than the viewport, so the page lock has nowhere to move the viewport to, and that is the clamp doing its job. The tool simply had nothing to pan.
+
+Two changes make it real, and they are deliberately in different modules:
+
+1. **Inside the page** — `goodnotes/paged` now installs the lock with `overscroll: PAGED_VIEW_OVERSCROLL_PX` (28 CSS px) instead of `false`. Nothing in this module is involved: the editor's own rubberband and `AppViewport.releaseOverscroll()` do all of it.
+2. **Between pages** — `handPan.ts`, wired into `attachInputGestures`. A hand drag whose travel the viewport demonstrably could *not* consume is an attempt to go somewhere the current page does not reach; past `HAND_PAGE_TURN_PX` (72 CSS px) of such travel, releasing turns the page through `getActivePagedView()`.
+
+### It cannot fight the editor
+
+`handPan.ts` **writes nothing to the viewport while the pointer is down.** Its listeners are the same passive, capture-phase `document` listeners the rest of this module uses, and the gesture is resolved on *release* — the same contract as the flick and the taps. The editor's own hand pan stays the only thing moving the viewport during the drag.
+
+"Unconsumed" is measured, not assumed:
+
+```ts
+unconsumedTravel(pointerDelta, scrollDelta, zoom) === pointerDelta - scrollDelta * zoom;
+```
+
+So while there is anywhere left to pan — zoomed in, mid-page — the figure stays at zero and no page turn can fire however far the user drags.
+
+### Measured (Chromium, 1194×834, Letter page, 3 pages)
+
+| gesture | before | after | content moved on screen |
+| --- | --- | --- | --- |
+| hand drag −80 px, page fitted | `scrollY 21.07` | peak `−15.80`, rest `21.07` | **−28.00 px** held, 0.00 px resting |
+| hand drag −300 px, page fitted | page 0 | page 1 | **−838.45 px** |
+| hand drag +300 px | page 1 | page 0 | **+838.45 px** |
+| hand drag (−120, −140) at zoom 2.2698 | — | — | **−120.00 / −140.00 px**, page unchanged |
+| one-finger *touch* hand drag, pencil-only on | — | — | −28.00 px held, then page 0 → 1 |
+| hand drag (−250, −180), continuous (no constraints) | — | — | **−250.00 / −180.00 px**, no spring-back |
+
+### Settings
+
+The gesture is governed by the existing `swipePages` switch — "a drag can turn the page" is one idea with two input shapes, and a second checkbox for the same promise would be chrome without a purpose. Its label and hint in `InputSettingsPanel` already read as "gesture page turns".
+
+### One-finger pan and the hand tool
+
+`canOneFingerPan` now returns `false` for the `hand` tool (`"hand"` added to `TOUCH_TOOLS_IN_PEN_MODE` in `pan.ts`). With pencil-only on and the hand tool active, both this module's one-finger pan and the editor's own hand pan used to arm on the same drag. **Measured, this made no visible difference** — the editor's `translate()` runs last in each frame and simply overwrote this module's `updateScene` write, so the net motion was already 1:1 (−120.00 px asked, −120.00 px delivered, before and after the change). The change is therefore hygiene, not a fix: it removes a redundant writer, a competing second rubberband at the page edge, and a spurious `one-finger-pan` gesture event.

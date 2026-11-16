@@ -108,6 +108,7 @@ export type { ViewMode } from "./mode";
 export {
   PAGED_VIEW_PADDING,
   PAGED_VIEW_GAP_CLEARANCE,
+  PAGED_VIEW_OVERSCROLL_PX,
   PAGED_VIEW_TRANSITION_MS,
   EMPTY_INSETS,
   addInsets,

@@ -290,3 +290,131 @@ No `UIOptions` change. The Excalidraw chrome the bar replaces is hidden by a bod
 - **Tap the active tool again** for its settings — the GoodNotes gesture. The bar only fires `onActiveToolMenu(tool, anchor)`; it renders no colours or widths itself.
 - **The overlay's width** is 248px (`PAGE_PANEL_WIDTH`), up from the old rail's 188px: it no longer has to pay for itself in permanent layout, so the thumbnails can be bigger. `side="right"` slides it in from the right instead.
 - **`returnFocusTo`** on `PagePanel` lets you name the element focus returns to. Without it, focus goes back to whatever was focused when the overlay opened, which is the Pages control in every normal flow.
+
+---
+
+## 9. The Hand (pan) control — added
+
+### What you have to change in `App.tsx`
+
+**Nothing.** The control is internal to `FloatingBar`: it adds no prop, changes no prop, and drives the editor itself through `goodnotes/tool-menu`'s `activateExtraTool(api, "hand")`. If your `<FloatingBar …>` block compiles today it already has the button.
+
+Two optional lines, if you want them:
+
+```diff
+   onToolChange={(tool) => {
+     // NEW (optional): the Hand control reports leaving pan as a switch to
+     // "select", so a host mirroring the active slot stays honest. It emits
+     // nothing when pan is *entered* — `hand` is not a `TaskbarToolId` and
+     // `goodnotes/types.ts` is the integrator's to change, not ours.
+     setMirroredTool(tool);
+   }}
+```
+
+```diff
+   // NEW (optional): the editor's own shortcut already works and is a
+   // toggle, so this is only needed if you suppress editor shortcuts.
+-  // (nothing)
++  // "H" → hand, handled by packages/excalidraw/components/Tools.tsx
++  //       (TOOLS.hand: { letterKey: KEYS.H, toggle: true })
+```
+
+### Where it sits, and why an eleventh control is justified
+
+```
+ ⌂ │ ▤ 1/1 │ ✒ ▰ ⌫ ◌ ▶ ✋ │ + │ …
+                           ^^ new, last in the tool run
+```
+
+The bar was cut to ten controls on purpose, so an extra one needs an argument. The test applied to the other five tools was applied here: **can the user afford to reach it through a menu?** No — panning is a *mode* you enter and leave continuously while writing (zoom into a corner, write, shove the paper, write), and a two-tap mode switch through "…" turns that rhythm into a chore. It is also the only control that makes a zoomed-in page navigable with a mouse, a trackpad or a single finger without a modifier key.
+
+It sits **last in the tool run, next to Select**, because Select and Hand are the two non-marking tools: everything to their left leaves ink.
+
+### What was considered and rejected
+
+- **Putting it in "…"** — rejected above: wrong for a mode.
+- **Moving `lasso` into "…" to keep the count at ten** — rejected. The lasso slot is a *host hook* (`onFuzzySelect` backs it with `goodnotes/fuzzy-select`); demoting it would quietly change a capability this module does not own, to buy 36 px.
+- **A long-press on Select** — rejected: an undiscoverable gesture is not a control.
+
+### Measured cost (Chromium, 1194 × 834, one document open, first-run hint dismissed)
+
+Union of the surfaces that actually paint — `.gn-bar` and Excalidraw's own `zoom-actions` pill — rasterised to a 1 px grid so nothing is double-counted:
+
+| | bar | zoom pill | union | % of 995,796 px² |
+| --- | --- | --- | --- | --- |
+| without the Hand control | 380 × 46 | 96 × 36 | 20,936 px² | **2.10%** |
+| with the Hand control | 416 × 46 | 96 × 36 | 22,592 px² | **2.27%** |
+
+**+1,656 px², +0.17 percentage points.** The pill grows 380 → 416 px (the 34 px button plus the 2 px flex gap); it stays centred and still clears a quarter of the viewport width on each side.
+
+> The brief quoted 2.50% as the resting figure and `INTEGRATION.md` § 0 quotes 2.40%; neither method is recorded, so the two numbers above are both taken with the *same* method on the *same* page, which is what makes the delta trustworthy. The absolute figure moves with which surfaces you count (an undo/redo island, a minimap dot, the first-run hint) — the +0.17 pp does not.
+
+### Keyboard shortcuts — two pre-existing lies in the bar, fixed
+
+Adding a Hand control put a **second `H`** in the bar and exposed something that was already wrong. Every letter `a`–`z` and `Shift`+`a`–`z` was pressed in the running app with the canvas focused and `appState.activeTool` read back:
+
+| the bar used to say | what the key actually did | now |
+| --- | --- | --- |
+| Pen **(P)** | `p` → `freedraw` ✓ — but it does **not** clear the highlighter marker, so after using the highlighter, `p` left you highlighting | **(P)**, now bound by the bar so it means the Pen *slot*, ink and all |
+| Highlighter **(H)** | `h` → **`hand`**. The editor owns `H` (`TOOLS.hand: { letterKey: KEYS.H, toggle: true }`); nothing in this app ever bound it to the highlighter. **This was wrong before the Hand control existed** — the Hand control did not take the key, it made the collision visible | **(⇧P)** — "the other pen", bound by the bar |
+| Eraser **(E)** | `e` → `eraser` ✓ | unchanged |
+| Lasso select **(Q)** | `q` → toggles the **tool lock** (`activeTool.locked`, measured `false → true → false`). `TOOLS.lasso` has no `letterKey`, and a scan of all 26 letters reached the lasso with none of them | **no shortcut advertised** |
+| Select **(V)** | `v` → `selection` ✓ | unchanged |
+| — | — | Hand **(H)**, the editor's own binding, a toggle |
+
+**`Shift+H` was the obvious choice for the highlighter and was rejected on measurement**: it is `actionFlipHorizontal` (`keyTest: event.shiftKey && event.code === CODES.H` in `packages/excalidraw/actions/actionFlip.ts`). It arrives already `defaultPrevented` and flips the selection. Of every `Shift`+letter, only `Shift+H` and `Shift+V` (flip vertical) are `defaultPrevented`. `Shift+P` was checked the same way — not `defaultPrevented`, and inert both with and without a selection.
+
+#### Why the bar binds any key at all
+
+The highlighter is not an editor tool — it is `freedraw` plus a `customData` marker — so the engine has no binding to give it and never will. `FloatingBar` installs one `keydown` listener for `P` and `Shift+P` (`INK_SHORTCUT_KEYS`). It does not fight the engine:
+
+- it listens in the **bubble phase on `document`**, i.e. after the editor's own handler has already run;
+- for `P` it does **not** call `preventDefault` — it completes the engine's action (which already set `freedraw`) by applying the pen's ink, rather than replacing it;
+- `Shift+P` reaches no engine tool at all, so claiming it takes nothing away;
+- it bails on `defaultPrevented`, any modifier, `event.repeat`, an editable target, an open `.gn-menu`, a target outside the editor container and the bar, `appState.editingTextElement` and `appState.openDialog`.
+
+#### Measured end state
+
+Bar titles:
+
+```
+  pen           "Pen (P)"
+  highlighter   "Highlighter (⇧P)"
+  eraser        "Eraser (E)"
+  lasso         "Lasso select (smart selection)"      <- no key claimed
+  select        "Select (V)"
+  hand          "Hand (pan) (H)"
+```
+
+Pressing each advertised key with the canvas focused, reading back `activeTool.type`, the highlighter marker in `currentItemCustomData`, and which bar button reports `aria-pressed="true"`:
+
+```
+  V        -> activeTool=selection  highlighterMarker=false  barPressed=["select"]
+  P        -> activeTool=freedraw   highlighterMarker=false  barPressed=["pen"]
+  Shift+P  -> activeTool=freedraw   highlighterMarker=true   barPressed=["highlighter"]
+  P        -> activeTool=freedraw   highlighterMarker=false  barPressed=["pen"]     <- straight after the highlighter
+  E        -> activeTool=eraser     highlighterMarker=false  barPressed=["eraser"]
+  H        -> activeTool=hand       highlighterMarker=false  barPressed=["hand"]
+  Shift+P  -> activeTool=freedraw   highlighterMarker=true   barPressed=["highlighter"]
+  V        -> activeTool=selection                           barPressed=["select"]
+```
+
+Every title matches what its key does, and no two controls claim the same key.
+
+**Nothing fires while typing.** Double-click to create a text element, then type `Pp`, press `Shift+P`, press `e`: the wysiwyg textarea reads `"PpPe"`, `editingTextElement` is still set, `activeTool` is unchanged and `highlighterMarker` is still `false` — all four keystrokes were text, none was a shortcut.
+
+### Accessibility
+
+- A real `<button>` in the toolbar's roving tabindex: focus the bar and press `ArrowRight`; verified that Home + 7 × `ArrowRight` lands on it (`data-control="hand"`, accessible name "Hand (pan)").
+- `aria-pressed` is mirrored from `appState.activeTool.type === "hand"` through `excalidrawAPI.onChange`, so a keyboard shortcut or another surface cannot make it lie. Verified `false → true → false` across two `Enter` presses.
+- It is a **toggle**: pressing it while pan is active returns to Select, so it is not a mode you can only leave through another control.
+- Visually hidden text name, `title` with the shortcut, `aria-disabled` (never `disabled`) in read mode — the same contract as the other five tools, from the same `.gn-bar__button--tool` class, so light/dark, focus ring and `prefers-reduced-motion` are inherited rather than re-stated.
+- Touch target 34 × 34 px inside a 46 px pill, identical to the other tools.
+
+### No tool change resizes the canvas
+
+Verified across Pen / Highlighter / Eraser / **Hand** / Select: interactive canvas `top = 0`, `height = 834`, `appState.width × height = 1194 × 834`, unchanged for every one.
+
+### What the control actually does
+
+See `goodnotes/paged/INTEGRATION.md` § 8 and `goodnotes/input/INTEGRATION.md` § 8. In short: the paged viewport lock now carries a 28 px rubberband so a hand drag is never a dead gesture, free panning inside a zoomed page was already correct, and an overdrag the page could not consume turns the page.

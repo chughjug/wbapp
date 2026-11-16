@@ -26,6 +26,11 @@
  * ambiguous drag stays with the editor. A claimed page flick corrects the
  * stray pan the editor did in the meantime by scrolling to the page.
  *
+ * THE HAND TOOL is handled the same way: `handPan.ts` watches a hand drag
+ * and, on release, turns the page when the viewport demonstrably could not
+ * consume the travel. It writes nothing while the pointer is down, so the
+ * editor's own hand pan stays the only thing moving the viewport.
+ *
  * ONE-FINGER PANNING is the exception to "resolved on lift" — a pan has to
  * track the finger live. It stays within the same no-preventDefault rule by
  * only running in the states where the editor has already decided to ignore
@@ -66,6 +71,7 @@ import {
 import { createChromeAutoHide } from "./chromeVisibility";
 import { requestRedo, requestUndo } from "./history";
 import { createHoverPreview } from "./hoverPreview";
+import { createHandOverdrag } from "./handPan";
 import { canOneFingerPan, createOneFingerPan } from "./pan";
 import { DEFAULT_INPUT_SETTINGS } from "./settings";
 
@@ -77,7 +83,9 @@ export type InputGestureEvent =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "palm-rejection"; active: boolean }
-  | { type: "one-finger-pan" };
+  | { type: "one-finger-pan" }
+  /** A hand-tool drag the page lock could not consume turned the page. */
+  | { type: "hand-page-turn"; direction: -1 | 1; from: number; to: number };
 
 /** What this device has turned out to be able to do. */
 export interface InputCapabilities {
@@ -178,6 +186,14 @@ export const attachInputGestures = (
   const pan = createOneFingerPan(api, {
     window: win,
     onEngage: () => options.onGesture?.({ type: "one-finger-pan" }),
+  });
+  // the hand tool's half of paged navigation: a drag the page lock could not
+  // consume turns the page on release. Writes no viewport state, so it never
+  // competes with the editor's own hand pan — see `handPan.ts`.
+  const handOverdrag = createHandOverdrag(api, {
+    isEnabled: () => getSettings().swipePages,
+    onPageTurn: (direction, from, to) =>
+      options.onGesture?.({ type: "hand-page-turn", direction, from, to }),
   });
 
   const pointers = new Map<number, TrackedPointer>();
@@ -511,6 +527,10 @@ export const attachInputGestures = (
     }
     const now = performance.now();
 
+    // the hand tool is driven by every pointer type — mouse, stylus and
+    // finger alike — so it is tracked ahead of the pen/touch split below
+    handOverdrag.pointerDown(event);
+
     if (event.pointerType === "pen") {
       hover.hide();
       // the nib wins over a finger already on the glass: whatever that touch
@@ -617,6 +637,7 @@ export const attachInputGestures = (
   };
 
   const onPointerMove = (event: PointerEvent) => {
+    handOverdrag.pointerMove(event);
     if (event.pointerType === "pen") {
       if (event.buttons === 0 && isInsideEditor(event.target)) {
         // hovering, not touching
@@ -681,6 +702,14 @@ export const attachInputGestures = (
 
   const onPointerUp = (event: PointerEvent) => {
     chrome.strokeEnd(event.pointerId, event.clientX, event.clientY);
+    // resolved on release, like the flick and the taps — see `handPan.ts`.
+    // This handler is bound to `pointercancel` too, and a cancelled gesture
+    // must be abandoned, not interpreted.
+    if (event.type === "pointerup") {
+      handOverdrag.pointerUp(event);
+    } else {
+      handOverdrag.cancel();
+    }
     if (event.pointerType === "pen") {
       notePenActivity();
       return;
@@ -698,6 +727,7 @@ export const attachInputGestures = (
     pointers.clear();
     session = null;
     pan.cancel();
+    handOverdrag.cancel();
     hover.hide();
     // the window lost focus mid-stroke: never leave the chrome hidden
     chrome.reveal("host");
@@ -733,6 +763,7 @@ export const attachInputGestures = (
       unsubscribeChange();
       win.clearTimeout(penReleaseTimer);
       pan.destroy();
+      handOverdrag.cancel();
       hover.destroy();
       chrome.detach();
     },

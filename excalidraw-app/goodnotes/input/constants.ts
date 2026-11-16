@@ -141,3 +141,34 @@ export const OVERSCROLL_MAX_PX = 28;
 
 /** How long the rubberband takes to spring back after release, in ms. */
 export const OVERSCROLL_SPRING_MS = 220;
+
+// ---------------------------------------------------------------------------
+// hand tool — turning the page by overdragging
+// ---------------------------------------------------------------------------
+
+/**
+ * Unconsumed vertical travel of a hand drag before releasing turns the page,
+ * in CSS px. See `handPan.ts` for what "unconsumed" means and why it is
+ * measured rather than assumed.
+ *
+ * Comfortably above {@link OVERSCROLL_MAX_PX} / `PAGED_VIEW_OVERSCROLL_PX`
+ * (28), so that merely feeling the rubberband can never turn a page: the
+ * user has to keep pulling well past the point where the paper has visibly
+ * stopped. Below a flick's {@link SWIPE_MIN_DISTANCE_PX} (90) because this
+ * one is a deliberate, slow drag with a tool chosen on purpose, not a flick
+ * that has to be told apart from an ordinary two-finger pan.
+ */
+export const HAND_PAGE_TURN_PX = 72;
+
+/**
+ * `|overdragY|` must exceed this multiple of `|overdragX|`.
+ *
+ * 1, not {@link SWIPE_HORIZONTAL_DOMINANCE}'s 2: pages stack vertically, so
+ * the competing reading of a diagonal overdrag is "nudging the corner of a
+ * zoomed page", which is harmless to lose. Requiring merely that the gesture
+ * is more vertical than horizontal is enough.
+ */
+export const HAND_PAGE_TURN_DOMINANCE = 1;
+
+/** Ignore further hand-tool page turns for this long after one fires. */
+export const HAND_PAGE_TURN_COOLDOWN_MS = 450;

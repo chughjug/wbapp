@@ -20,7 +20,12 @@
  *     panning *within the page* is exactly what the same clamp produces.
  *   - `lock.zoom` makes the fit zoom the minimum zoom, so no amount of
  *     zooming out can bring a neighbouring page into view.
- *   - `overscroll: false` makes it rigid (no rubberband past the page).
+ *   - `overscroll: PAGED_VIEW_OVERSCROLL_PX` gives a small, bounded
+ *     rubberband past the clamp, which the editor springs back itself when
+ *     the gesture ends. It is deliberately NOT slack: the resting viewport is
+ *     still exactly the clamp. It exists because a rigid clamp made every
+ *     navigation gesture a dead control at fit zoom — see the constant's
+ *     docs for the measurement that forced the change.
  *
  * That is deliberately NOT a `onChange` → `updateScene` correction loop: we
  * never write the viewport in response to an ordinary pan or zoom, so there
@@ -68,6 +73,7 @@ import {
 } from "./mode";
 import {
   EMPTY_INSETS,
+  PAGED_VIEW_OVERSCROLL_PX,
   PAGED_VIEW_PADDING,
   PAGED_VIEW_TRANSITION_MS,
   clampViewport,
@@ -407,7 +413,12 @@ export const attachPagedView = (
       // "contain" (not "scale-down"): the page must FILL the workspace even
       // when that means zooming past 100%.
       fit: "contain",
-      lock: { scroll: true, zoom: true, overscroll: false },
+      // `overscroll` is a bounded rubberband, NOT slack in the clamp: the
+      // editor springs it back to the clamp the moment the gesture ends
+      // (`AppViewport.releaseOverscroll`). It is what keeps a navigation
+      // gesture — wheel, space-drag, HAND TOOL — from being a dead control
+      // while the page is fitted. See `PAGED_VIEW_OVERSCROLL_PX`.
+      lock: { scroll: true, zoom: true, overscroll: PAGED_VIEW_OVERSCROLL_PX },
       offsets: insets,
       animation: animate ? { duration: PAGED_VIEW_TRANSITION_MS } : false,
     });

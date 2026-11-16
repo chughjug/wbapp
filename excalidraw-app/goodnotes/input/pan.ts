@@ -59,12 +59,31 @@ import {
   OVERSCROLL_SPRING_MS,
 } from "./constants";
 
-/** Tools for which the editor still honours a touch pointer in pen mode. */
+/**
+ * Tools for which a lone finger must be left to the editor.
+ *
+ * Two different reasons sit in this one set, on purpose — it is read in
+ * exactly one place and both reasons give the same answer:
+ *
+ * - `selection`, `lasso`, `text`, `image` — the editor still honours a touch
+ *   pointer on these in pen mode (`allowOnPointerDown` in
+ *   `packages/excalidraw/components/App.tsx`), so the finger is already
+ *   doing the thing the user asked for.
+ * - `hand` — the editor pans one-finger there itself (`AppPan.start` accepts
+ *   a single pointer while the hand tool is active). Panning here too would
+ *   be two mechanisms writing the viewport from the same drag, and they do
+ *   not agree: the editor's `translate()` is clamped by
+ *   `scrollConstraints`, this module's write is a raw `updateScene`, so the
+ *   page would move at roughly double speed and overshoot the lock. The
+ *   hand tool's reconciliation with paged mode lives in `handPan.ts`, which
+ *   deliberately writes no viewport state at all.
+ */
 const TOUCH_TOOLS_IN_PEN_MODE = new Set([
   "selection",
   "lasso",
   "text",
   "image",
+  "hand",
 ]);
 
 /**
@@ -87,7 +106,9 @@ const TOUCH_TOOLS_IN_PEN_MODE = new Set([
  * panning has a supported route — turn on "Pencil-only drawing", which is
  * precisely the statement "my finger is not a pen".
  *
- * The hand tool is left alone: the editor already pans one-finger there.
+ * The hand tool is left alone — the editor already pans one-finger there, so
+ * joining in would make the page move twice per drag. See
+ * {@link TOUCH_TOOLS_IN_PEN_MODE}.
  */
 export const canOneFingerPan = (appState: {
   penMode: boolean;

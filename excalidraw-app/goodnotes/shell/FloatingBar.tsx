@@ -9,17 +9,19 @@
  *
  * ```
  *        ┌──────────────────────────────────────────────────┐
- *        │ ⌂ · ▤ 2/12 │ ✒ ▰ ⌫ ◌ ▶ │ + │ … │
+ *        │ ⌂ · ▤ 2/12 │ ✒ ▰ ⌫ ◌ ▶ ✋ │ + │ … │
  *        └──────────────────────────────────────────────────┘
  * ```
  *
- * Ten visible controls, in three runs:
+ * Eleven visible controls, in three runs:
  *
  * - **Home · Pages** — where am I. Pages carries a compact "2/12" counter and
  *   opens the page overlay ({@link PagePanel}), which is a dialog, not a
  *   column: it costs nothing when closed.
- * - **pen · highlighter · eraser · lasso · select** — the five tools a note
- *   app actually uses mid-stroke. Everything else is one tap further away.
+ * - **pen · highlighter · eraser · lasso · select · hand** — the six tools a
+ *   note app actually uses mid-stroke. Everything else is one tap further
+ *   away. Hand (pan) is last because it and Select are the non-marking
+ *   tools; see {@link HAND_TOOL} for why it earns a permanent slot.
  * - **"+"** — secondary inserts: text, the five shapes, image, sticky note,
  *   import PDF, insert graph.
  * - **"…"** — document actions: new document, add page, undo/redo, share,
@@ -27,7 +29,9 @@
  *   host appends through {@link FloatingBarProps.moreItems}.
  *
  * Nothing that the old twenty-odd-control nav bar could reach became
- * unreachable; see `INTEGRATION.md` for the capability audit.
+ * unreachable; see `INTEGRATION.md` for the capability audit, and § 9 there
+ * for the measured chrome cost of the Hand control (+0.17 pp, 2.10% →
+ * 2.27% of a 1194x834 viewport).
  *
  * Accessibility contract (a floating bar makes this harder, not optional):
  * - the whole bar is one `role="toolbar"`: a single tab stop, roving
@@ -89,7 +93,15 @@ import {
 import { TaskbarMenu } from "../taskbar/Menu";
 import { activateTool, toolFromAppState } from "../taskbar/tools";
 
-import { GraphIcon, PlusIcon, SettingsIcon, ThemeIcon } from "./icons";
+import { activateExtraTool } from "../tool-menu/editor";
+
+import {
+  GraphIcon,
+  HandIcon,
+  PlusIcon,
+  SettingsIcon,
+  ThemeIcon,
+} from "./icons";
 
 import "./FloatingBar.scss";
 
@@ -146,7 +158,41 @@ const SHAPE_ITEMS: { id: TaskbarShapeId; label: string; icon: ReactNode }[] = [
   { id: "line", label: "Line", icon: <LineIcon /> },
 ];
 
-/** The five tools that earn a permanent slot, in bar order. */
+/**
+ * The five tools that earn a permanent slot, in bar order.
+ *
+ * ── A shortcut here is a PROMISE, so each one was pressed ──────────────────
+ * Every letter a–z and Shift+a–z was pressed in the running app with the
+ * canvas focused and `appState.activeTool` read back. Two of the five
+ * advertised letters turned out to be wrong, and both were wrong *before*
+ * the Hand control existed:
+ *
+ * - **Highlighter said `H`.** `h` is the editor's own binding for the HAND
+ *   tool (`TOOLS.hand: { letterKey: KEYS.H, toggle: true }` in
+ *   `packages/excalidraw/components/Tools.tsx`) and nothing in this app ever
+ *   bound it to the highlighter. Pressing `h` has always given you the hand
+ *   tool; the label simply said otherwise. It is now `Shift+P` — "the other
+ *   pen", next to the pen's own `P` — and bound below.
+ *
+ *   `Shift+H` was the obvious candidate and was REJECTED on measurement: it
+ *   is `actionFlipHorizontal` (`keyTest: event.shiftKey && event.code ===
+ *   CODES.H`), which arrives already `defaultPrevented` and flips whatever
+ *   is selected. `Shift+P` was checked the same way — not
+ *   `defaultPrevented`, and inert both with and without a selection.
+ * - **Lasso said `Q`.** `q` toggles the editor's TOOL LOCK
+ *   (`activeTool.locked`, measured `false -> true -> false`). `TOOLS.lasso`
+ *   has no `letterKey` at all, and a scan of all 26 letters reached the
+ *   lasso with none of them. The claim is therefore removed rather than
+ *   replaced: the slot is usually the host's smart-selection hook
+ *   (`onFuzzySelect`), which no engine key could reach anyway.
+ *
+ * The other three were verified honest: `p` → `freedraw`, `e` → `eraser`,
+ * `v` → `selection`.
+ *
+ * `shortcut: null` means "this control has no keyboard route", and the
+ * parenthetical is left off the tooltip entirely — an empty promise is worse
+ * than no promise.
+ */
 const PRIMARY_TOOLS: {
   id: Extract<
     TaskbarToolId,
@@ -154,19 +200,78 @@ const PRIMARY_TOOLS: {
   >;
   label: string;
   icon: ReactNode;
-  shortcut: string;
+  shortcut: string | null;
 }[] = [
   { id: "pen", label: "Pen", icon: <PenIcon />, shortcut: "P" },
   {
     id: "highlighter",
     label: "Highlighter",
     icon: <HighlighterIcon />,
-    shortcut: "H",
+    shortcut: "⇧P",
   },
   { id: "eraser", label: "Eraser", icon: <EraserIcon />, shortcut: "E" },
-  { id: "lasso", label: "Lasso select", icon: <LassoIcon />, shortcut: "Q" },
+  { id: "lasso", label: "Lasso select", icon: <LassoIcon />, shortcut: null },
   { id: "select", label: "Select", icon: <SelectIcon />, shortcut: "V" },
 ];
+
+/**
+ * The two ink shortcuts this module binds itself, and why it has to.
+ *
+ * The highlighter is not an editor tool: it is `freedraw` plus a `customData`
+ * marker, so the engine has no binding to give it and never will. `Shift+P`
+ * is therefore bound here. The guard list below is the same one
+ * `goodnotes/paged`'s controller uses for its arrow keys.
+ *
+ * `P` is bound here too, and that is not redundant. The engine's `p` gives
+ * you `freedraw` and nothing else — it does not clear the highlighter
+ * marker. So after `Shift+H`, pressing `p` would leave you highlighting
+ * while the Pen tooltip claimed otherwise: exactly the lie this change
+ * exists to remove. Binding it makes `P` mean the Pen *slot*, ink and all,
+ * the same as tapping the button.
+ *
+ * Neither binding fights the engine:
+ * - `Shift+P` is measured to be unbound. Every `Shift`+letter and every free
+ *   plain letter was pressed in the running app, with and without a
+ *   selection, and `Shift+P` changed nothing and was not
+ *   `defaultPrevented`. (`findToolByKey` in `Tools.tsx` skips a plain-bound
+ *   tool when Shift is held, so `freedraw` declines `Shift+P` too.)
+ * - the `P` handler listens in the BUBBLE phase on `document`, i.e. after
+ *   the editor's own handler has already run, and does not call
+ *   `preventDefault` — it completes the engine's action instead of replacing
+ *   it, and works whether or not the engine saw the key.
+ */
+const INK_SHORTCUT_KEYS: Record<string, "pen" | "highlighter"> = {
+  p: "pen",
+  "shift+p": "highlighter",
+};
+
+/**
+ * The hand (pan) slot.
+ *
+ * NOT a {@link TaskbarToolId}: `goodnotes/taskbar`'s model has no `hand`
+ * slot and `toolFromAppState` maps the editor's `hand` tool to `null`, so
+ * the bar tracks it from `appState.activeTool.type` directly and activates
+ * it through `goodnotes/tool-menu`'s `activateExtraTool`. That keeps the
+ * taskbar model untouched (this module does not own it) while still never
+ * lying about `aria-pressed`.
+ *
+ * ── Why it earns a permanent slot, as an eleventh control ──────────────────
+ * The bar was cut to ten controls on purpose and an extra one is a real
+ * cost, so the test applied to the other five tools was applied here: can
+ * the user afford to reach it through a menu? No. Panning is a MODE you
+ * enter and leave continuously while writing — zoom in to a corner, write,
+ * shove the paper, write — and a two-tap mode switch through "…" turns that
+ * rhythm into a chore. It is also the only control that makes a zoomed-in
+ * page navigable with a mouse or a single finger without a modifier key.
+ *
+ * It sits last in the tool run, next to Select, because the two are the
+ * non-marking tools: everything to the left of them leaves ink.
+ */
+const HAND_TOOL = {
+  id: "hand",
+  label: "Hand (pan)",
+  shortcut: "H",
+} as const;
 
 export interface FloatingBarProps {
   /**
@@ -380,6 +485,12 @@ export const FloatingBar = ({
   const [openMenu, setOpenMenu] = useState<"insert" | "more" | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [editorTheme, setEditorTheme] = useState<"light" | "dark">("light");
+  /**
+   * Mirrored straight from the editor, never from `controlledTool`: `hand`
+   * is not a `TaskbarToolId`, so a host driving the bar's active slot has no
+   * way to express it.
+   */
+  const [handActive, setHandActive] = useState(false);
 
   const activeTool =
     controlledTool === undefined ? internalTool : controlledTool;
@@ -396,6 +507,7 @@ export const FloatingBar = ({
     const sync = () => {
       const appState = excalidrawAPI.getAppState();
       setEditorTheme(appState.theme === "dark" ? "dark" : "light");
+      setHandActive(appState.activeTool.type === "hand");
       const mapped = toolFromAppState(appState as any);
       setInternalTool(mapped.tool);
       if (mapped.shape) {
@@ -451,6 +563,108 @@ export const FloatingBar = ({
       onToolChangeRef,
     ],
   );
+
+  /**
+   * Hand is a TOGGLE, not a one-way trip: pressing it while it is active
+   * goes back to Select. Without that, a bar whose other tools all swap
+   * straight to another tool would leave the one mode you cannot leave by
+   * pressing the same button again.
+   */
+  const toggleHand = useCallback(() => {
+    if (readMode || !excalidrawAPI || excalidrawAPI.isDestroyed) {
+      return;
+    }
+    if (excalidrawAPI.getAppState().activeTool.type === "hand") {
+      activateTool(excalidrawAPI, "select");
+      setInternalTool("select");
+      setHandActive(false);
+      onToolChangeRef.current?.("select");
+      return;
+    }
+    activateExtraTool(excalidrawAPI, "hand");
+    setHandActive(true);
+  }, [readMode, excalidrawAPI, onToolChangeRef]);
+
+  /**
+   * The ink shortcuts. See {@link INK_SHORTCUT_KEYS} for why this module
+   * binds any key at all, and why neither binding fights the engine.
+   *
+   * It calls `activateTool` rather than {@link selectTool} on purpose: a
+   * keyboard shortcut must never open the Active Tool Menu, which
+   * `selectTool` does when the tool you ask for is already the active one.
+   */
+  const runInkShortcut = useLatest((tool: "pen" | "highlighter") => {
+    if (readMode || !excalidrawAPI || excalidrawAPI.isDestroyed) {
+      return;
+    }
+    activateTool(excalidrawAPI, tool, {
+      pen: penPreset,
+      highlighter: highlighterPreset,
+    });
+    setInternalTool(tool);
+    setHandActive(false);
+    onToolChangeRef.current?.(tool);
+  });
+
+  useEffect(() => {
+    if (typeof document === "undefined" || !excalidrawAPI) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.repeat
+      ) {
+        return;
+      }
+      const combo = `${
+        event.shiftKey ? "shift+" : ""
+      }${event.key.toLowerCase()}`;
+      const tool = INK_SHORTCUT_KEYS[combo];
+      if (!tool) {
+        return;
+      }
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT")
+      ) {
+        return; // the user is typing
+      }
+      // the editor or this bar must own the keyboard — not an open menu,
+      // and not some other app surface (the shelf, a dialog, settings)
+      const owned =
+        target === document.body ||
+        (target instanceof Element &&
+          !target.closest(".gn-menu") &&
+          !!(
+            target.closest(".excalidraw-container") || target.closest(".gn-bar")
+          ));
+      if (!owned) {
+        return;
+      }
+      const appState = excalidrawAPI.getAppState();
+      if (appState.editingTextElement || appState.openDialog) {
+        return;
+      }
+      if (event.shiftKey) {
+        // Shift+P reaches no engine tool, so this handler is the whole
+        // binding and must claim the key. Plain `p` is deliberately NOT
+        // claimed — see `INK_SHORTCUT_KEYS`.
+        event.preventDefault();
+      }
+      runInkShortcut.current(tool);
+    };
+    // BUBBLE phase, so the editor's own handler has already run
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [excalidrawAPI, runInkShortcut]);
 
   // Theme is only otherwise reachable from Excalidraw's hamburger island,
   // which `suppressDefaultChrome` hides — so the bar can always toggle it.
@@ -723,6 +937,7 @@ export const FloatingBar = ({
     for (const tool of PRIMARY_TOOLS) {
       ids.push(tool.id);
     }
+    ids.push(HAND_TOOL.id);
     if (insertSections.length) {
       ids.push(insertId);
     }
@@ -937,7 +1152,7 @@ export const FloatingBar = ({
               // `aria-disabled`, never `disabled`, so no tab stop disappears
               aria-disabled={disabled || undefined}
               aria-pressed={pressed}
-              title={`${label} (${tool.shortcut})`}
+              title={tool.shortcut ? `${label} (${tool.shortcut})` : label}
               onFocus={() => setFocusId(tool.id)}
               onClick={() => {
                 setFocusId(tool.id);
@@ -957,6 +1172,26 @@ export const FloatingBar = ({
             </button>
           );
         })}
+
+        <button
+          type="button"
+          ref={registerRef(HAND_TOOL.id)}
+          className="gn-bar__button gn-bar__button--tool"
+          data-control={HAND_TOOL.id}
+          tabIndex={tabIndexFor(HAND_TOOL.id)}
+          aria-disabled={readMode || undefined}
+          aria-pressed={handActive}
+          title={`${HAND_TOOL.label} (${HAND_TOOL.shortcut})`}
+          onFocus={() => setFocusId(HAND_TOOL.id)}
+          onClick={() => {
+            setFocusId(HAND_TOOL.id);
+            setOpenMenu(null);
+            toggleHand();
+          }}
+        >
+          <HandIcon />
+          <span className="gn-bar__sr">{HAND_TOOL.label}</span>
+        </button>
 
         <span
           className="gn-bar__separator"

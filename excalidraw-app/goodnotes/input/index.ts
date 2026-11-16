@@ -18,6 +18,10 @@
  * 4. **Two-finger horizontal flick = previous/next page**, via
  *    `goodnotes/pages`' `scrollToPage`. Claimed only when the flick is fast
  *    and decisively sideways, so ordinary two-finger panning is untouched.
+ *    The HAND TOOL has the same reach: a hand drag whose travel the paged
+ *    viewport lock could not consume turns the page on release
+ *    ({@link createHandOverdrag}). Both are governed by the one
+ *    `swipePages` switch.
  * 5. **Auto-hiding chrome.** A stroke begins → the editor chrome fades out;
  *    a tap, a non-drawing pointer, a key press or focus brings it straight
  *    back. Exposed as a subscribable store ({@link subscribeChromeVisibility})
@@ -60,6 +64,14 @@ export type {
  */
 export { canOneFingerPan, createOneFingerPan } from "./pan";
 export type { OneFingerPanHandle } from "./pan";
+
+/**
+ * The hand tool's reconciliation with paged mode: a drag the page lock
+ * refused turns the page. Writes no viewport state of its own — the editor
+ * keeps doing the panning. See `handPan.ts` for the whole argument.
+ */
+export { createHandOverdrag, unconsumedTravel } from "./handPan";
+export type { HandOverdragHandle, HandOverdragOptions } from "./handPan";
 
 /** Framework-free entry point (same behaviour, no React). */
 export { attachInputGestures } from "./gestures";
@@ -107,6 +119,9 @@ export {
   ONE_FINGER_PAN_SLOP_PX,
   OVERSCROLL_MAX_PX,
   OVERSCROLL_SPRING_MS,
+  HAND_PAGE_TURN_PX,
+  HAND_PAGE_TURN_DOMINANCE,
+  HAND_PAGE_TURN_COOLDOWN_MS,
   TAP_COOLDOWN_MS,
   TAP_MAX_DURATION_MS,
   TAP_MAX_MOVEMENT_PX,

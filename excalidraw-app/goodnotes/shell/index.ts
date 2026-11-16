@@ -11,7 +11,7 @@
  *
  * ```
  *          ┌───────────────────────────────────────────┐
- *          │ ⌂ │ ▤ 2/12 │ ✒ ▰ ⌫ ◌ ▶ │ + │ … │
+ *          │ ⌂ │ ▤ 2/12 │ ✒ ▰ ⌫ ◌ ▶ ✋ │ + │ … │
  *          └───────────────────────────────────────────┘
  * ```
  *
@@ -19,10 +19,10 @@
  *
  * 1. {@link FloatingBar} — `position: absolute`, centred near the top of the
  *    stage, rounded, translucent with a backdrop blur. It *floats over* the
- *    canvas rather than displacing it, so the page gets the full height. Ten
- *    visible controls where there were twenty-odd: Home · Pages (with a
- *    compact "2/12" counter) │ pen, highlighter, eraser, lasso, select │ "+"
- *    for secondary inserts │ "…" for document actions.
+ *    canvas rather than displacing it, so the page gets the full height.
+ *    Eleven visible controls where there were twenty-odd: Home · Pages (with
+ *    a compact "2/12" counter) │ pen, highlighter, eraser, lasso, select,
+ *    hand │ "+" for secondary inserts │ "…" for document actions.
  * 2. {@link PagePanel} — the page rail is now a slide-over **dialog** with a
  *    scrim. Closed, it renders nothing and holds no column; open, it traps
  *    focus, dismisses on Escape and on a scrim click, and returns focus to
@@ -41,6 +41,7 @@
  * | home | Home control |
  * | pages | Pages control (opens the overlay) |
  * | pen / highlighter / eraser / lasso / select | the bar |
+ * | hand (pan) | the bar — new; see `INTEGRATION.md` § 9 |
  * | fuzzy select | the lasso slot (`onFuzzySelect`) |
  * | text / shapes / image / sticky | "+" |
  * | import PDF, insert graph | "+" |

@@ -210,3 +210,50 @@ import {
 - The matte element is appended as the _last_ child of `.gn-shell-canvas`, i.e. into a React-managed parent. React only ever inserts before its own children, so this is safe in practice, but it is a DOM-level assumption.
 - Everything was verified in **Chromium with synthesised input**, including CDP touch for the flick — not on a real iPad.
 - `PAGE_GAP`-sized slivers are handled by the matte, but if a host disables it (`matte: false`) on a portrait canvas, the neighbouring page will peek by a few dozen pixels.
+
+---
+
+## 8. The lock is no longer rigid: `overscroll` (added for the hand tool)
+
+`applyLock` used to install `lock: { scroll: true, zoom: true, overscroll: false }`. That made every *navigation* gesture a dead control while the page is fitted — at the fit zoom the page box is smaller than the viewport, so the clamp has nowhere to move the viewport to. Measured in the running app (iPad Pro 11" viewport, Letter page):
+
+```
+                       scrollX / scrollY before   after    content moved
+  wheel scroll            378.07 /  21.07        378.07 /  21.07     0.00 px
+  space-drag              378.07 /  21.07        378.07 /  21.07     0.00 px
+  hand-tool drag          378.07 /  21.07        378.07 /  21.07     0.00 px
+```
+
+The lock now installs `overscroll: PAGED_VIEW_OVERSCROLL_PX` (28 CSS px), exported from `./pagedView` and from the module index.
+
+**This is not slack in the clamp.** `ScrollConstraints.overscroll` is the editor's own rubberband (`constrainScrollAxis` in `packages/excalidraw/viewport.ts`), and `AppViewport.snapBack()` / `releaseOverscroll()` return the viewport to exactly the clamp when the gesture ends. The *resting* viewport is bit-identical to before:
+
+| | before | after |
+| --- | --- | --- |
+| resting `scrollX / scrollY`, page fitted | `378.07 / 21.07` | `378.07 / 21.07` |
+| peak during a hand drag | `378.07 / 21.07` (0.00 px) | `378.07 / −15.80` (**−28.00 px**) |
+| page rect on screen after `refit()` | — | `left 287.14, top 16.00, 619.73 × 802.00` in a `1194 × 834` box |
+| watchdog corrections after a refit | — | `0` |
+
+### Why 28 and not the editor's default
+
+`resolveOverscroll(true)` is `DEFAULT_OVERSCROLL = 150` px, which would drag a neighbouring page into view — pages are `PAGE_GAP` (48) scene px apart, and the vertical clearance budget is `PAGE_GAP * PAGED_VIEW_GAP_CLEARANCE * zoom` ≈ 31 CSS px at the fit zoom of a Letter page on an iPad Pro 11". 28 is the same figure `goodnotes/input`'s one-finger pan already uses (`OVERSCROLL_MAX_PX`). **Keep the two in step.**
+
+### What did NOT change
+
+- `lockMatches` does not compare `overscroll`, so the watchdog's loop-breaker is unaffected (verified: `getCorrectionCount() === 0` after a refit).
+- The two-finger flick still turns pages and lands on the exact fit — verified with CDP touch: page 0 → 1 → 0, resting viewport back to `378.07 / 21.07`.
+- Arrow keys, `goToPage`, the page panel and adoption are untouched.
+- No tool change resizes the canvas: canvas `top 0`, `height 834`, `appState.width/height 1194 × 834` across Pen / Highlighter / Eraser / **Hand** / Select.
+
+### The page turn cannot leave the document
+
+Verified on a **single-page** document: a hand overdrag past the threshold, three times (up, down, up), is a **no-op** — `pageIndex` stays `0` of `1`, the 28 px rubberband is held and springs exactly back (`scrollY 21.07 → ±28.00 px held → 21.07`, net `0.00`), and the app stays healthy throughout (`window.h` live, 3 canvases, controller present, no page errors). The fit afterwards is still exact (`left 287.14, top 16.00, 619.73 × 802.00`, one watchdog correction, well inside `MAX_CORRECTION_BURST`).
+
+On a two-page document the same is true at both ends: at page 0 a downward overdrag stays at 0, at the last page an upward overdrag stays there.
+
+This needs no guard in `handPan.ts`: it calls `controller.next()` / `prev()`, which go through `goToPage`, whose first act is `if (index < 0 || index >= pages.length) return false`. `onPageTurn` only fires when that returns `true`, so the cooldown is not even consumed by a refused turn.
+
+### One known side effect, in `packages/` (not fixed — app-level only)
+
+With `overscroll > 0`, `AppViewport.translate` calls `this.snapBackDebounced()` from *inside* a `setState` updater (`packages/excalidraw/components/App.viewport.ts`, `translate`, the `if (overscroll > 0)` branch). React logs *"An update … was scheduled from inside an update function"* in development. **It is pre-existing**: the same warning is emitted with `overscroll: false` by another path, verified by temporarily reverting this change. No behavioural effect was observed. The fix is to hoist that call out of the updater, which is a `packages/` change.

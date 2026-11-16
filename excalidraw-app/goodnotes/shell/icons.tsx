@@ -46,6 +46,24 @@ export const GraphIcon = () =>
     </>,
   );
 
+/**
+ * The hand (pan) tool. An open palm — four fingers and a thumb over a
+ * rounded palm — which is the idiom every tablet note app uses for "move
+ * the paper, don't mark it". Drawn with the same 1.6 stroke as the other
+ * tool glyphs so it does not read as heavier than the pen beside it.
+ */
+export const HandIcon = () =>
+  svg(
+    <>
+      {/* pinky + the palm's left edge, drawn as one outline */}
+      <path d="M8.5 16.4V6.6a1.5 1.5 0 0 1 3 0v3.9" />
+      {/* index finger */}
+      <path d="M11.5 10.5V4.6a1.5 1.5 0 0 1 3 0v5.9" />
+      {/* middle finger, then the palm and the thumb down to the wrist */}
+      <path d="M14.5 10.5V6.1a1.5 1.5 0 0 1 3 0v8.4a6.5 6.5 0 0 1-6.5 6.5h-1a5 5 0 0 1-3.6-1.55l-3.05-3.25a1.5 1.5 0 0 1 2.2-2.05l2.45 2.6" />
+    </>,
+  );
+
 /** Host commands appended to the "…" menu (settings and friends). */
 export const SettingsIcon = () =>
   svg(

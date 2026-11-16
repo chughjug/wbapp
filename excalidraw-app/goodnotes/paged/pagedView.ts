@@ -77,6 +77,35 @@ export const PAGED_VIEW_GAP_CLEARANCE = 0.85;
 /** Page-change transition, in ms (skipped under `prefers-reduced-motion`). */
 export const PAGED_VIEW_TRANSITION_MS = 260;
 
+/**
+ * Rubberband give the paged lock allows past the page, in CSS px.
+ *
+ * ── Why the lock is no longer rigid ────────────────────────────────────────
+ * It used to install `overscroll: false`. That is defensible at rest, but it
+ * made every *navigation* gesture a dead control while the page is fitted:
+ * at fit zoom the page box is smaller than the viewport, so the clamp has
+ * nowhere to move the viewport to, and a wheel, a space-drag and a HAND-TOOL
+ * drag all left `scrollX/scrollY` bit-identical. Measured in the running app:
+ * `378.07 / 21.07` before and after all three.
+ *
+ * The editor already implements exactly the right answer — `ScrollConstraints
+ * .overscroll` (`packages/excalidraw/viewport.ts`), a rubberband give applied
+ * inside `constrainScrollAxis` and sprung back by `AppViewport.snapBack()` /
+ * `releaseOverscroll()` when the gesture ends. Turning it on is therefore not
+ * a weakening of the lock: the *resting* viewport is unchanged (the snap-back
+ * always lands exactly on the clamp), and nothing can be left off-centre.
+ *
+ * ── Why this number ────────────────────────────────────────────────────────
+ * The editor's own default is `DEFAULT_OVERSCROLL = 150`, which is far too
+ * much here: pages are stacked `PAGE_GAP` (48) scene px apart, so a 150px
+ * give would drag a neighbouring page into view and undo the whole point of
+ * paged mode. 28 CSS px is the same figure `goodnotes/input`'s one-finger pan
+ * uses (`OVERSCROLL_MAX_PX`), chosen against the same clearance budget
+ * (`PAGE_GAP * PAGED_VIEW_GAP_CLEARANCE * zoom` ≈ 31 CSS px at the fit zoom
+ * of a Letter page on an iPad Pro 11"). Keep the two in step.
+ */
+export const PAGED_VIEW_OVERSCROLL_PX = 28;
+
 export const EMPTY_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
 
 const clampNumber = (value: number, min: number, max: number) =>
