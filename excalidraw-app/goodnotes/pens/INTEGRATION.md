@@ -210,3 +210,21 @@ Round trip: slider → `0.3`; `localStorage["goodnotes-pen-width"]` = `{"pen":0.
 ## 6. Accessibility
 
 Real `<button type="button">` elements; `aria-pressed` on the active preset; accessible names that include tool, width, opacity and shortcut number (visually hidden span); `aria-expanded`/`aria-controls` on the editor toggle; `:focus-visible` outlines using `--focus-highlight-color` (verified: a `Tab` press yields `2px solid rgb(165,216,255)`); fully keyboard reachable; the preset list is a `<ul>` labelled "Pen presets"; and `@media (prefers-reduced-motion: reduce)` drops the transitions (verified: `transition-property: none` under reduced motion). Verified in both light and dark theme using only Excalidraw's CSS custom properties.
+
+## 7. What a width below ~0.36 actually does (read before touching `MIN_PEN_WIDTH`)
+
+A pen stroke lays down `strokeWidth * 2.8` scene units of ink (measured; see `goodnotes/ink/INTEGRATION.md` § "The sub-pixel floor"). At 100% zoom on a 1× display that makes `strokeWidth` **0.357 exactly one device pixel**, and on a 2× display (iPad) **0.18**.
+
+Below that the line is thinner than a pixel, and the slider stops making it thinner — it makes it **lighter** instead. Before this was handled, a sub-pixel stroke also came out visibly patchy and broken, because each pixel's alpha depended on where the centreline happened to fall inside it; that is what the "small pens look rough" report was. The renderer now floors such a stroke at one device pixel and dims it by the same factor, so it is even instead of ragged. Measured at the app's default 76% zoom, 1×: the per-column alpha variation at `strokeWidth` 0.1 fell from 0.340 to 0.168, and at 0.2 from 0.244 to 0.123. **Nothing at 0.4 or above changed by a single pixel** — all the measurements in § 5b still hold exactly.
+
+New export, for UI that wants to be honest about this:
+
+```ts
+export const HAIRLINE_PEN_WIDTH: 0.36; // the 1× / 100% threshold
+```
+
+Widths below it are still perfectly usable — a pale hairline is a real annotation weight — but a control should not imply that 0.1 and 0.3 differ in _thickness_. They differ in _weight_. Suggested copy for the width slider's description, using `--input-label-color` (not `--color-muted`, which is a background grey): _"Below 0.4 a stroke is thinner than a screen pixel, so it gets lighter rather than thinner."_
+
+### `App.tsx` changes required
+
+**None.** The floor lives entirely inside `packages/element/src/renderElement.ts` and needs no state, no prop and no wiring; `HAIRLINE_PEN_WIDTH` is an optional export for copy. The existing `currentItemFreedrawStrokeWidth` branch in `App.getCurrentItemStrokeWidth()` is untouched and still required.

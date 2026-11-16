@@ -73,7 +73,7 @@ import {
 import { getContainingFrame } from "./frame";
 import { getCornerRadius } from "./utils";
 
-import { ShapeCache } from "./shape";
+import { getFreedrawUniformInkWidth, ShapeCache } from "./shape";
 import {
   getStickyNoteFooter,
   getStickyNotePathCommands,
@@ -441,6 +441,88 @@ const strokeStickyNoteEdge = (
 };
 
 /**
+ * SUB-PIXEL (HAIRLINE) FLOOR.
+ *
+ * A freedraw stroke is a filled ribbon. Once that ribbon is narrower than one
+ * device pixel it can no longer cover a whole pixel anywhere, so the
+ * rasteriser renders it as a chain of partially covered pixels whose alpha
+ * depends on where the centreline happens to fall inside each one. The result
+ * reads as a grey, patchy, broken line — and no amount of path smoothing
+ * helps, because the path is not the problem.
+ *
+ * Measured in Chromium at zoom 1, `deviceScaleFactor` 1, same gesture each
+ * time: a `strokeWidth` of 0.1 (0.28 device px of ink) peaks at alpha 0.52,
+ * averages 0.29, and its per-column peak alpha varies by 25% along the
+ * stroke. The identical stroke magnified to 2.24 device px is smooth
+ * (variation 5%) — which is what rules out the geometry as the cause.
+ *
+ * So: when the ribbon would be thinner than a device pixel, widen it to one
+ * device pixel and scale alpha down by the same factor. Total ink is
+ * conserved, the line stays as light as it should be, and it is uniform
+ * instead of patchy. This is the standard hairline rule; it is the only
+ * thing that can be done, because thinner than a pixel does not exist.
+ */
+const FREEDRAW_HAIRLINE_MIN_DEVICE_PX = 1;
+
+/**
+ * Ceiling on the widening, as a multiple of `strokeWidth`, so that it always
+ * fits inside the element's cached bitmap however far the user zooms out —
+ * which is why it is relative. `getCanvasPadding` gives a freedraw element
+ * `strokeWidth * 12` of margin and the ink's own half-width eats
+ * `strokeWidth * 1.4` of it, leaving `strokeWidth * 10.6`; half the widening
+ * falls outside the ink, so 16 keeps a comfortable margin.
+ *
+ * It only binds when a device pixel is more than ~17 `strokeWidth`s wide,
+ * i.e. below roughly 40% zoom on a 1× display, where the floor degrades
+ * gracefully back towards the un-compensated look.
+ */
+const FREEDRAW_HAIRLINE_MAX_WIDEN_FACTOR = 16;
+
+const getFreedrawHairlineCompensation = (
+  element: NonDeletedExcalidrawElement,
+  context: CanvasRenderingContext2D,
+): { widen: number; alpha: number; fill: boolean } | null => {
+  // `getTransform` is the only honest source of device-pixels-per-scene-unit
+  // here: this runs both into the per-element cache (scaled by zoom × backing
+  // store) and straight onto the export canvas.
+  if (
+    !isFreeDrawElement(element) ||
+    typeof context.getTransform !== "function"
+  ) {
+    return null;
+  }
+  // pressure-varying strokes have no single width to floor; left alone
+  const inkWidth = getFreedrawUniformInkWidth(element);
+  if (!(inkWidth > 0)) {
+    return null;
+  }
+  const { a, b, c, d } = context.getTransform();
+  const scale = Math.sqrt(Math.abs(a * d - b * c));
+  const devicePx = inkWidth * scale;
+  if (!(devicePx > 0) || devicePx >= FREEDRAW_HAIRLINE_MIN_DEVICE_PX) {
+    return null;
+  }
+  const widen = Math.min(
+    FREEDRAW_HAIRLINE_MIN_DEVICE_PX / scale - inkWidth,
+    element.strokeWidth * FREEDRAW_HAIRLINE_MAX_WIDEN_FACTOR,
+  );
+  return {
+    widen,
+    // mass-conserving: a ribbon (inkWidth + widen) wide at this alpha lays
+    // down exactly as much ink as an `inkWidth` ribbon at full alpha
+    alpha: inkWidth / (inkWidth + widen),
+    // Stroking the ribbon's outline lays a `widen`-wide band along each of
+    // its two edges. When `widen >= inkWidth` those two bands already meet in
+    // the middle, so the stroke alone paints the whole widened ribbon in a
+    // single composite — which is the point: two overlapping composites at
+    // alpha < 1 darken where they meet, and the darkening is exactly what we
+    // are trying to get rid of. Only when the ribbon is too wide for the
+    // bands to meet does it still need filling.
+    fill: widen < inkWidth,
+  };
+};
+
+/**
  * `save()`s the context around `draw`, restoring it even when `draw` throws:
  * the scene renderer logs a failing element and carries on, and the element
  * mustn't leave its transforms and clips behind for the next one.
@@ -526,6 +608,17 @@ const drawElementOnCanvas = (
       withSavedContext(context, () => {
         const shapes = ShapeCache.generateElementShape(element, renderConfig);
         const createPath = getCreatePath(renderConfig.renderEnvironment);
+        // see `getFreedrawHairlineCompensation`: a sub-pixel ribbon is widened
+        // to one device pixel and dimmed by the same factor, so it rasterises
+        // evenly instead of breaking up
+        const hairline = getFreedrawHairlineCompensation(element, context);
+
+        if (hairline) {
+          context.globalAlpha *= hairline.alpha;
+          context.lineWidth = hairline.widen;
+          context.lineJoin = "round";
+          context.lineCap = "round";
+        }
 
         for (const shape of shapes) {
           if (typeof shape === "string") {
@@ -540,7 +633,18 @@ const drawElementOnCanvas = (
               renderConfig.theme === THEME.DARK &&
                 !(isDarkViewing(renderConfig) && isHighlighterElement(element)),
             );
-            context.fill(createPath(shape));
+            const path = createPath(shape);
+            if (hairline) {
+              // stroking the outline grows the ribbon by `lineWidth` in total
+              // (half outside, half inside)
+              context.strokeStyle = context.fillStyle;
+              if (hairline.fill) {
+                context.fill(path);
+              }
+              context.stroke(path);
+            } else {
+              context.fill(path);
+            }
           } else {
             rc.draw(shape);
           }

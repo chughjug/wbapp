@@ -1357,6 +1357,23 @@ const getConstantWidthFreedrawOutline = (
     .map(([x, y]) => [x, y] as [number, number]);
 };
 
+/**
+ * The width, in scene units, of the ink a uniform (constant-width) freedraw
+ * stroke actually lays down. `LaserPointer`'s `size` is the ribbon's
+ * half-width, so the ink spans twice it — verified in the browser: a
+ * `strokeWidth` of 1 covers 2.80 px of ink per px of path length, and 2
+ * covers 5.64 px.
+ *
+ * Returns 0 for pressure-varying strokes, whose width is not uniform and so
+ * has no single answer. Used by the renderer's sub-pixel (hairline) floor.
+ */
+export const getFreedrawUniformInkWidth = (
+  element: ExcalidrawFreeDrawElement,
+): number =>
+  element.strokeOptions?.variability === "constant"
+    ? element.strokeWidth * CONSTANT_WIDTH_FREEDRAW.SIZE_FACTOR * 2
+    : 0;
+
 export const getFreedrawOutlinePoints = (
   element: ExcalidrawFreeDrawElement,
 ): [number, number][] => {

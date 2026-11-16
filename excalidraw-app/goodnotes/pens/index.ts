@@ -22,6 +22,7 @@ export {
   PEN_WIDTHS,
   MIN_PEN_WIDTH,
   MAX_PEN_WIDTH,
+  HAIRLINE_PEN_WIDTH,
   loadPenPresets,
   savePenPresets,
   resetPenPresets,
