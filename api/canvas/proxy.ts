@@ -76,15 +76,15 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const host = String(req.headers["x-canvas-host"] ?? "").trim().toLowerCase();
+  const host = String(req.headers["x-canvas-host"] ?? "")
+    .trim()
+    .toLowerCase();
   const token = String(req.headers["x-canvas-token"] ?? "").trim();
   const path = String(req.query?.path ?? "").replace(/^\/+/, "");
   const search = String(req.query?.query ?? "");
 
   if (!host || !token || !path) {
-    res
-      .status(400)
-      .json({ error: "Missing Canvas host, token, or path." });
+    res.status(400).json({ error: "Missing Canvas host, token, or path." });
     return;
   }
   if (!isAllowedHost(host)) {
@@ -128,8 +128,8 @@ export default async function handler(req: any, res: any) {
     // deliberately vague: never surface anything that could include the token
     const timedOut =
       error instanceof Error && /timeout|abort/i.test(error.message);
-    res
-      .status(timedOut ? 504 : 502)
-      .json({ error: timedOut ? "Canvas timed out." : "Could not reach Canvas." });
+    res.status(timedOut ? 504 : 502).json({
+      error: timedOut ? "Canvas timed out." : "Could not reach Canvas.",
+    });
   }
 }

@@ -13,7 +13,10 @@
 .gn-canvas-browser {
   --gn-canvas-text: var(--text-primary-color, var(--color-on-surface));
   --gn-canvas-text-secondary: var(--color-gray-70, #5c5c5c); // 6.6:1 on white
-  --gn-canvas-surface: var(--island-bg-color, var(--color-surface-lowest, #fff));
+  --gn-canvas-surface: var(
+    --island-bg-color,
+    var(--color-surface-lowest, #fff)
+  );
   --gn-canvas-surface-alt: var(--color-surface-low, #f5f5f9);
   --gn-canvas-border: var(--dialog-border-color, var(--color-gray-20, #ced4da));
   --gn-canvas-accent: var(--color-primary, #6965db);
@@ -35,7 +38,10 @@
   // dark theme's --color-primary is a pale lilac (#a8a5ff); white on it is
   // ~2.3:1, so the primary button takes near-black text instead
   --gn-canvas-accent-text: #1b1b1f;
-  --gn-canvas-surface: var(--island-bg-color, var(--color-surface-low, #232329));
+  --gn-canvas-surface: var(
+    --island-bg-color,
+    var(--color-surface-low, #232329)
+  );
   --gn-canvas-surface-alt: var(--color-surface-high, #2e2d39);
   --gn-canvas-border: var(--dialog-border-color, var(--color-gray-80, #343a40));
   --gn-canvas-danger-bg: var(--color-danger-icon-background, #672120);

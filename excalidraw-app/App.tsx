@@ -99,8 +99,8 @@ import {
 } from "./goodnotes/pages";
 import { PaperBackgroundLayer } from "./goodnotes/paper";
 import { PagedViewControls, usePagedView } from "./goodnotes/paged";
+import { Dashboard } from "./goodnotes/dashboard";
 import {
-  Shelf,
   createDoc,
   getScene,
   saveSceneDebounced,
@@ -1572,7 +1572,7 @@ const GoodNotesRoot = () => {
   if (!docId && !isTransientScene) {
     return (
       <>
-        <Shelf
+        <Dashboard
           theme={editorTheme}
           onOpenDocument={openDocument}
           headerExtra={<PdfDropZone variant="inline" />}

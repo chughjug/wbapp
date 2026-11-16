@@ -124,50 +124,23 @@ The gesture is resolved **when the last finger lifts**, never mid-drag, so an am
 
 ### 5a. One-finger panning
 
-**The bug it fixes.** With palm rejection up (`appState.penMode`), the editor
-refuses a `touch` pointer on a drawing tool (`allowOnPointerDown`) — and it
-only pans with *two* pointers. So a one-finger drag did **nothing at all**:
-measured in paged mode, zoomed to 2.23×, a 300 px one-finger drag moved
-`scrollY` by 0.00 and drew nothing. That is the "I can't scroll the page with
-my finger" report.
+**The bug it fixes.** With palm rejection up (`appState.penMode`), the editor refuses a `touch` pointer on a drawing tool (`allowOnPointerDown`) — and it only pans with _two_ pointers. So a one-finger drag did **nothing at all**: measured in paged mode, zoomed to 2.23×, a 300 px one-finger drag moved `scrollY` by 0.00 and drew nothing. That is the "I can't scroll the page with my finger" report.
 
-**The rule** (`canOneFingerPan`, `pan.ts`): one finger pans **only when the
-finger cannot be the drawing instrument** — `penMode` is up *and* the active
-tool is not one the editor still honours for touch (`selection`, `lasso`,
-`text`, `image`). In exactly those states the editor drops the touch on the
-floor, so nothing is stolen and nothing has to be `preventDefault`-ed (which
-would break pinch, see the header of `gestures.ts`). Consequences, all
-measured:
+**The rule** (`canOneFingerPan`, `pan.ts`): one finger pans **only when the finger cannot be the drawing instrument** — `penMode` is up _and_ the active tool is not one the editor still honours for touch (`selection`, `lasso`, `text`, `image`). In exactly those states the editor drops the touch on the floor, so nothing is stolen and nothing has to be `preventDefault`-ed (which would break pinch, see the header of `gestures.ts`). Consequences, all measured:
 
 | State | One finger does |
 | --- | --- |
-| No stylus seen, palm rejection idle | **draws** — the finger *is* the pencil |
+| No stylus seen, palm rejection idle | **draws** — the finger _is_ the pencil |
 | Stylus used in the last `PEN_ACTIVE_WINDOW_MS`, drawing tool | **pans** |
 | "Pencil-only drawing" on, drawing tool | **pans** |
 | Selection / lasso / text / image tool | selects / marquees, as the editor intends |
 | Hand tool | the editor's own one-finger pan, untouched |
 
-A user with no stylus who still wants finger panning turns on **Pencil-only
-drawing** — which is exactly the statement "my finger is not a pen". That is
-why this is not a separate three-way setting; the on/off switch
-(`oneFingerPan`, default **on**) only exists to opt out entirely.
+A user with no stylus who still wants finger panning turns on **Pencil-only drawing** — which is exactly the statement "my finger is not a pen". That is why this is not a separate three-way setting; the on/off switch (`oneFingerPan`, default **on**) only exists to opt out entirely.
 
-**Clamping.** The pan does not go through the editor's internal
-`viewport.translate()` (not on the imperative API), so it applies the same
-clamp itself via `goodnotes/paged`'s `clampViewport`, fed from
-`appState.scrollConstraints`. Measured: one-finger panning stops at scene
-`y = 2201.2 … 3270.8` for a page occupying `2208 … 3264` with 6.8 scene px of
-inset slack — i.e. bit-for-bit the limit the editor's own two-finger pan
-reaches. A neighbouring page is never reachable. With no constraints
-installed (continuous mode) the pan is free.
+**Clamping.** The pan does not go through the editor's internal `viewport.translate()` (not on the imperative API), so it applies the same clamp itself via `goodnotes/paged`'s `clampViewport`, fed from `appState.scrollConstraints`. Measured: one-finger panning stops at scene `y = 2201.2 … 3270.8` for a page occupying `2208 … 3264` with 6.8 scene px of inset slack — i.e. bit-for-bit the limit the editor's own two-finger pan reaches. A neighbouring page is never reachable. With no constraints installed (continuous mode) the pan is free.
 
-**Rubberband.** Paged mode installs `overscroll: false`, so when the page
-already fits there is genuinely nowhere to go. Rather than feel dead, the pan
-applies its own asymptotic give — at most `OVERSCROLL_MAX_PX` (28 px,
-measured peak 25.5 px for a 300 px drag) — and springs back to the clamp over
-`OVERSCROLL_SPRING_MS`. It is a *hint*, never navigation: it is far smaller
-than the page-gap clearance paged mode keeps, so no neighbouring page edge is
-ever exposed, and the gesture always ends exactly on the clamp (net `Δ 0.00`).
+**Rubberband.** Paged mode installs `overscroll: false`, so when the page already fits there is genuinely nowhere to go. Rather than feel dead, the pan applies its own asymptotic give — at most `OVERSCROLL_MAX_PX` (28 px, measured peak 25.5 px for a 300 px drag) — and springs back to the clamp over `OVERSCROLL_SPRING_MS`. It is a _hint_, never navigation: it is far smaller than the page-gap clearance paged mode keeps, so no neighbouring page edge is ever exposed, and the gesture always ends exactly on the clamp (net `Δ 0.00`).
 
 ### Paged view
 

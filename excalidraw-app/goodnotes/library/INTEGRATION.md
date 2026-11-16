@@ -366,7 +366,7 @@ import type {
 
 | Feature | Model | Why |
 | --- | --- | --- |
-| Nested courses | **Path string inside the existing `DocMeta.course`**: `"MATH 221/Problem sets"` (rendered `MATH 221 / Problem sets`) | No change to the shared contract, no new entity, no referential integrity to maintain, zero migration — a depth-1 path is exactly today's data. A folder *is* the set of documents whose path starts with it, so it cannot drift. See the long rationale at the top of `coursePath.ts`. Cost: renaming is an N-document rewrite, paid in one batched write by `renameCourseTree`, which also rewrites every descendant and moves the course's colour/emoji rows (`renameCourseStyleTree`). |
+| Nested courses | **Path string inside the existing `DocMeta.course`**: `"MATH 221/Problem sets"` (rendered `MATH 221 / Problem sets`) | No change to the shared contract, no new entity, no referential integrity to maintain, zero migration — a depth-1 path is exactly today's data. A folder _is_ the set of documents whose path starts with it, so it cannot drift. See the long rationale at the top of `coursePath.ts`. Cost: renaming is an N-document rewrite, paid in one batched write by `renameCourseTree`, which also rewrites every descendant and moves the course's colour/emoji rows (`renameCourseStyleTree`). |
 | Archive | **Reserved tag `"archived"`** — the same mechanism as favourites | One source of truth on the document, carried by `duplicateDoc` for free, no second store to keep in sync with `deleteDoc`. |
 | Pinning | **Reserved tag `"pinned"`** | Same. Pinned documents sort first in every sort order. |
 
@@ -389,6 +389,6 @@ import type {
 - Every item also has a real `<input type="checkbox">` with its own accessible name (`Select <title>`), tabbable through the roving tabindex.
 - Keyboard: **Space** toggles selection on the focused item (Enter still opens it), **Shift+Arrow** extends from the anchor, **Cmd/Ctrl+A** selects everything shown, **Escape** clears. Mouse: Cmd/Ctrl-click toggles, Shift-click selects a range.
 - Selection count and the result of every bulk action are announced in `role="status" aria-live="polite"` regions.
-- The bulk bar is a `role="group"` of real text buttons placed *before* the grid in the DOM, so Tab reaches it immediately; each action names its scope ("Delete 12 documents").
+- The bulk bar is a `role="group"` of real text buttons placed _before_ the grid in the DOM, so Tab reaches it immediately; each action names its scope ("Delete 12 documents").
 - Deleting many documents raises **one** confirmation, never N.
 - The roving tabindex and its measured row step are untouched.
