@@ -9,7 +9,14 @@
 import React, { useId, useState } from "react";
 
 import { visibleTags } from "./filters";
-import { Icon, ICON_CHECK, ICON_CLOSE } from "./icons";
+import { formatCoursePath } from "./coursePath";
+import {
+  Icon,
+  ICON_ARCHIVE,
+  ICON_CHECK,
+  ICON_CLOSE,
+  ICON_PIN,
+} from "./icons";
 
 import type { CourseStyle } from "./courses";
 import type { DocMeta } from "../types";
@@ -36,7 +43,95 @@ export interface DocumentItemProps {
   onToggleFavourite: (doc: DocMeta) => void;
   onFocusCard: (id: string) => void;
   registerRef: (id: string, node: HTMLButtonElement | null) => void;
+
+  // ------------------------------------------------------------- selection
+  /** Part of the current multi-selection. */
+  isSelected?: boolean;
+  /** At least one document is selected anywhere, so checkboxes stay visible. */
+  selectionActive?: boolean;
+  /**
+   * Toggle/extend the selection. `shift` requests a range from the anchor,
+   * `meta` an additive toggle; neither means "select only this one".
+   */
+  onToggleSelect?: (
+    id: string,
+    modifiers: { shift: boolean; meta: boolean },
+  ) => void;
+
+  // ------------------------------------------------------- flags + filters
+  isPinned?: boolean;
+  isArchived?: boolean;
+  onTogglePinned?: (doc: DocMeta) => void;
+  onToggleArchived?: (doc: DocMeta) => void;
+  /** Clicking a tag chip filters the library by it. */
+  onSelectTag?: (tag: string) => void;
+  /** Autocomplete sources for the inline editor. */
+  tagSuggestions?: readonly string[];
+  courseSuggestions?: readonly string[];
 }
+
+/**
+ * Mouse/keyboard activation shared by the card and the row.
+ *
+ * Modifier-click selects instead of opening (Cmd/Ctrl toggles, Shift
+ * extends), and Space toggles selection from the keyboard — the one place
+ * where a `<button>`'s default is deliberately overridden, because Enter
+ * still opens the document and a multi-select list with no keyboard
+ * selection gesture is not usable without a mouse.
+ */
+export const useItemActivation = (props: DocumentItemProps) => {
+  const { doc, onOpen, onToggleSelect } = props;
+  return {
+    onClick: (event: React.MouseEvent) => {
+      const meta = event.metaKey || event.ctrlKey;
+      if (onToggleSelect && (meta || event.shiftKey)) {
+        event.preventDefault();
+        event.stopPropagation();
+        onToggleSelect(doc.id, { shift: event.shiftKey, meta });
+        return;
+      }
+      onOpen(doc);
+    },
+    onKeyDown: (event: React.KeyboardEvent) => {
+      if (onToggleSelect && (event.key === " " || event.key === "Spacebar")) {
+        event.preventDefault();
+        event.stopPropagation();
+        onToggleSelect(doc.id, { shift: event.shiftKey, meta: true });
+      }
+    },
+  };
+};
+
+/** The per-item selection checkbox. A real input, always keyboard reachable. */
+export const SelectionCheckbox = ({
+  doc,
+  isSelected,
+  tabIndex,
+  onToggleSelect,
+}: Pick<DocumentItemProps, "doc" | "isSelected" | "tabIndex"> & {
+  onToggleSelect: (
+    id: string,
+    modifiers: { shift: boolean; meta: boolean },
+  ) => void;
+}) => (
+  <span className="gn-select-box">
+    <input
+      type="checkbox"
+      className="gn-select-box__input"
+      checked={!!isSelected}
+      tabIndex={tabIndex}
+      aria-label={`Select ${doc.title}`}
+      onClick={(event) => event.stopPropagation()}
+      onChange={(event) => {
+        const native = event.nativeEvent as MouseEvent & { shiftKey?: boolean };
+        onToggleSelect(doc.id, {
+          shift: !!native?.shiftKey,
+          meta: true,
+        });
+      }}
+    />
+  </span>
+);
 
 export const toDateInputValue = (timestamp: number | null): string => {
   if (timestamp == null) {
@@ -68,6 +163,8 @@ export const DocumentEditor = ({
   onSetDueDate,
   onAddTag,
   onRemoveTag,
+  tagSuggestions,
+  courseSuggestions,
 }: Pick<
   DocumentItemProps,
   | "doc"
@@ -77,10 +174,15 @@ export const DocumentEditor = ({
   | "onSetDueDate"
   | "onAddTag"
   | "onRemoveTag"
+  | "tagSuggestions"
+  | "courseSuggestions"
 >) => {
   const fieldId = useId();
   const [tagDraft, setTagDraft] = useState("");
   const tags = visibleTags(doc);
+  const tagOptions = (tagSuggestions ?? []).filter(
+    (tag) => !tags.some((it) => it.toLowerCase() === tag.toLowerCase()),
+  );
 
   return (
     <div className="gn-card__editor">
@@ -107,10 +209,22 @@ export const DocumentEditor = ({
           id={`${fieldId}-course`}
           className="gn-input"
           type="text"
-          defaultValue={doc.course ?? ""}
-          placeholder="e.g. Biology 201"
+          defaultValue={doc.course ? formatCoursePath(doc.course) : ""}
+          placeholder="e.g. Biology 201 / Labs"
+          list={courseSuggestions?.length ? `${fieldId}-courses` : undefined}
+          autoComplete="off"
           onBlur={(event) => onSetCourse(doc.id, event.target.value)}
         />
+        {courseSuggestions && courseSuggestions.length > 0 && (
+          <datalist id={`${fieldId}-courses`}>
+            {courseSuggestions.map((course) => (
+              <option key={course} value={course} />
+            ))}
+          </datalist>
+        )}
+        <span className="gn-field__hint">
+          Use “ / ” to nest, e.g. MATH 221 / Problem sets
+        </span>
       </label>
 
       <label className="gn-field" htmlFor={`${fieldId}-due`}>
@@ -157,6 +271,8 @@ export const DocumentEditor = ({
             value={tagDraft}
             placeholder="Add a tag"
             aria-label={`Add a tag to ${doc.title}`}
+            list={tagOptions.length ? `${fieldId}-tags` : undefined}
+            autoComplete="off"
             onChange={(event) => setTagDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && tagDraft.trim()) {
@@ -179,34 +295,49 @@ export const DocumentEditor = ({
             <Icon path={ICON_CHECK} />
           </button>
         </div>
+        {tagOptions.length > 0 && (
+          <datalist id={`${fieldId}-tags`}>
+            {tagOptions.map((tag) => (
+              <option key={tag} value={tag} />
+            ))}
+          </datalist>
+        )}
       </div>
     </div>
   );
 };
 
-/** The star / duplicate / delete / edit cluster, identical in both views. */
+/** The star / pin / archive / edit / duplicate / delete cluster. */
 export const DocumentActions = ({
   doc,
   isEditing,
   isFavourite,
+  isPinned,
+  isArchived,
   tabIndex,
   onStartEdit,
   onStopEdit,
   onDuplicate,
   onDelete,
   onToggleFavourite,
+  onTogglePinned,
+  onToggleArchived,
   className,
 }: Pick<
   DocumentItemProps,
   | "doc"
   | "isEditing"
   | "isFavourite"
+  | "isPinned"
+  | "isArchived"
   | "tabIndex"
   | "onStartEdit"
   | "onStopEdit"
   | "onDuplicate"
   | "onDelete"
   | "onToggleFavourite"
+  | "onTogglePinned"
+  | "onToggleArchived"
 > & { className?: string }) => (
   <div className={`gn-card__actions${className ? ` ${className}` : ""}`}>
     <button
@@ -228,6 +359,34 @@ export const DocumentActions = ({
         filled={isFavourite}
       />
     </button>
+    {onTogglePinned && (
+      <button
+        type="button"
+        className={`gn-icon-button${isPinned ? " gn-icon-button--on" : ""}`}
+        tabIndex={tabIndex}
+        aria-pressed={!!isPinned}
+        aria-label={
+          isPinned ? `Unpin ${doc.title}` : `Pin ${doc.title} to the top`
+        }
+        onClick={() => onTogglePinned(doc)}
+      >
+        <Icon path={ICON_PIN} filled={!!isPinned} />
+      </button>
+    )}
+    {onToggleArchived && (
+      <button
+        type="button"
+        className={`gn-icon-button${isArchived ? " gn-icon-button--on" : ""}`}
+        tabIndex={tabIndex}
+        aria-pressed={!!isArchived}
+        aria-label={
+          isArchived ? `Unarchive ${doc.title}` : `Archive ${doc.title}`
+        }
+        onClick={() => onToggleArchived(doc)}
+      >
+        <Icon path={ICON_ARCHIVE} />
+      </button>
+    )}
     <button
       type="button"
       className="gn-icon-button"

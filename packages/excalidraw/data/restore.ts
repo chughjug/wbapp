@@ -272,10 +272,20 @@ const getStrokeWidthKey = (strokeWidth: unknown): StrokeWidthKey | null => {
 
 const restoreFreedrawStrokeOptions = (
   strokeOptions: unknown,
-): { variability: StrokeVariability; streamline: number } => {
+): {
+  variability: StrokeVariability;
+  streamline: number;
+  smoothing?: number;
+  thinning?: number;
+} => {
   const options =
     strokeOptions && typeof strokeOptions === "object"
-      ? (strokeOptions as { variability?: unknown; streamline?: unknown })
+      ? (strokeOptions as {
+          variability?: unknown;
+          streamline?: unknown;
+          smoothing?: unknown;
+          thinning?: unknown;
+        })
       : null;
 
   return {
@@ -283,6 +293,12 @@ const restoreFreedrawStrokeOptions = (
     streamline: isFiniteNumber(options?.streamline)
       ? options?.streamline
       : DEFAULT_STROKE_STREAMLINE,
+    // "ink feel" tuning: preserved when present, otherwise left undefined so
+    // the renderer falls back to its historical constants
+    ...(isFiniteNumber(options?.smoothing)
+      ? { smoothing: options.smoothing }
+      : {}),
+    ...(isFiniteNumber(options?.thinning) ? { thinning: options.thinning } : {}),
   };
 };
 

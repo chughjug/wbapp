@@ -51,3 +51,10 @@ export const ICON_LIST = "M4 6h16M4 12h16M4 18h16";
 export const ICON_CHEVRON_DOWN = "M6 9l6 6 6-6";
 export const ICON_DATABASE =
   "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6";
+export const ICON_PIN =
+  "M15 3l6 6-3 1-4.5 4.5L13 19l-2 2-3.5-3.5L3 21l3.5-4.5L3 13l2-2 4.5-.5L14 6l1-3z";
+export const ICON_ARCHIVE =
+  "M3 6h18v3H3V6zm2 3h14v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V9zm4 4h6";
+export const ICON_TAG =
+  "M3 12.5V4a1 1 0 0 1 1-1h8.5L21 11.5 12.5 20 3 12.5zM7.5 7.5h.01";
+export const ICON_CHEVRON_RIGHT = "M9 6l6 6-6 6";

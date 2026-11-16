@@ -267,3 +267,42 @@ export const useCourseStyles = (): UseCourseStylesResult => {
     [styles, styleOf],
   );
 };
+
+// ---------------------------------------------------------------------------
+// hierarchy maintenance
+// ---------------------------------------------------------------------------
+
+/**
+ * Follow a course rename in the style store: the row for `from` moves to
+ * `to`, and so does every nested course's row ("MATH 221/Labs" ->
+ * "MATH 230/Labs"). Without this a renamed folder would silently lose its
+ * colour and emoji, since the style store is keyed by the full path.
+ *
+ * Resolves with the number of style rows moved.
+ */
+export const renameCourseStyleTree = async (
+  from: string,
+  to: string,
+): Promise<number> => {
+  const source = from.trim();
+  const target = to.trim();
+  if (!source || !target || source === target) {
+    return 0;
+  }
+  const styles = await listCourseStyles();
+  const prefix = `${source}/`;
+  let moved = 0;
+  for (const [key, style] of Object.entries(styles)) {
+    if (key !== source && !key.startsWith(prefix)) {
+      continue;
+    }
+    const nextKey = key === source ? target : `${target}${key.slice(source.length)}`;
+    await set(nextKey, style, styleStore);
+    await del(key, styleStore);
+    moved++;
+  }
+  if (moved > 0) {
+    emitChange();
+  }
+  return moved;
+};

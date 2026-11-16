@@ -1297,6 +1297,17 @@ const getFreedrawStreamline = (element: ExcalidrawFreeDrawElement) =>
   element.strokeOptions?.streamline ?? DEFAULT_STROKE_STREAMLINE;
 
 /**
+ * Per-element perfect-freehand tuning, baked in at creation time from the
+ * user's "ink feel" preference (see `inkFeel.ts`). Absent on strokes drawn
+ * before the preference existed, which keep the historical constants.
+ */
+const getFreedrawSmoothing = (element: ExcalidrawFreeDrawElement) =>
+  element.strokeOptions?.smoothing ?? VARIABLE_WIDTH_FREEDRAW.SMOOTHING;
+
+const getFreedrawThinning = (element: ExcalidrawFreeDrawElement) =>
+  element.strokeOptions?.thinning ?? VARIABLE_WIDTH_FREEDRAW.THINNING;
+
+/**
  * Pressure-sensitive (variable width) freedraw outline, rendered with
  * perfect-freehand. This is the original Excalidraw freedraw look.
  */
@@ -1315,8 +1326,8 @@ const getVariableWidthFreedrawOutline = (
   return getStroke(inputPoints as number[][], {
     simulatePressure: element.simulatePressure,
     size: element.strokeWidth * VARIABLE_WIDTH_FREEDRAW.SIZE_FACTOR,
-    thinning: VARIABLE_WIDTH_FREEDRAW.THINNING,
-    smoothing: VARIABLE_WIDTH_FREEDRAW.SMOOTHING,
+    thinning: getFreedrawThinning(element),
+    smoothing: getFreedrawSmoothing(element),
     streamline: getFreedrawStreamline(element),
     easing: (t) => Math.sin((t * Math.PI) / 2), // https://easings.net/#easeOutSine
     last: true,

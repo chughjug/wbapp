@@ -7,6 +7,9 @@
  * grid view already uses). Each column therefore carries a visually hidden
  * prefix in the button's accessible name — the composed name is identical to
  * the grid card's, so switching view does not change what is announced.
+ *
+ * Selection semantics match the card exactly: `role="row"` +
+ * `aria-selected` on the wrapper, one `gridcell` inside, and a real checkbox.
  */
 
 import React from "react";
@@ -20,8 +23,14 @@ import {
   initialsOf,
 } from "./format";
 import { visibleTags } from "./filters";
+import { formatCoursePath } from "./coursePath";
 import { hexToRgbChannels } from "./courses";
-import { DocumentActions, DocumentEditor } from "./DocumentEditor";
+import {
+  DocumentActions,
+  DocumentEditor,
+  SelectionCheckbox,
+  useItemActivation,
+} from "./DocumentEditor";
 
 import type { DocumentItemProps } from "./DocumentEditor";
 
@@ -32,26 +41,51 @@ export const DocumentRow = React.memo((props: DocumentItemProps) => {
     tabIndex,
     isEditing,
     isFavourite,
+    isSelected,
+    isPinned,
+    isArchived,
+    selectionActive,
     courseStyle,
-    onOpen,
     onFocusCard,
+    onToggleSelect,
     registerRef,
   } = props;
 
   const urgency = getDueUrgency(doc.dueDate, now);
   const tags = visibleTags(doc);
+  const activation = useItemActivation(props);
 
   return (
-    <li className="gn-row-wrapper">
-      <div className={`gn-row${isEditing ? " gn-row--editing" : ""}`}>
+    <li
+      className={`gn-row-wrapper${isSelected ? " gn-selected" : ""}`}
+      role="row"
+      aria-selected={onToggleSelect ? !!isSelected : undefined}
+    >
+      <div
+        className={`gn-row${isEditing ? " gn-row--editing" : ""}${
+          isSelected ? " gn-row--selected" : ""
+        }${selectionActive ? " gn-row--selecting" : ""}`}
+        role="gridcell"
+      >
+        {onToggleSelect && (
+          <SelectionCheckbox
+            doc={doc}
+            isSelected={isSelected}
+            tabIndex={tabIndex}
+            onToggleSelect={onToggleSelect}
+          />
+        )}
+
         <button
           type="button"
           className="gn-row__open"
           ref={(node) => registerRef(doc.id, node)}
           tabIndex={tabIndex}
           aria-label={describeDocument(doc, now, isFavourite, tags)}
+          aria-keyshortcuts={onToggleSelect ? "Space" : undefined}
           onFocus={() => onFocusCard(doc.id)}
-          onClick={() => onOpen(doc)}
+          onClick={activation.onClick}
+          onKeyDown={activation.onKeyDown}
         >
           <span className="gn-row__thumb" aria-hidden="true">
             {doc.thumbnail ? (
@@ -64,6 +98,16 @@ export const DocumentRow = React.memo((props: DocumentItemProps) => {
             {isFavourite && (
               <span className="gn-row__star" aria-hidden="true">
                 ★
+              </span>
+            )}
+            {isPinned && (
+              <span className="gn-flag" aria-hidden="true">
+                Pinned
+              </span>
+            )}
+            {isArchived && (
+              <span className="gn-flag" aria-hidden="true">
+                Archived
               </span>
             )}
             {doc.title}
@@ -83,7 +127,7 @@ export const DocumentRow = React.memo((props: DocumentItemProps) => {
                   }
                 />
                 {courseStyle?.emoji ? `${courseStyle.emoji} ` : ""}
-                {doc.course}
+                {formatCoursePath(doc.course)}
               </>
             ) : (
               <span className="gn-row__dim">—</span>

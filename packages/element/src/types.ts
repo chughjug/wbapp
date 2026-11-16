@@ -425,6 +425,14 @@ export type StrokeVariability = "variable" | "constant";
 export type StrokeOptions = Readonly<{
   variability: StrokeVariability;
   streamline: number;
+  /**
+   * perfect-freehand tuning baked in at stroke creation time from the user's
+   * "ink feel" preference (see `inkFeel.ts`). Optional for backwards
+   * compatibility: strokes drawn before the preference existed, and strokes
+   * created programmatically, fall back to the editor defaults in `shape.ts`.
+   */
+  smoothing?: number;
+  thinning?: number;
 }>;
 
 export type ExcalidrawFreeDrawElement = _ExcalidrawElementBase &

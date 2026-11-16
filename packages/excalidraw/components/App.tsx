@@ -17,8 +17,6 @@ import {
   KEYS,
   APP_NAME,
   CURSOR_TYPE,
-  DEFAULT_STROKE_STREAMLINE,
-  DEFAULT_STROKE_STREAMLINE_PRECISE,
   DRAGGING_THRESHOLD,
   ELEMENT_SHIFT_TRANSLATE_AMOUNT,
   ELEMENT_TRANSLATE_AMOUNT,
@@ -212,6 +210,8 @@ import {
   isEligibleFrameChildType,
   getBindingStrategyForDraggingBindingElementEndpoints,
   isNonDeletedElement,
+  resolveFreedrawStrokeOptions,
+  shouldSimulatePressure,
 } from "@excalidraw/element";
 
 import type { GlobalPoint, LocalPoint } from "@excalidraw/math";
@@ -8354,7 +8354,13 @@ class App extends React.Component<AppProps, AppState> {
       y: gridY,
     });
 
-    const simulatePressure = event.pressure === 0.5;
+    // `shouldSimulatePressure` keeps the original `pressure === 0.5` heuristic
+    // unless the user has opted into trusting real pen pressure
+    // (see `packages/element/src/inkFeel.ts`).
+    const simulatePressure = shouldSimulatePressure({
+      pointerType: event.pointerType,
+      pressure: event.pressure,
+    });
 
     const strokeVariability = this.state.currentItemStrokeVariability;
 
@@ -8372,13 +8378,12 @@ class App extends React.Component<AppProps, AppState> {
       roundness: null,
       customData: this.state.currentItemCustomData ?? undefined,
       simulatePressure,
-      strokeOptions: {
+      // perfect-freehand tuning from the "ink feel" preference, baked in now
+      // so that changing the preference never re-shapes existing strokes
+      strokeOptions: resolveFreedrawStrokeOptions({
+        pointerType: event.pointerType,
         variability: strokeVariability,
-        streamline:
-          event.pointerType !== "mouse"
-            ? DEFAULT_STROKE_STREAMLINE_PRECISE
-            : DEFAULT_STROKE_STREAMLINE,
-      },
+      }),
       locked: false,
       frameId: topLayerFrame ? topLayerFrame.id : null,
       points: [pointFrom<LocalPoint>(0, 0)],

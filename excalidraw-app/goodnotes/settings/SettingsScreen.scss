@@ -1,0 +1,545 @@
+/**
+ * Settings screen styling.
+ *
+ * COLOUR RULES THIS FILE OBEYS, because two of Excalidraw's own custom
+ * properties are traps:
+ *   - `--color-muted` is a BACKGROUND grey. It is never used for text here.
+ *   - `--keybinding-color` sits at roughly 1.9:1 on white. It is never used
+ *     for text here either; the shortcut chips get their own ink colour and
+ *     an explicit surface behind them.
+ * Every colour below is declared as a local `--gn-set-*` token with a literal
+ * fallback, so the screen is legible even when it is mounted outside the
+ * editor's `.excalidraw` scope (where none of the editor's variables exist).
+ */
+
+.gn-settings,
+.gn-settings-hint {
+  --gn-set-fg: var(--text-primary-color, #1b1b1f);
+  // a real secondary INK colour (>= 4.5:1 on the surfaces below), not
+  // --color-muted, which is a background
+  --gn-set-fg-dim: #5c5c68;
+  --gn-set-bg: var(--island-bg-color, #ffffff);
+  --gn-set-bg-sunken: #f5f5f7;
+  --gn-set-border: var(--default-border-color, #e4e4e8);
+  --gn-set-accent: var(--color-primary, #6965db);
+  --gn-set-accent-ink: #ffffff;
+  --gn-set-danger: #c92a2a;
+  --gn-set-danger-bg: #fff5f5;
+  --gn-set-ok: #2b7a4b;
+  --gn-set-shadow: 0 10px 40px rgb(0 0 0 / 22%);
+
+  &.theme--dark {
+    --gn-set-fg: #e8e8ec;
+    --gn-set-fg-dim: #a8a8b4;
+    --gn-set-bg: #232329;
+    --gn-set-bg-sunken: #1b1b20;
+    --gn-set-border: #3b3b44;
+    --gn-set-accent: #a8a5ff;
+    --gn-set-accent-ink: #1b1b20;
+    --gn-set-danger: #ff8787;
+    --gn-set-danger-bg: #36242a;
+    --gn-set-ok: #8ce99a;
+    --gn-set-shadow: 0 10px 40px rgb(0 0 0 / 55%);
+  }
+}
+
+/* ---- modal shell ------------------------------------------------------ */
+
+.gn-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2vh 1rem;
+  background: rgb(14 14 18 / 48%);
+  animation: gn-settings-fade 140ms ease-out;
+}
+
+@keyframes gn-settings-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.gn-settings {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(44rem, 100%);
+  max-height: 96vh;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: var(--gn-set-bg);
+  color: var(--gn-set-fg);
+  box-shadow: var(--gn-set-shadow);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  animation: gn-settings-rise 160ms ease-out;
+
+  /* when embedded rather than modal, it is just a panel */
+  &.is-inline {
+    width: 100%;
+    max-height: none;
+    box-shadow: none;
+    border: 1px solid var(--gn-set-border);
+    animation: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--gn-set-accent);
+    outline-offset: 2px;
+    border-radius: 0.3rem;
+  }
+}
+
+@keyframes gn-settings-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.gn-settings__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem 0.9rem;
+  border-bottom: 1px solid var(--gn-set-border);
+}
+
+.gn-settings__title {
+  flex: 1;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.gn-settings__close {
+  flex: 0 0 auto;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--gn-set-border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--gn-set-fg);
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--gn-set-bg-sunken);
+  }
+}
+
+.gn-settings__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.25rem 1.25rem 1.5rem;
+  scroll-behavior: smooth;
+}
+
+/* ---- in-screen navigation -------------------------------------------- */
+
+.gn-settings__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--gn-set-border);
+  background: var(--gn-set-bg-sunken);
+}
+
+.gn-settings__nav-link {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--gn-set-bg);
+  color: var(--gn-set-fg);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 550;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--gn-set-border);
+  }
+}
+
+/* ---- sections --------------------------------------------------------- */
+
+.gn-settings-section {
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--gn-set-border);
+  scroll-margin-top: 0.5rem;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.gn-settings-section__title {
+  margin: 0 0 0.2rem;
+  font-size: 1.0625rem;
+  font-weight: 620;
+}
+
+.gn-settings-section__blurb {
+  margin: 0 0 0.9rem;
+  color: var(--gn-set-fg-dim);
+  font-size: 0.8438rem;
+}
+
+.gn-settings-section__sub {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/* a field: label on the left, control on the right, wrapping on narrow */
+.gn-settings-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0;
+
+  &__text {
+    flex: 1 1 14rem;
+    min-width: 0;
+  }
+
+  &__label {
+    display: block;
+    font-weight: 550;
+  }
+
+  &__hint {
+    margin: 0.1rem 0 0;
+    color: var(--gn-set-fg-dim);
+    font-size: 0.8125rem;
+  }
+
+  &__control {
+    flex: 0 0 auto;
+  }
+}
+
+/* the embedded InputSettingsPanel is already a card; flatten it in here */
+.gn-settings__embedded-input.gn-input-settings {
+  max-width: none;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+
+  .gn-input-settings__title {
+    // the Settings screen already has a heading for this section
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* ---- buttons ---------------------------------------------------------- */
+
+.gn-settings-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.25rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--gn-set-border);
+  border-radius: 0.5rem;
+  background: var(--gn-set-bg);
+  color: var(--gn-set-fg);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 550;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--gn-set-bg-sunken);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &.is-primary {
+    border-color: transparent;
+    background: var(--gn-set-accent);
+    color: var(--gn-set-accent-ink);
+  }
+
+  &.is-danger {
+    border-color: var(--gn-set-danger);
+    color: var(--gn-set-danger);
+
+    &:hover:not(:disabled) {
+      background: var(--gn-set-danger-bg);
+    }
+  }
+}
+
+.gn-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* ---- reference list --------------------------------------------------- */
+
+.gn-settings-ref {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.gn-settings-ref__group-title {
+  margin: 1rem 0 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gn-set-fg-dim);
+}
+
+.gn-settings-ref__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 15rem) 1fr;
+  gap: 0.25rem 1rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--gn-set-border);
+
+  @media (max-width: 34rem) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gn-settings-ref__trigger {
+  font-weight: 600;
+}
+
+/* keyboard chips: their OWN ink + surface. --keybinding-color is ~1.9:1 on
+   white and is deliberately not used. */
+.gn-settings-kbd {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--gn-set-border);
+  border-bottom-width: 2px;
+  border-radius: 0.3rem;
+  background: var(--gn-set-bg-sunken);
+  color: var(--gn-set-fg);
+  font-family: ui-monospace, "SFMono-Regular", "Menlo", monospace;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.gn-settings-ref__effect {
+  margin: 0;
+}
+
+.gn-settings-ref__also {
+  margin: 0.15rem 0 0;
+  color: var(--gn-set-fg-dim);
+  font-size: 0.8125rem;
+}
+
+.gn-settings-ref__off {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0 0.35rem;
+  border-radius: 0.3rem;
+  background: var(--gn-set-danger-bg);
+  color: var(--gn-set-danger);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+/* ---- storage ---------------------------------------------------------- */
+
+.gn-settings-storage__figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin: 0 0 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.6rem;
+  background: var(--gn-set-bg-sunken);
+
+  div {
+    min-width: 7rem;
+  }
+
+  dt {
+    margin: 0;
+    color: var(--gn-set-fg-dim);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  dd {
+    margin: 0.1rem 0 0;
+    font-size: 1.125rem;
+    font-weight: 620;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.gn-settings-storage__bar {
+  height: 0.5rem;
+  margin-bottom: 0.4rem;
+  border-radius: 999px;
+  background: var(--gn-set-border);
+  overflow: hidden;
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--gn-set-accent);
+    transition: width 220ms ease-out;
+  }
+}
+
+.gn-settings-progress {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--gn-set-border);
+  border-radius: 0.6rem;
+  background: var(--gn-set-bg-sunken);
+  font-size: 0.875rem;
+
+  &.is-error {
+    border-color: var(--gn-set-danger);
+    color: var(--gn-set-danger);
+  }
+
+  &.is-done {
+    color: var(--gn-set-ok);
+  }
+
+  progress {
+    display: block;
+    width: 100%;
+    height: 0.5rem;
+    margin-top: 0.4rem;
+    accent-color: var(--gn-set-accent);
+  }
+}
+
+.gn-settings-confirm {
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--gn-set-danger);
+  border-radius: 0.6rem;
+  background: var(--gn-set-danger-bg);
+
+  p {
+    margin: 0 0 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  strong {
+    font-weight: 700;
+  }
+}
+
+.gn-settings-radio {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.3rem 0;
+
+  input {
+    margin: 0.3rem 0 0;
+    accent-color: var(--gn-set-accent);
+  }
+
+  span {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--gn-set-fg-dim);
+  }
+}
+
+/* ---- first-run hint --------------------------------------------------- */
+
+.gn-settings-hint {
+  position: fixed;
+  z-index: 55;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  box-sizing: border-box;
+  max-width: min(26rem, calc(100vw - 2rem));
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--gn-set-border);
+  border-radius: 0.75rem;
+  background: var(--gn-set-bg);
+  color: var(--gn-set-fg);
+  box-shadow: var(--gn-set-shadow);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  animation: gn-settings-rise 220ms ease-out;
+
+  p {
+    flex: 1 1 12rem;
+    margin: 0;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--gn-set-accent);
+    outline-offset: 2px;
+    border-radius: 0.3rem;
+  }
+}
+
+/* ---- visually hidden, but announced ----------------------------------- */
+
+.gn-settings-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- motion ----------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-settings-backdrop,
+  .gn-settings,
+  .gn-settings-hint {
+    animation: none;
+  }
+
+  .gn-settings__body {
+    scroll-behavior: auto;
+  }
+
+  .gn-settings-storage__bar span {
+    transition: none;
+  }
+}

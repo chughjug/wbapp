@@ -25,6 +25,13 @@ import { createStore, del, entries, get, set } from "idb-keyval";
 
 import { PAGE_FRAME_PREFIX } from "../types";
 
+import {
+  isInCourseTree,
+  normalizeCoursePath,
+  rewriteCoursePath,
+} from "./coursePath";
+import { addTagToList, removeTagFromList, renameTagInList } from "./tags";
+
 import type { DocMeta, DocScene } from "../types";
 
 /** Lightweight metadata — everything the shelf needs, and nothing heavy. */
@@ -58,12 +65,39 @@ export const subscribe = (listener: Listener): (() => void) => {
   };
 };
 
+let batchDepth = 0;
+let batchDirty = false;
+
 const emitChange = () => {
+  // A bulk action touches N rows; subscribers (and therefore the whole shelf)
+  // must re-read once, not N times.
+  if (batchDepth > 0) {
+    batchDirty = true;
+    return;
+  }
   for (const listener of [...listeners]) {
     try {
       listener();
     } catch (error: any) {
       console.error("goodnotes/library: listener threw", error);
+    }
+  }
+};
+
+/**
+ * Run `fn` with change notification coalesced into a single emit at the end.
+ * Nestable; the emit happens when the outermost batch resolves, and still
+ * happens if `fn` throws part-way (subscribers must see partial writes).
+ */
+export const runBatched = async <T,>(fn: () => Promise<T>): Promise<T> => {
+  batchDepth++;
+  try {
+    return await fn();
+  } finally {
+    batchDepth--;
+    if (batchDepth === 0 && batchDirty) {
+      batchDirty = false;
+      emitChange();
     }
   }
 };
@@ -134,6 +168,14 @@ const normalizeMeta = (raw: Partial<DocMeta> & { id: string }): DocMeta => {
     pageCount: typeof raw.pageCount === "number" ? raw.pageCount : 1,
     defaultTemplate: raw.defaultTemplate ?? "blank",
     defaultPageSize: raw.defaultPageSize ?? "LETTER",
+    // optional contract fields: preserved verbatim so a metadata write (bulk
+    // or otherwise) never silently drops a value another module wrote.
+    ...(raw.defaultLandscape === undefined
+      ? {}
+      : { defaultLandscape: raw.defaultLandscape }),
+    ...(raw.defaultImageFit === undefined
+      ? {}
+      : { defaultImageFit: raw.defaultImageFit }),
   };
 };
 
@@ -353,3 +395,188 @@ export const deleteDoc = async (id: string): Promise<void> => {
   await Promise.all([del(id, metaStore), del(id, sceneStore)]);
   emitChange();
 };
+
+// ---------------------------------------------------------------------------
+// bulk writes
+//
+// Every one of these is a single batched notification (see `runBatched`), so
+// a 40-document move repaints the shelf once. They are deliberately
+// sequential rather than Promise.all: idb-keyval shares one connection per
+// store and a read-modify-write per row must not interleave with its sibling.
+// ---------------------------------------------------------------------------
+
+/** Patch, or a function of the current metadata returning a patch. */
+export type DocPatch =
+  | Partial<DocMeta>
+  | ((meta: DocMeta) => Partial<DocMeta> | null);
+
+/**
+ * Apply a patch to many documents. Unknown ids are skipped (a concurrent
+ * delete must not fail the whole bulk action). Resolves with the documents
+ * that were actually written.
+ */
+export const updateManyDocs = async (
+  ids: readonly string[],
+  patch: DocPatch,
+): Promise<DocMeta[]> =>
+  runBatched(async () => {
+    const written: DocMeta[] = [];
+    for (const id of ids) {
+      const current = await getDoc(id);
+      if (!current) {
+        continue;
+      }
+      const resolved =
+        typeof patch === "function" ? patch(current) : patch;
+      if (!resolved) {
+        continue;
+      }
+      written.push(await updateDocMeta(id, resolved));
+    }
+    return written;
+  });
+
+/** Delete many documents (metadata + scenes). Resolves with the count. */
+export const deleteManyDocs = async (
+  ids: readonly string[],
+): Promise<number> =>
+  runBatched(async () => {
+    let removed = 0;
+    for (const id of ids) {
+      const existing = await getDoc(id);
+      await deleteDoc(id);
+      if (existing) {
+        removed++;
+      }
+    }
+    return removed;
+  });
+
+/** Duplicate many documents, in the order given. */
+export const duplicateManyDocs = async (
+  ids: readonly string[],
+): Promise<DocMeta[]> =>
+  runBatched(async () => {
+    const copies: DocMeta[] = [];
+    for (const id of ids) {
+      const existing = await getDoc(id);
+      if (!existing) {
+        continue;
+      }
+      copies.push(await duplicateDoc(id));
+    }
+    return copies;
+  });
+
+/**
+ * Add or remove one tag across many documents. Used for every flag
+ * (favourite / archived / pinned) as well as user tags, so there is exactly
+ * one code path.
+ */
+export const setTagOnMany = async (
+  ids: readonly string[],
+  tag: string,
+  present: boolean,
+): Promise<DocMeta[]> =>
+  updateManyDocs(ids, (meta) => {
+    const next = present
+      ? addTagToList(meta.tags, tag)
+      : removeTagFromList(meta.tags, tag);
+    return next.length === meta.tags.length &&
+      next.every((it, index) => it === meta.tags[index])
+      ? null
+      : { tags: next };
+  });
+
+/**
+ * Rename a tag across the *whole* library (not just a selection). Resolves
+ * with the number of documents rewritten. Renaming onto an existing tag
+ * merges the two.
+ */
+export const renameTagEverywhere = async (
+  from: string,
+  to: string,
+): Promise<number> =>
+  runBatched(async () => {
+    const docs = await listDocs();
+    let changed = 0;
+    for (const doc of docs) {
+      const next = renameTagInList(doc.tags, from, to);
+      if (next.length !== doc.tags.length ||
+        next.some((it, index) => it !== doc.tags[index])
+      ) {
+        await updateDocMeta(doc.id, { tags: next });
+        changed++;
+      }
+    }
+    return changed;
+  });
+
+/** Remove a tag from every document. Resolves with the number rewritten. */
+export const deleteTagEverywhere = async (tag: string): Promise<number> =>
+  runBatched(async () => {
+    const docs = await listDocs();
+    let changed = 0;
+    for (const doc of docs) {
+      const next = removeTagFromList(doc.tags, tag);
+      if (next.length !== doc.tags.length) {
+        await updateDocMeta(doc.id, { tags: next });
+        changed++;
+      }
+    }
+    return changed;
+  });
+
+/**
+ * Rename a course node and, crucially, every course nested below it:
+ * renaming "MATH 221" to "MATH 230" also moves "MATH 221/Problem sets" to
+ * "MATH 230/Problem sets". Resolves with the number of documents rewritten.
+ *
+ * This is the price of the path-string model (see coursePath.ts); it is paid
+ * here, once, in one batched write.
+ */
+export const renameCourseTree = async (
+  from: string,
+  to: string,
+): Promise<number> =>
+  runBatched(async () => {
+    const source = normalizeCoursePath(from);
+    const target = normalizeCoursePath(to);
+    if (!source || !target || source === target) {
+      return 0;
+    }
+    const docs = await listDocs();
+    let changed = 0;
+    for (const doc of docs) {
+      if (!doc.course || !isInCourseTree(doc.course, source)) {
+        continue;
+      }
+      const next = rewriteCoursePath(doc.course, source, target);
+      if (next !== doc.course) {
+        await updateDocMeta(doc.id, { course: next });
+        changed++;
+      }
+    }
+    return changed;
+  });
+
+/**
+ * Detach a course sub-tree from the library: every document in it loses its
+ * course (the documents themselves are never deleted by a folder action).
+ */
+export const clearCourseTree = async (course: string): Promise<number> =>
+  runBatched(async () => {
+    const root = normalizeCoursePath(course);
+    if (!root) {
+      return 0;
+    }
+    const docs = await listDocs();
+    let changed = 0;
+    for (const doc of docs) {
+      if (doc.course && isInCourseTree(doc.course, root)) {
+        await updateDocMeta(doc.id, { course: null });
+        changed++;
+      }
+    }
+    return changed;
+  });
