@@ -1,9 +1,10 @@
 # Integration — Highlighter + Pen presets (`goodnotes/pens`)
 
-Two parts:
+Three parts:
 
 1. An app-level module, `excalidraw-app/goodnotes/pens/` (self-contained).
-2. A small patch under `packages/` that teaches the renderer about highlighter strokes. **Review section 3 carefully** — it is the only part that touches the editor core.
+2. A small patch under `packages/` that teaches the renderer about highlighter strokes. **Review section 3 carefully.**
+3. A second, smaller patch under `packages/` (3 files, +23 lines, nothing removed) that lets a freedraw stroke take an **exact** width instead of one of three steps — **section 5**, which also carries the measured proof that 0.2 really draws thinner than the old `thin`.
 
 ---
 
@@ -82,16 +83,34 @@ export const HIGHLIGHTER_CUSTOM_DATA: { goodnotes: { highlighter: true } };
 
 export const PENS_STORAGE_KEY: "goodnotes-pens";
 export const DEFAULT_PEN_PRESETS: readonly PenPreset[];
-export const PEN_WIDTHS: { thin: 0.5; medium: 1; bold: 2 };
-export const MIN_PEN_WIDTH: number;
-export const MAX_PEN_WIDTH: number;
 
 export const loadPenPresets: () => PenPreset[]; // never throws
 export const savePenPresets: (p: readonly PenPreset[]) => boolean;
 export const resetPenPresets: () => PenPreset[];
+
+// ── the continuous width model (see § 5) ───────────────────────────────────
+export const MIN_PEN_WIDTH: 0.1;
+export const MAX_PEN_WIDTH: 6;
+export const PEN_WIDTH_STEP: 0.1;
+export const PEN_WIDTH_STOPS: readonly { width: number; label: string }[];
+//   0.2 Extra fine · 0.5 Fine · 1 Medium · 2 Bold · 3.5 Extra bold
+export const DEFAULT_PEN_WIDTH: 0.5;
+export const DEFAULT_HIGHLIGHTER_WIDTH: 3.5;
+export const clampPenWidth: (width: number) => number; // clamp + 2dp round
+export const formatPenWidth: (width: number) => string; // "0.2", "1", "3.5"
+
+// per-ink-tool "last nib used", localStorage key `goodnotes-pen-width`
+export const PEN_WIDTH_STORAGE_KEY: "goodnotes-pen-width";
+export const DEFAULT_PEN_WIDTH_MEMORY: { pen: 0.5; highlighter: 3.5 };
+export const loadPenWidths: () => { pen: number; highlighter: number };
+export const savePenWidth: (tool: "pen" | "highlighter", w: number) => boolean;
+
+// still exported: shapes and text have no exact-width override and go
+// through Excalidraw's three-step key
+export const PEN_WIDTHS: { thin: 0.5; medium: 1; bold: 2 };
 export const snapPenWidth: (width: number) => "thin" | "medium" | "bold";
 
-export type { PenWidthKey, PenPreset };
+export type { PenWidthKey, InkToolId, PenWidthMemory, PenPreset };
 ```
 
 ---
@@ -132,9 +151,61 @@ Driven in the real app at `http://localhost:3001` with Playwright, sampling pixe
 - **A single stroke crossing itself does not darken** — verified visually with a self-intersecting loop; the overlap is a uniform flat yellow.
 - **Honest caveat:** two _separate_ highlighter strokes crossing each other still darken slightly (`236→218` in G). That is inherent to compositing each element separately at `globalAlpha < 1`; `multiply` changes the colour of the overlap but cannot make it idempotent. Perfectly flat stroke-to-stroke overlaps would require rendering all highlighter elements into one shared offscreen layer at full alpha and compositing that layer once — a much larger renderer change that was out of scope here.
 
-## 5. Known limitation: stroke width granularity
+## 5. Continuous stroke widths (replaces the old three-step limitation)
 
-Excalidraw only exposes three freedraw widths through `appState.currentItemStrokeWidthKey` (`thin`/`medium`/`bold` → `strokeWidth` `0.5`/`1`/`2`, rendered at `strokeWidth × 4.25` px). `PenPreset.width` is expressed in those units and snapped to the nearest with `snapPenWidth()`. A genuinely fat GoodNotes highlighter (~25 px) is therefore not reachable without a further `packages/` change (an arbitrary `currentItemStrokeWidth` override in `App.getCurrentItemStrokeWidth`), which was deliberately left out to keep the core patch minimal.
+**The finding first:** `ExcalidrawElement["strokeWidth"]` is, and always was, a plain `number` (`packages/element/src/types.ts:47`). Nothing about freedraw is quantised. The three steps came from exactly one place — `App.getCurrentItemStrokeWidth()` resolving `appState.currentItemStrokeWidthKey` through `FREEDRAW_STROKE_WIDTH` (`packages/common/src/constants.ts:500`) — and that resolution is the _only_ chokepoint for a stroke's width at creation time.
+
+So this is 90% an app-level fix, but not 100%: an app can put any number on an element it owns, and it cannot put any number on an element the editor is _about to create_. Making the live stroke draw at 0.2 therefore needed one override in that single chokepoint. **4 lines of behaviour in `packages/`, all additive** — see § 5a.
+
+### The model
+
+|  |  |
+| --- | --- |
+| range | `0.1` – `6.0`, step `0.1` (`<input type="range">`, Home / End / arrows) |
+| one-tap stops | `0.2` Extra fine · `0.5` Fine · `1` Medium · `2` Bold · `3.5` Extra bold |
+| old `thin` / `medium` / `bold` | `0.5` / `1` / `2` — still exactly reachable, now as three points on the slider |
+| memory | per ink tool, `localStorage` `goodnotes-pen-width`, e.g. `{"pen":0.3,"highlighter":3.5}` |
+| presets | `PenPreset.width` is now honoured exactly; no `snapPenWidth()` on the way to the canvas |
+
+`PenPreset` itself is **unchanged** (`{ id; label; tool; color; width; opacity }`) — `width` was already a `number`, it was simply snapped on the way out. Pens saved by the three-step build load untouched; `loadPenPresets()` only clamps `width` into `[0.1, 6]`, a no-op for `0.5` / `1` / `2`. **No migration is required and no saved pen is orphaned.**
+
+### 5a. The `packages/` change for this feature
+
+Three files, **23 added lines, 0 removed, 0 modified**. Nothing is deleted or rewritten, no licence header or attribution is touched, and the published `@excalidraw/excalidraw` API is unchanged for other consumers: the new `AppState` key defaults to `null`, and `null` reproduces today's behaviour byte for byte.
+
+| # | File | Lines | Change | Why it was unavoidable |
+| --- | --- | --- | --- | --- |
+| 1 | `packages/excalidraw/types.ts` | +8 (1 code, 7 doc) | `currentItemFreedrawStrokeWidth: number \| null;` on `AppState` | The app can only talk to the editor through `updateScene({ appState })`. With no key there is no channel. |
+| 2 | `packages/excalidraw/appState.ts` | +6 | `currentItemFreedrawStrokeWidth: null` in `getDefaultAppState()`; `{ browser: true, export: false, server: false }` in `APP_STATE_STORAGE_CONF` | Mandatory for any new `AppState` key. `browser: true` is what makes a chosen width survive a reload; `export`/`server` stay `false` so no document or server payload changes shape. |
+| 3 | `packages/excalidraw/components/App.tsx` | +9 | In `getCurrentItemStrokeWidth()`: return the override when `elementType === "freedraw"` and the value is a finite number `> 0`; otherwise fall through to the existing `getStrokeWidthByKey(…)` | The one and only chokepoint (`App.tsx:8387` → `newFreeDrawElement({ strokeWidth })`). Rewriting the element afterwards from the app was the alternative and it is worse: the live stroke would draw at `0.5` and jump to `0.2` on pointer-up, a visible 2.5× snap on every stroke. |
+
+Snapshot fallout: 133 `appState` snapshots across `contextmenu`, `history` and `regressionTests` gained the single line `"currentItemFreedrawStrokeWidth": null,` (`yarn vitest run -u`). The whole `packages/` suite then passes — **147 files, 2685 tests, 0 failures**.
+
+**Known gap:** Excalidraw's own stroke-width picker (`actionProperties.tsx`) writes `currentItemStrokeWidthKey` and does not clear the override, so if a host re-exposes the native property panel the key will be ignored for freedraw until something writes an exact width. Clearing it there would have meant touching an upstream action and its tests; the GoodNotes shell hides that panel, so it was left alone. `applyInk({ widthKey })` in `goodnotes/tool-menu/editor.ts` _does_ clear the override, so every in-app path stays coherent.
+
+### 5b. Measured, in the browser
+
+Playwright, Chromium, 1194×834 (iPad Pro 11"), `deviceScaleFactor: 1`, canvas zoom pinned to 1.0. Each row: set the width **through the real slider**, draw one horizontal stroke, read `element.strokeWidth` back out of the scene, then sample a 400×30 px crop of `canvas.excalidraw__canvas.static` around it. `inkMass` = sum of `(255 − luma)/255` over the crop.
+
+| slider | `appState` exact | width key | readout | `element.strokeWidth` | dark px (luma < 128) | any-ink px | inkMass |
+| --: | --: | --- | --- | --: | --: | --: | --: |
+| 0.1 | 0.1 | thin | `0.1` | **0.1** | 0 | 349 | 77.84 |
+| 0.2 | 0.2 | thin | `0.2` | **0.2** | 0 | 349 | 154.39 |
+| 0.35 → 0.4 | 0.4 | thin | `0.4` | **0.4** | 348 | 700 | 310.62 |
+| 0.5 (old `thin`) | 0.5 | thin | `0.5` | **0.5** | 696 | 700 | 465.33 |
+| 1 (old `medium`) | 1 | medium | `1` | **1** | 700 | 1404 | 927.49 |
+| 2 (old `bold`) | 2 | bold | `2` | **2** | 2112 | 2120 | 1713.81 |
+| 3.5 | 3.5 | bold | `3.5` | **3.5** | 3556 | 3568 | 3132.98 |
+| 6 | 6 | bold | `6` | **6** | 5780 | 6513 | 5410.71 |
+
+Read this way:
+
+- **`element.strokeWidth` equals the requested width in all eight rows.** Nothing snaps back to 0.5.
+- **0.2 against the old `thin` (0.5):** `inkMass` 154.39 vs 465.33 — **33.2 %** of the ink, against a 40 % ideal; the shortfall is sub-pixel antialiasing, not quantisation. Dark pixels: **0 vs 696**. At 0.2 the stroke never reaches luma < 128 anywhere, i.e. it is genuinely a hairline.
+- `0.35` becomes `0.4` because the native range input snaps to its `step` of 0.1. That is the slider's documented grid, not a width model limit.
+- Across the whole range `inkMass` tracks the requested width almost linearly (77.84 → 5410.71 for 0.1 → 6, a 69.5× span for a 60× width span).
+
+Round trip: slider → `0.3`; `localStorage["goodnotes-pen-width"]` = `{"pen":0.3,"highlighter":3.5}`; full page reload; tap Pen; `appState.currentItemFreedrawStrokeWidth` = `0.3`; the next stroke's `element.strokeWidth` = **0.3**. Switching to the Highlighter gives **3.5** and back to the Pen gives **0.3** again — each ink tool keeps its own nib.
 
 ## 6. Accessibility
 

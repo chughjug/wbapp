@@ -29,5 +29,25 @@ export {
 } from "./presets";
 export type { PenWidthKey } from "./presets";
 
+/**
+ * The continuous width model the ink UI uses. `element.strokeWidth` is an
+ * arbitrary number; only Excalidraw's picker was ever quantised to three
+ * steps, so these are the real bounds, the slider's grid, the one-tap stops
+ * and the per-tool "last nib used" memory.
+ */
+export {
+  PEN_WIDTH_STEP,
+  PEN_WIDTH_STOPS,
+  PEN_WIDTH_STORAGE_KEY,
+  DEFAULT_PEN_WIDTH,
+  DEFAULT_HIGHLIGHTER_WIDTH,
+  DEFAULT_PEN_WIDTH_MEMORY,
+  clampPenWidth,
+  formatPenWidth,
+  loadPenWidths,
+  savePenWidth,
+} from "./presets";
+export type { InkToolId, PenWidthMemory } from "./presets";
+
 /** Re-exported for convenience; the canonical declaration lives in the contract. */
 export type { PenPreset } from "../types";

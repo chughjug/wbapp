@@ -8899,6 +8899,15 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   public getCurrentItemStrokeWidth(elementType: ExcalidrawElement["type"]) {
+    const freedrawWidth = this.state.currentItemFreedrawStrokeWidth;
+    if (
+      elementType === "freedraw" &&
+      typeof freedrawWidth === "number" &&
+      Number.isFinite(freedrawWidth) &&
+      freedrawWidth > 0
+    ) {
+      return freedrawWidth;
+    }
     return getStrokeWidthByKey(
       elementType,
       this.state.currentItemStrokeWidthKey,

@@ -19,7 +19,14 @@ import type {
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types";
 
-import { PEN_WIDTHS, snapPenWidth } from "../pens/presets";
+import {
+  DEFAULT_PEN_WIDTH,
+  PEN_WIDTHS,
+  clampPenWidth,
+  loadPenWidths,
+  savePenWidth,
+  snapPenWidth,
+} from "../pens/presets";
 
 import type { PenPreset } from "../types";
 
@@ -121,12 +128,46 @@ export const shapeFromAppState = (
 /** Everything the ink controls can change, all optional. */
 export interface InkPatch {
   color?: string;
+  /**
+   * Exact freedraw stroke width, in `element.strokeWidth` units. Clamped to
+   * `[MIN_PEN_WIDTH, MAX_PEN_WIDTH]`. Writes
+   * `appState.currentItemFreedrawStrokeWidth`, and keeps the three-step
+   * `currentItemStrokeWidthKey` pointed at the nearest key so anything that
+   * still reads the key (shapes, Excalidraw's own property panel) stays
+   * coherent.
+   */
+  width?: number;
+  /**
+   * The three-step key, for callers that genuinely want quantised widths
+   * (shapes). Setting it *clears* the exact freedraw width, so the key wins —
+   * otherwise the two would silently disagree.
+   */
   widthKey?: ToolMenuWidthKey;
   /** 0–100, clamped. */
   opacity?: number;
   /** `"variable"` = pressure/velocity taper, `"constant"` = even width. */
   variability?: StrokeVariability;
 }
+
+/**
+ * The exact width new freedraw strokes will use, resolved the same way the
+ * editor resolves it: the override if set, else the three-step key.
+ */
+export const readInkWidth = (
+  appState: Pick<
+    AppState,
+    "currentItemFreedrawStrokeWidth" | "currentItemStrokeWidthKey"
+  >,
+): number => {
+  const exact = appState.currentItemFreedrawStrokeWidth;
+  if (typeof exact === "number" && Number.isFinite(exact) && exact > 0) {
+    return exact;
+  }
+  return (
+    PEN_WIDTHS[appState.currentItemStrokeWidthKey as ToolMenuWidthKey] ??
+    DEFAULT_PEN_WIDTH
+  );
+};
 
 /**
  * Push ink styling into the editor. Only the keys present in `patch` are
@@ -143,8 +184,14 @@ export const applyInk = (
   if (patch.color !== undefined) {
     appState.currentItemStrokeColor = patch.color;
   }
+  if (patch.width !== undefined) {
+    const width = clampPenWidth(patch.width);
+    appState.currentItemFreedrawStrokeWidth = width;
+    appState.currentItemStrokeWidthKey = snapPenWidth(width);
+  }
   if (patch.widthKey !== undefined) {
     appState.currentItemStrokeWidthKey = patch.widthKey;
+    appState.currentItemFreedrawStrokeWidth = null;
   }
   if (patch.opacity !== undefined) {
     appState.currentItemOpacity = Math.round(
@@ -246,18 +293,26 @@ export const activateTool = (
   }
   const locked = opts.locked ?? api.getAppState().activeTool.locked;
 
+  // each ink tool carries its own remembered nib, the way a real pen case
+  // does: picking the highlighter must not inherit the pen's 0.2
+  const widths = loadPenWidths();
+
   switch (tool) {
     case "pen":
       api.setActiveTool({ type: "freedraw", locked });
-      api.updateScene({ appState: { currentItemCustomData: null } });
+      mergeAppState(api, {
+        currentItemCustomData: null,
+        currentItemFreedrawStrokeWidth: clampPenWidth(widths.pen),
+        currentItemStrokeWidthKey: snapPenWidth(widths.pen),
+      });
       return;
     case "highlighter":
       api.setActiveTool({ type: "freedraw", locked });
-      api.updateScene({
-        appState: {
-          // a fresh object per activation so elements never share a reference
-          currentItemCustomData: { goodnotes: { highlighter: true } },
-        },
+      mergeAppState(api, {
+        // a fresh object per activation so elements never share a reference
+        currentItemCustomData: { goodnotes: { highlighter: true } },
+        currentItemFreedrawStrokeWidth: clampPenWidth(widths.highlighter),
+        currentItemStrokeWidthKey: snapPenWidth(widths.highlighter),
       });
       return;
     case "eraser":
@@ -306,14 +361,193 @@ export const applyPreset = (
     activateTool(api, "eraser");
     return;
   }
-  activateTool(api, preset.tool === "highlighter" ? "highlighter" : "pen");
+  const tool = preset.tool === "highlighter" ? "highlighter" : "pen";
+  activateTool(api, tool);
   applyInk(api, {
     color: preset.color,
-    widthKey: snapPenWidth(preset.width),
+    width: preset.width,
     opacity: preset.opacity,
   });
+  savePenWidth(tool, preset.width);
 };
 
 /** Width key → the `PenPreset.width` number used by the presets module. */
 export const widthKeyToPresetWidth = (key: ToolMenuWidthKey): number =>
   PEN_WIDTHS[key];
+
+/**
+ * Push the width remembered for `tool` into the editor, unconditionally.
+ *
+ * Called when the ink tool *changes*, so the highlighter never inherits the
+ * pen's 0.2 nib (and vice versa) — the way a real pen case works. Returns the
+ * width that was applied.
+ */
+export const applyRememberedInkWidth = (
+  api: ExcalidrawImperativeAPI | null,
+  tool: "pen" | "highlighter",
+): number | null => {
+  if (!isUsable(api)) {
+    return null;
+  }
+  const width = clampPenWidth(loadPenWidths()[tool]);
+  mergeAppState(api, {
+    currentItemFreedrawStrokeWidth: width,
+    currentItemStrokeWidthKey: snapPenWidth(width),
+  });
+  return width;
+};
+
+/**
+ * Push the remembered ink width into a freshly-created editor, so a width
+ * chosen before a reload is the width the first stroke after it draws with.
+ *
+ * No-op once an exact width is set, so it can never stomp a document's own
+ * saved `appState` or a width the user just picked. Safe to call on every
+ * render; it is idempotent.
+ */
+export const restoreRememberedInkWidth = (
+  api: ExcalidrawImperativeAPI | null,
+): void => {
+  if (!isUsable(api)) {
+    return;
+  }
+  const appState = api.getAppState();
+  if (typeof appState.currentItemFreedrawStrokeWidth === "number") {
+    return;
+  }
+  applyRememberedInkWidth(
+    api,
+    isHighlighterActive(appState) ? "highlighter" : "pen",
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/*  Tools that exist in the engine but have no button in the GoodNotes bar     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Excalidraw tools that are fully implemented but that the redesigned bar
+ * never surfaced. These are *not* {@link ToolMenuToolId}s: none of them has
+ * styling to show, so activating one deliberately closes the settings popover
+ * (`toolFromAppState` returns `null` for them).
+ *
+ * The three shipped here are the ones that earn their place in a note-taking
+ * app; see `INTEGRATION.md` § "Engine tools we did NOT surface" for the ones
+ * that do not.
+ */
+export const EXTRA_TOOLS = ["laser", "lasso", "hand"] as const;
+
+export type ExtraToolId = typeof EXTRA_TOOLS[number];
+
+export const EXTRA_TOOL_LABELS: Record<ExtraToolId, string> = {
+  laser: "Laser pointer",
+  lasso: "Lasso select",
+  hand: "Pan",
+};
+
+/**
+ * The subset the popover actually renders. Two of the three are left out, and
+ * both omissions were decided by measurement, not taste:
+ *
+ * - `lasso` — the GoodNotes nav bar already carries a lasso button ("Lasso
+ *   select (smart selection)"). A second one behind **More** is duplicate
+ *   chrome.
+ * - `hand` — measured in the running app: the paged surface pins the
+ *   viewport, so `appState.scrollX/scrollY` do not move for a wheel, a
+ *   space-drag or a hand-tool drag (378.07 / 21.07 before and after all
+ *   three). A Pan button here would be a dead control.
+ *
+ * Both stay in {@link EXTRA_TOOLS}: {@link activateExtraTool} is the public
+ * way for any surface to reach them, and `hand` becomes real again the moment
+ * a free-scrolling (whiteboard) mode ships.
+ */
+export const POPOVER_EXTRA_TOOLS: readonly ExtraToolId[] = ["laser"];
+
+/** Is one of {@link EXTRA_TOOLS} the editor's active tool? */
+export const extraToolFromAppState = (
+  appState: Pick<AppState, "activeTool">,
+): ExtraToolId | null => {
+  const type = appState.activeTool.type;
+  return (EXTRA_TOOLS as readonly string[]).includes(type)
+    ? (type as ExtraToolId)
+    : null;
+};
+
+/**
+ * Activate a laser pointer / lasso / pan. Real `appState.activeTool` types
+ * that `packages/excalidraw` already implements end to end — the laser gets
+ * its fading trail from `laserTrails.ts`, the lasso its freehand selection
+ * path, the hand its drag-to-pan.
+ *
+ * `locked: false` on the laser: it is a presenting mode you leave by picking
+ * a pen, not a one-shot.
+ */
+export const activateExtraTool = (
+  api: ExcalidrawImperativeAPI | null,
+  tool: ExtraToolId,
+): void => {
+  if (!isUsable(api)) {
+    return;
+  }
+  api.setActiveTool({ type: tool, locked: false });
+};
+
+/**
+ * Toggle Excalidraw's shape snapping (`appState.objectsSnapModeEnabled`) —
+ * the alignment guides that make two boxes in a diagram line up. Real state
+ * the editor reads in `getSnapLines`; normally only reachable from the canvas
+ * context menu, which the GoodNotes shell replaces.
+ */
+export const setObjectSnapping = (
+  api: ExcalidrawImperativeAPI | null,
+  enabled: boolean,
+): void => {
+  if (!isUsable(api)) {
+    return;
+  }
+  mergeAppState(api, { objectsSnapModeEnabled: enabled });
+};
+
+export const isObjectSnappingEnabled = (
+  appState: Pick<AppState, "objectsSnapModeEnabled">,
+): boolean => appState.objectsSnapModeEnabled === true;
+
+/**
+ * Open Excalidraw's eye dropper, so the next canvas tap sets the current ink
+ * colour from a pixel already on the page.
+ *
+ * `App.openEyeDropper` is private and the imperative API exposes no wrapper,
+ * so the only non-`packages/` way in is the editor's own keyboard shortcut
+ * (<kbd>Shift</kbd>+<kbd>S</kbd>, handled in `App.onKeyDown`). We dispatch
+ * that event on the editor container the handler is bound to — i.e. we take
+ * exactly the path a user pressing the key takes, rather than reaching into
+ * editor internals or patching `packages/`.
+ *
+ * Returns `false` when no editor container could be found, so a caller can
+ * avoid showing a control that would do nothing.
+ */
+export const openEyeDropper = (
+  api: ExcalidrawImperativeAPI | null,
+  container?: HTMLElement | null,
+): boolean => {
+  if (!isUsable(api) || typeof document === "undefined") {
+    return false;
+  }
+  const target =
+    container ??
+    document.querySelector<HTMLElement>(".excalidraw-container") ??
+    document.querySelector<HTMLElement>(".excalidraw");
+  if (!target) {
+    return false;
+  }
+  target.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "S",
+      code: "KeyS",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  return true;
+};

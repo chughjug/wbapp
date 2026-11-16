@@ -11,6 +11,8 @@
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
+import { loadPenWidths, savePenWidth } from "../pens";
+
 import type { PenPreset } from "../types";
 
 import type { TaskbarShapeId, TaskbarToolId } from "./model";
@@ -105,13 +107,30 @@ export const SHAPE_TOOL: Record<TaskbarShapeId, string> = {
 const isUsable = (api: ExcalidrawImperativeAPI | null) =>
   !!api && !api.isDestroyed;
 
-const applyInk = (api: ExcalidrawImperativeAPI, preset: PenPreset) => {
+/**
+ * @param explicit `true` when the host named this preset (a saved pen), in
+ * which case its width is authoritative. When the bar falls back to
+ * {@link DEFAULT_PEN} / {@link DEFAULT_HIGHLIGHTER} the nib the user last
+ * chose for that tool wins instead — a generic default must not silently
+ * reset a 0.2 margin pen to 1.
+ */
+const applyInk = (
+  api: ExcalidrawImperativeAPI,
+  preset: PenPreset,
+  explicit: boolean,
+) => {
+  const tool = preset.tool === "highlighter" ? "highlighter" : "pen";
+  const width = explicit ? preset.width : loadPenWidths()[tool];
   // locked: ink is a persistent tool — see PERSISTENT_TOOLS
   api.setActiveTool({ type: "freedraw", locked: true });
   api.updateScene({
     appState: {
       currentItemStrokeColor: preset.color,
-      currentItemStrokeWidthKey: snapStrokeWidth(preset.width),
+      // the key is only the three-step fallback; the exact width is what
+      // actually draws, so a 0.2 margin pen chosen in the bar is no longer
+      // rounded up to 0.5
+      currentItemStrokeWidthKey: snapStrokeWidth(width),
+      currentItemFreedrawStrokeWidth: width,
       currentItemOpacity: Math.round(
         Math.min(100, Math.max(0, preset.opacity)),
       ),
@@ -122,6 +141,9 @@ const applyInk = (api: ExcalidrawImperativeAPI, preset: PenPreset) => {
           : null,
     },
   });
+  // record it as this tool's remembered nib, so the tool menu's
+  // restore-on-tool-change does not immediately overwrite it
+  savePenWidth(tool, width);
 };
 
 export interface ActivateToolOptions {
@@ -154,10 +176,14 @@ export const activateTool = (
       editor.setActiveTool({ type: "lasso", locked: false });
       return;
     case "pen":
-      applyInk(editor, options.pen ?? DEFAULT_PEN);
+      applyInk(editor, options.pen ?? DEFAULT_PEN, !!options.pen);
       return;
     case "highlighter":
-      applyInk(editor, options.highlighter ?? DEFAULT_HIGHLIGHTER);
+      applyInk(
+        editor,
+        options.highlighter ?? DEFAULT_HIGHLIGHTER,
+        !!options.highlighter,
+      );
       return;
     case "eraser":
       editor.setActiveTool({ type: "eraser", locked: true });

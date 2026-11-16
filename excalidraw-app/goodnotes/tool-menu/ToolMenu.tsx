@@ -17,19 +17,31 @@ import type {
 } from "@excalidraw/excalidraw/types";
 
 import {
+  MAX_PEN_WIDTH,
+  MIN_PEN_WIDTH,
   PEN_WIDTHS,
+  PEN_WIDTH_STEP,
+  PEN_WIDTH_STOPS,
+  clampPenWidth,
+  formatPenWidth,
   loadPenPresets,
   resetPenPresets,
   savePenPresets,
+  savePenWidth,
 } from "../pens/presets";
 
 import {
+  EXTRA_TOOL_LABELS,
+  POPOVER_EXTRA_TOOLS,
+  activateExtraTool,
   activateTool,
   applyInk,
   applyPreset,
   applyShapeStyle,
   applyTextStyle,
   isHighlighterActive,
+  openEyeDropper,
+  readInkWidth,
   setToolLocked,
   shapeFromAppState,
 } from "./editor";
@@ -168,6 +180,8 @@ interface EditorStyle {
   strokeColor: string;
   backgroundColor: string;
   widthKey: ToolMenuWidthKey;
+  /** Exact freedraw width new strokes will use (override, else the key). */
+  width: number;
   opacity: number;
   variability: StrokeVariability;
   roundness: AppState["currentItemRoundness"];
@@ -183,6 +197,7 @@ const readStyle = (appState: AppState): EditorStyle => ({
   strokeColor: appState.currentItemStrokeColor,
   backgroundColor: appState.currentItemBackgroundColor,
   widthKey: appState.currentItemStrokeWidthKey,
+  width: readInkWidth(appState),
   opacity: appState.currentItemOpacity,
   variability: appState.currentItemStrokeVariability,
   roundness: appState.currentItemRoundness,
@@ -198,6 +213,7 @@ const FALLBACK_STYLE: EditorStyle = {
   strokeColor: "#1e1e1e",
   backgroundColor: "transparent",
   widthKey: "medium",
+  width: PEN_WIDTHS.thin,
   opacity: 100,
   variability: "constant",
   roundness: "round",
@@ -842,9 +858,17 @@ export const ToolMenu = ({
     updateActivePreset({ color });
   };
 
-  const onWidth = (widthKey: ToolMenuWidthKey) => {
-    applyInk(excalidrawAPI, { widthKey });
-    updateActivePreset({ width: PEN_WIDTHS[widthKey] });
+  /**
+   * Ink width is CONTINUOUS. It writes the exact
+   * `appState.currentItemFreedrawStrokeWidth`, not the three-step key, so
+   * 0.2 (an annotation-margin nib) is a real, drawable width rather than
+   * something that snaps back to `thin` = 0.5.
+   */
+  const onInkWidth = (value: number) => {
+    const width = clampPenWidth(value);
+    applyInk(excalidrawAPI, { width });
+    updateActivePreset({ width });
+    savePenWidth(tool === "highlighter" ? "highlighter" : "pen", width);
   };
 
   const onOpacity = (opacity: number) => {
@@ -930,6 +954,67 @@ export const ToolMenu = ({
     </Group>
   );
 
+  /**
+   * Bar thickness for a width stop, so a chip reads as what it draws. The
+   * square root rather than the width itself: linear mapping makes 0.2 and
+   * 0.5 visually identical at this size, and telling those two apart is the
+   * entire point of the finer stops.
+   */
+  const widthDotPx = (width: number) =>
+    Math.max(
+      2,
+      Math.min(14, Math.round((1 + 5.2 * Math.sqrt(width)) * 10) / 10),
+    );
+
+  const inkWidthGroup = (
+    <fieldset className="gn-tool-menu__group gn-tool-menu__group--ink-width">
+      <legend className="gn-tool-menu__legend">Width</legend>
+      <div className="gn-tool-menu__row">
+        {PEN_WIDTH_STOPS.map((stop) => (
+          <Radio
+            key={stop.width}
+            name="gn-tool-menu-width-stop"
+            value={stop.width}
+            checked={Math.abs(style.width - stop.width) < 0.001}
+            label={`${stop.label}, ${formatPenWidth(stop.width)}`}
+            onSelect={onInkWidth}
+            className="gn-tool-menu__radio--width"
+          >
+            <span
+              className="gn-tool-menu__width-dot"
+              aria-hidden="true"
+              style={{
+                ["--gn-width-dot" as string]: `${widthDotPx(stop.width)}px`,
+              }}
+            />
+          </Radio>
+        ))}
+      </div>
+      <div className="gn-tool-menu__field">
+        <input
+          id="gn-tool-menu-ink-width"
+          className="gn-tool-menu__range"
+          type="range"
+          min={MIN_PEN_WIDTH}
+          max={MAX_PEN_WIDTH}
+          step={PEN_WIDTH_STEP}
+          value={style.width}
+          aria-label="Stroke width"
+          aria-valuetext={`${formatPenWidth(style.width)} of ${formatPenWidth(
+            MAX_PEN_WIDTH,
+          )}`}
+          onChange={(event) => onInkWidth(Number(event.target.value))}
+        />
+        <output
+          className="gn-tool-menu__output"
+          htmlFor="gn-tool-menu-ink-width"
+        >
+          {formatPenWidth(style.width)}
+        </output>
+      </div>
+    </fieldset>
+  );
+
   const opacityControl = (onChange: (value: number) => void) => (
     <div className="gn-tool-menu__field">
       <label className="gn-tool-menu__legend" htmlFor="gn-tool-menu-opacity">
@@ -1007,7 +1092,7 @@ export const ToolMenu = ({
       "color",
       colorGroup(tool === "highlighter" ? "Colour" : "Ink", onColor),
     );
-    push("width", widthGroup(onWidth));
+    push("width", inkWidthGroup);
     if (tool === "highlighter") {
       push("opacity", opacityControl(onOpacity));
     }
@@ -1228,6 +1313,47 @@ export const ToolMenu = ({
       opacityControl((opacity) => applyTextStyle(excalidrawAPI, { opacity })),
     );
   }
+
+  /**
+   * Tools that `packages/excalidraw` implements end to end but that the
+   * redesigned bar never surfaced. They are pushed for EVERY tool and are
+   * deliberately absent from {@link COMPACT_GROUPS}, so they live behind
+   * "More" and add exactly zero chrome to the resting popover.
+   *
+   * Everything here writes real editor state — see `INTEGRATION.md` for the
+   * engine features that were looked at and left out on purpose.
+   */
+  push(
+    "tools",
+    <Group legend="More tools" className="gn-tool-menu__group--tools">
+      {POPOVER_EXTRA_TOOLS.map((extraTool) => (
+        <button
+          key={extraTool}
+          type="button"
+          className="gn-tool-menu__chip"
+          data-testid={`gn-tool-menu-extra-${extraTool}`}
+          onClick={() => {
+            activateExtraTool(excalidrawAPI, extraTool);
+            onClose();
+          }}
+        >
+          {EXTRA_TOOL_LABELS[extraTool]}
+        </button>
+      ))}
+      <button
+        type="button"
+        className="gn-tool-menu__chip"
+        data-testid="gn-tool-menu-extra-eyedropper"
+        onClick={() => {
+          // close first: the dropper's next click must land on the canvas
+          onClose({ restoreFocus: false });
+          openEyeDropper(excalidrawAPI);
+        }}
+      >
+        Match colour
+      </button>
+    </Group>,
+  );
 
   /* ---------------------------- render ----------------------------------- */
 

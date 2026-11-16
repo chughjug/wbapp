@@ -1,8 +1,10 @@
 /**
  * GoodNotes-style pen presets: a small, ordered set of saved pens that can be
- * activated in one tap (or one key press).
+ * activated in one tap (or one key press) — plus the width model the ink UI
+ * uses.
  *
- * Persisted to `localStorage` under {@link PENS_STORAGE_KEY}.
+ * Persisted to `localStorage` under {@link PENS_STORAGE_KEY} (the pens) and
+ * {@link PEN_WIDTH_STORAGE_KEY} (the last freely-chosen width per ink tool).
  */
 
 import type { PenPreset } from "../types";
@@ -10,11 +12,18 @@ import type { PenPreset } from "../types";
 /** localStorage key holding the user's pen presets. */
 export const PENS_STORAGE_KEY = "goodnotes-pens";
 
+/** localStorage key holding the last freely-chosen width per ink tool. */
+export const PEN_WIDTH_STORAGE_KEY = "goodnotes-pen-width";
+
 /**
- * Excalidraw only exposes three discrete freedraw stroke widths through
- * `appState.currentItemStrokeWidthKey`, which map to these element
- * `strokeWidth` values (see `FREEDRAW_STROKE_WIDTH` in `@excalidraw/common`).
- * `PenPreset.width` is expressed in those units and snapped to the nearest.
+ * Excalidraw's own picker has exactly three freedraw widths
+ * (`appState.currentItemStrokeWidthKey` → `FREEDRAW_STROKE_WIDTH`). They are
+ * kept here because non-freedraw elements (shapes, text) still go through
+ * that key, and because {@link snapPenWidth} needs them.
+ *
+ * `PenPreset.width` is **not** restricted to these: `element.strokeWidth` has
+ * always been an arbitrary `number`, and freedraw elements now take an exact
+ * width through `appState.currentItemFreedrawStrokeWidth`.
  */
 export const PEN_WIDTHS = {
   thin: 0.5,
@@ -24,11 +33,54 @@ export const PEN_WIDTHS = {
 
 export type PenWidthKey = keyof typeof PEN_WIDTHS;
 
-/** Smallest / largest selectable width, for the editor UI. */
-export const MIN_PEN_WIDTH = PEN_WIDTHS.thin;
-export const MAX_PEN_WIDTH = PEN_WIDTHS.bold;
+/**
+ * Smallest / largest selectable width, in `element.strokeWidth` units.
+ *
+ * The floor is 0.1: measured in the running app, a 0.1 stroke still rasterises
+ * to visible ink at zoom 1 (it is ~1/5 of the old `thin`). The ceiling of 6 is
+ * 3× the old `bold`, which is as wide as a highlighter needs.
+ */
+export const MIN_PEN_WIDTH = 0.1;
+export const MAX_PEN_WIDTH = 6;
+/** Slider granularity. 0.1 keeps every stop expressible as one decimal. */
+export const PEN_WIDTH_STEP = 0.1;
 
-/** Snap an arbitrary width to the nearest width Excalidraw can actually draw. */
+/**
+ * One-tap stops shown next to the slider. Chosen so the two smallest are
+ * below the old `thin` (0.5) — the annotation-margin sizes the three-step
+ * picker could not express at all.
+ */
+export const PEN_WIDTH_STOPS: readonly { width: number; label: string }[] = [
+  { width: 0.2, label: "Extra fine" },
+  { width: 0.5, label: "Fine" },
+  { width: 1, label: "Medium" },
+  { width: 2, label: "Bold" },
+  { width: 3.5, label: "Extra bold" },
+];
+
+/** Default width per ink tool, used when nothing has been chosen yet. */
+export const DEFAULT_PEN_WIDTH = 0.5;
+export const DEFAULT_HIGHLIGHTER_WIDTH = 3.5;
+
+/** Clamp to the selectable range and round onto the slider's grid. */
+export const clampPenWidth = (width: number): number => {
+  if (!Number.isFinite(width)) {
+    return DEFAULT_PEN_WIDTH;
+  }
+  const clamped = Math.min(MAX_PEN_WIDTH, Math.max(MIN_PEN_WIDTH, width));
+  // 0.1 grid, but keep exact stop values exact (0.35 etc. would be lost)
+  return Math.round(clamped * 100) / 100;
+};
+
+/** Human-readable width, e.g. `0.2` / `1` / `3.5`. For an `<output>`. */
+export const formatPenWidth = (width: number): string =>
+  String(Math.round(width * 100) / 100);
+
+/**
+ * Snap an arbitrary width to the nearest of Excalidraw's three width *keys*.
+ * Still needed: shapes and text have no exact-width override, and the editor's
+ * own property panel reads the key.
+ */
 export const snapPenWidth = (width: number): PenWidthKey => {
   let best: PenWidthKey = "medium";
   let bestDelta = Infinity;
@@ -45,11 +97,19 @@ export const snapPenWidth = (width: number): PenWidthKey => {
 /** The out-of-the-box pens. Order is the tray order and the 1-9 key order. */
 export const DEFAULT_PEN_PRESETS: readonly PenPreset[] = [
   {
+    id: "margin-note",
+    label: "Margin note",
+    tool: "freedraw",
+    color: "#e03131",
+    width: 0.2,
+    opacity: 100,
+  },
+  {
     id: "fine-black",
     label: "Fine black pen",
     tool: "freedraw",
     color: "#1e1e1e",
-    width: PEN_WIDTHS.thin,
+    width: 0.5,
     opacity: 100,
   },
   {
@@ -57,7 +117,7 @@ export const DEFAULT_PEN_PRESETS: readonly PenPreset[] = [
     label: "Thick blue pen",
     tool: "freedraw",
     color: "#1971c2",
-    width: PEN_WIDTHS.bold,
+    width: 2,
     opacity: 100,
   },
   {
@@ -65,7 +125,7 @@ export const DEFAULT_PEN_PRESETS: readonly PenPreset[] = [
     label: "Yellow highlighter",
     tool: "highlighter",
     color: "#ffd43b",
-    width: PEN_WIDTHS.bold,
+    width: 3.5,
     opacity: 45,
   },
   {
@@ -73,7 +133,7 @@ export const DEFAULT_PEN_PRESETS: readonly PenPreset[] = [
     label: "Eraser",
     tool: "eraser",
     color: "#1e1e1e",
-    width: PEN_WIDTHS.medium,
+    width: 1,
     opacity: 100,
   },
 ];
@@ -104,6 +164,10 @@ const clonePresets = (presets: readonly PenPreset[]): PenPreset[] =>
  * Read the saved presets. Falls back to {@link DEFAULT_PEN_PRESETS} when
  * nothing is stored, storage is unavailable (private mode / SSR) or the stored
  * payload is malformed. Never throws.
+ *
+ * Migration: the stored shape is unchanged (`PenPreset[]`), so pens saved by
+ * the three-width build load as-is; their widths are merely clamped into the
+ * (wider) selectable range, which is a no-op for 0.5 / 1 / 2.
  */
 export const loadPenPresets = (): PenPreset[] => {
   try {
@@ -117,6 +181,7 @@ export const loadPenPresets = (): PenPreset[] => {
     }
     const presets = parsed.filter(isPenPreset).map((preset) => ({
       ...preset,
+      width: clampPenWidth(preset.width),
       opacity: Math.min(100, Math.max(0, preset.opacity)),
     }));
     return presets.length ? presets : clonePresets(DEFAULT_PEN_PRESETS);
@@ -143,4 +208,58 @@ export const resetPenPresets = (): PenPreset[] => {
     // ignore
   }
   return clonePresets(DEFAULT_PEN_PRESETS);
+};
+
+/* -------------------------------------------------------------------------- */
+/*  Last-used width, per ink tool                                              */
+/* -------------------------------------------------------------------------- */
+
+/** The two ink tools that carry their own remembered width. */
+export type InkToolId = "pen" | "highlighter";
+
+export interface PenWidthMemory {
+  pen: number;
+  highlighter: number;
+}
+
+export const DEFAULT_PEN_WIDTH_MEMORY: PenWidthMemory = {
+  pen: DEFAULT_PEN_WIDTH,
+  highlighter: DEFAULT_HIGHLIGHTER_WIDTH,
+};
+
+/**
+ * Read the last freely-chosen width for each ink tool. Never throws; falls
+ * back to {@link DEFAULT_PEN_WIDTH_MEMORY} key by key, so a half-written
+ * payload still yields a usable record.
+ */
+export const loadPenWidths = (): PenWidthMemory => {
+  try {
+    const raw = localStorage.getItem(PEN_WIDTH_STORAGE_KEY);
+    if (!raw) {
+      return { ...DEFAULT_PEN_WIDTH_MEMORY };
+    }
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) {
+      return { ...DEFAULT_PEN_WIDTH_MEMORY };
+    }
+    const record = parsed as Record<string, unknown>;
+    const read = (key: InkToolId): number =>
+      typeof record[key] === "number" && Number.isFinite(record[key])
+        ? clampPenWidth(record[key] as number)
+        : DEFAULT_PEN_WIDTH_MEMORY[key];
+    return { pen: read("pen"), highlighter: read("highlighter") };
+  } catch {
+    return { ...DEFAULT_PEN_WIDTH_MEMORY };
+  }
+};
+
+/** Persist one tool's width. Returns `false` if storage rejected the write. */
+export const savePenWidth = (tool: InkToolId, width: number): boolean => {
+  try {
+    const next = { ...loadPenWidths(), [tool]: clampPenWidth(width) };
+    localStorage.setItem(PEN_WIDTH_STORAGE_KEY, JSON.stringify(next));
+    return true;
+  } catch {
+    return false;
+  }
 };

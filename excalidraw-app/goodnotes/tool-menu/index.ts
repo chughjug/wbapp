@@ -72,6 +72,9 @@ export {
   toolFromAppState,
   shapeFromAppState,
   isHighlighterActive,
+  readInkWidth,
+  applyRememberedInkWidth,
+  restoreRememberedInkWidth,
   widthKeyToPresetWidth,
   HIGHLIGHTER_MARKER,
   SHAPE_TOOL_TYPES,
@@ -84,6 +87,24 @@ export type {
   ToolMenuToolId,
   ToolMenuWidthKey,
 } from "./editor";
+
+/**
+ * Tools Excalidraw already implements that the GoodNotes bar never surfaced.
+ * Exported so the nav bar can give the laser pointer and the lasso their own
+ * buttons as well — the popover's "More tools" row is the floor, not the
+ * ceiling.
+ */
+export {
+  EXTRA_TOOLS,
+  EXTRA_TOOL_LABELS,
+  POPOVER_EXTRA_TOOLS,
+  activateExtraTool,
+  extraToolFromAppState,
+  setObjectSnapping,
+  isObjectSnappingEnabled,
+  openEyeDropper,
+} from "./editor";
+export type { ExtraToolId } from "./editor";
 
 /**
  * The docked / floating choice, and its `localStorage` persistence.
@@ -139,9 +160,18 @@ export type { ToolMenuEdge, ToolMenuPosition } from "./position";
 export {
   PENS_STORAGE_KEY,
   PEN_WIDTHS,
+  PEN_WIDTH_STOPS,
+  PEN_WIDTH_STEP,
+  PEN_WIDTH_STORAGE_KEY,
+  MIN_PEN_WIDTH,
+  MAX_PEN_WIDTH,
+  clampPenWidth,
+  formatPenWidth,
   loadPenPresets,
   savePenPresets,
   resetPenPresets,
+  loadPenWidths,
+  savePenWidth,
   snapPenWidth,
 } from "../pens/presets";
 export type { PenPreset } from "../types";

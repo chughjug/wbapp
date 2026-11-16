@@ -281,6 +281,9 @@
     width: 1.5rem;
     border-radius: 999px;
     background-color: currentColor;
+    /* continuous widths set --gn-width-dot inline; the three keyed values
+       below are the shape panel's quantised picker, which is unchanged */
+    height: var(--gn-width-dot, 4px);
 
     &[data-width="thin"] {
       height: 2px;
@@ -291,6 +294,25 @@
     &[data-width="bold"] {
       height: 7px;
     }
+  }
+
+  /* the ink width cell: one-tap stops on top, the continuous slider under
+     them. Both write the same exact `strokeWidth`, so the stops are just
+     bookmarks on the slider rather than a second, coarser model. */
+  &__group--ink-width {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    .gn-tool-menu__field {
+      min-width: 8.5rem;
+    }
+  }
+
+  /* tools that have no styling of their own, so they wrap rather than
+     compete for the row's width */
+  &__group--tools .gn-tool-menu__row {
+    flex-wrap: wrap;
   }
 
   /* ------------------------------ chips -------------------------------- */
@@ -736,6 +758,27 @@
 
   .gn-tool-menu__radio {
     padding: 0.1875rem 0.3125rem;
+  }
+
+  /* the width cell is label + stops + slider on one line, and wraps the
+     slider under the stops when the popover is too narrow for all three —
+     so the numeric readout is never pushed off the edge */
+  .gn-tool-menu__group--ink-width {
+    flex-wrap: wrap;
+
+    .gn-tool-menu__row {
+      flex: 0 0 auto;
+    }
+
+    .gn-tool-menu__field {
+      flex: 1 1 7rem;
+      min-width: 7rem;
+      column-gap: 0.375rem;
+    }
+
+    .gn-tool-menu__range {
+      min-width: 3.5rem;
+    }
   }
 
   /* --- trailing actions ------------------------------------------------ */

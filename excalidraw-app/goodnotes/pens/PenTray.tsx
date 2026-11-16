@@ -3,10 +3,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 import {
-  PEN_WIDTHS,
+  MAX_PEN_WIDTH,
+  MIN_PEN_WIDTH,
+  PEN_WIDTH_STEP,
+  clampPenWidth,
+  formatPenWidth,
   loadPenPresets,
   resetPenPresets,
   savePenPresets,
+  savePenWidth,
   snapPenWidth,
 } from "./presets";
 
@@ -40,11 +45,16 @@ export const applyPenPreset = (
     return;
   }
 
+  const width = clampPenWidth(preset.width);
+  savePenWidth(preset.tool === "highlighter" ? "highlighter" : "pen", width);
   excalidrawAPI.setActiveTool({ type: "freedraw" });
   excalidrawAPI.updateScene({
     appState: {
       currentItemStrokeColor: preset.color,
-      currentItemStrokeWidthKey: snapPenWidth(preset.width),
+      // the exact width wins for freedraw; the key is kept in step for
+      // anything that still reads it (shapes, the editor's own panel)
+      currentItemFreedrawStrokeWidth: width,
+      currentItemStrokeWidthKey: snapPenWidth(width),
       currentItemOpacity: Math.round(
         Math.min(100, Math.max(0, preset.opacity)),
       ),
@@ -56,12 +66,6 @@ export const applyPenPreset = (
     },
   });
 };
-
-const WIDTH_OPTIONS: { value: number; label: string }[] = [
-  { value: PEN_WIDTHS.thin, label: "Thin" },
-  { value: PEN_WIDTHS.medium, label: "Medium" },
-  { value: PEN_WIDTHS.bold, label: "Bold" },
-];
 
 export interface PenTrayProps {
   excalidrawAPI: ExcalidrawImperativeAPI | null;
@@ -87,16 +91,10 @@ const describePreset = (preset: PenPreset): string => {
   if (preset.tool === "eraser") {
     return "eraser";
   }
-  const width =
-    WIDTH_OPTIONS.find((o) => o.value === snapWidthValue(preset.width))
-      ?.label ?? "medium";
-  return `${preset.tool === "highlighter" ? "highlighter" : "pen"}, ${width}, ${
-    preset.opacity
-  }% opacity`;
+  return `${
+    preset.tool === "highlighter" ? "highlighter" : "pen"
+  }, width ${formatPenWidth(preset.width)}, ${preset.opacity}% opacity`;
 };
-
-const snapWidthValue = (width: number): number =>
-  PEN_WIDTHS[snapPenWidth(width)];
 
 /**
  * Compact, keyboard-driven tray of saved pens. Clicking (or pressing 1-9)
@@ -222,9 +220,10 @@ export const PenTray = ({
                       preset.tool === "highlighter"
                         ? String(preset.opacity / 100)
                         : "1",
-                    ["--pen-width" as any]: `${
-                      2 + snapWidthValue(preset.width) * 3
-                    }px`,
+                    ["--pen-width" as any]: `${Math.max(
+                      2,
+                      Math.min(14, 2 + clampPenWidth(preset.width) * 2.2),
+                    )}px`,
                   }}
                 />
                 <span className="goodnotes-pen-tray__label">
@@ -297,18 +296,19 @@ export const PenTray = ({
 
           <label className="goodnotes-pen-tray__field">
             <span>Width</span>
-            <select
-              value={snapWidthValue(editing.width)}
+            <input
+              type="range"
+              min={MIN_PEN_WIDTH}
+              max={MAX_PEN_WIDTH}
+              step={PEN_WIDTH_STEP}
+              value={editing.width}
               onChange={(event) =>
-                updatePreset(editing.id, { width: Number(event.target.value) })
+                updatePreset(editing.id, {
+                  width: clampPenWidth(Number(event.target.value)),
+                })
               }
-            >
-              {WIDTH_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            />
+            <output>{formatPenWidth(editing.width)}</output>
           </label>
 
           <label className="goodnotes-pen-tray__field">

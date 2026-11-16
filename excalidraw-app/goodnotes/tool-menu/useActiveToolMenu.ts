@@ -13,7 +13,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
-import { activateTool, toolFromAppState } from "./editor";
+import {
+  activateTool,
+  applyRememberedInkWidth,
+  restoreRememberedInkWidth,
+  toolFromAppState,
+} from "./editor";
 import { loadToolMenuPlacement, subscribeToolMenuPlacement } from "./position";
 
 import type { ToolMenuShapeId, ToolMenuToolId } from "./editor";
@@ -127,6 +132,11 @@ export const useActiveToolMenu = ({
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
 
+  // a width chosen before a reload is the width the next stroke draws with
+  useEffect(() => {
+    restoreRememberedInkWidth(excalidrawAPI);
+  }, [excalidrawAPI]);
+
   // follow the editor's real tool
   useEffect(() => {
     if (!excalidrawAPI || excalidrawAPI.isDestroyed) {
@@ -141,6 +151,13 @@ export const useActiveToolMenu = ({
       }
       previous = next;
       setTool(next);
+      if (next === "pen" || next === "highlighter") {
+        // Arriving at an ink tool — from the nav bar, a keyboard shortcut,
+        // undo, anywhere — restores THAT tool's own remembered nib, so the
+        // highlighter never inherits the pen's 0.2. Only reached when the
+        // tool identity actually changed, so it can never fight the slider.
+        applyRememberedInkWidth(excalidrawAPI, next);
+      }
       if (next === null) {
         // selection / hand / frame / … — nothing honest to show
         setIsOpen(false);

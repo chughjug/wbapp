@@ -454,6 +454,14 @@ export interface AppState {
   currentItemBackgroundColor: string;
   currentItemFillStyle: ExcalidrawElement["fillStyle"];
   currentItemStrokeWidthKey: StrokeWidthKey;
+  /**
+   * Exact stroke width for newly created `freedraw` elements, bypassing the
+   * three-step {@link currentItemStrokeWidthKey}. `null` (the default) keeps
+   * the historical behaviour. `element.strokeWidth` has always been an
+   * arbitrary `number`; only the picker was quantised, which is too coarse
+   * for handwriting (there is no width below `FREEDRAW_STROKE_WIDTH.thin`).
+   */
+  currentItemFreedrawStrokeWidth: number | null;
   currentItemStrokeStyle: ExcalidrawElement["strokeStyle"];
   currentItemRoughness: number;
   /**

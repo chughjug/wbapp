@@ -2,16 +2,21 @@
 
 > **Changed again (chrome reduction):** the default is now `placement="anchored"` — a **compact popover pinned to the tool button that opened it**, portalled onto `document.body` and mounted only while open. The docked band cost 1194×53 px (62,685 px²) of permanent chrome on an iPad Pro 11"; the popover costs **0 px² when closed**.
 >
-> - It opens when you tap the tool that is **already active** (`NavBar` / `FloatingBar` → `onActiveToolMenu(tool, anchorElement)` → `toolMenu.onToolSelect(tool, anchor)`). Selecting a *different* tool just switches tool, as on paper.
+> - It opens when you tap the tool that is **already active** (`NavBar` / `FloatingBar` → `onActiveToolMenu(tool, anchorElement)` → `toolMenu.onToolSelect(tool, anchor)`). Selecting a _different_ tool just switches tool, as on paper.
 > - It dismisses on an outside click, on <kbd>Esc</kbd>, and **as soon as a mark is made** (element count rises).
 > - It is a `role="dialog"` with a focus trap; <kbd>Esc</kbd> and the close button return focus to the anchor, while dismissal caused by going back to the page deliberately does **not** move focus (`onClose({ restoreFocus: false })`).
-> - Content is two rows — colours and widths, nothing nested. Everything else for the tool is behind **More**, which makes the *same* popover taller rather than opening a submenu.
+> - Content is two rows — colours and widths, nothing nested. Everything else for the tool is behind **More**, which makes the _same_ popover taller rather than opening a submenu.
 > - `placement="docked"` (the band) and `placement="floating"` (the edge-snapped overlay) are unchanged and still selectable; the header button cycles anchored → docked → floating, and the choice persists in `localStorage` and is subscribable (`subscribeToolMenuPlacement`).
 > - Because it portals itself, `<ToolMenu {...toolMenu.menuProps} />` may be rendered anywhere in the tree; it no longer has to sit between the bar and `.gn-shell-body`. `menuProps` now carries `anchor`.
 
-Self-contained app-level module. **No `packages/` patch is required** — it is built entirely on the documented `ExcalidrawImperativeAPI` surface (`setActiveTool`, `updateScene({ appState })`, `onChange`, `getAppState`).
+> **Changed again (finer widths + hidden tools):** the Width row is now a **continuous control** — five one-tap stops (`0.2` / `0.5` / `1` / `2` / `3.5`) plus a real `<input type="range" min="0.1" max="6" step="0.1">` with a numeric readout. The old three keyed widths are still exactly reachable as three points on it. Behind **More**, a new **More tools** row exposes the **laser pointer** and the **eyedropper**, two things the engine has had all along and the bar never surfaced. Neither addition costs a single pixel when the popover is closed.
 
-It does depend on one `packages/` change that `goodnotes/pens` already shipped: `appState.currentItemCustomData`, which is what makes a freedraw stroke a highlighter. That is already on `main` (`packages/excalidraw/types.ts`, `appState.ts`, `components/App.tsx`, `element/src/renderElement.ts`).
+Self-contained app-level module, built on the documented `ExcalidrawImperativeAPI` surface (`setActiveTool`, `updateScene({ appState })`, `onChange`, `getAppState`).
+
+It depends on two small `packages/` additions, both documented in `goodnotes/pens/INTEGRATION.md`:
+
+1. `appState.currentItemCustomData` — what makes a freedraw stroke a highlighter (already on `main`).
+2. `appState.currentItemFreedrawStrokeWidth` — what makes a freedraw stroke take an **exact** width instead of one of three. 3 files, **+23 lines, 0 removed**, default `null` = today's behaviour exactly. See `goodnotes/pens/INTEGRATION.md` § 5a for the line-by-line justification.
 
 ---
 
@@ -105,6 +110,31 @@ Note the tray also owns the global `1`–`9` preset shortcuts. This module does 
 
 No provider, no context, no state lifting. Placement, edge position and presets persist themselves.
 
+### 1g. Widths: what you must change, and what you need not
+
+**Nothing is required.** `useActiveToolMenu` (already created at `App.tsx:433`) now also owns the ink width:
+
+- on mount it calls `restoreRememberedInkWidth(excalidrawAPI)` — idempotent, and a no-op once an exact width is set, so it can never stomp a document's own saved `appState`;
+- whenever the editor _arrives_ at an ink tool from anywhere (the nav bar, a keyboard shortcut, undo) it applies that tool's own remembered nib, so the highlighter never inherits the pen's 0.2.
+
+Both are self-healing, which is why no `App.tsx` edit is needed.
+
+**One thing worth changing, though.** `NavBar` activates ink through `goodnotes/taskbar/tools.ts`, whose private `applyInk()` writes only `currentItemStrokeWidthKey` (`snapStrokeWidth(preset.width)`) and never the exact width. The consequence is mild but real: a `PenPreset` handed to the bar has its `width` **rounded to 0.5 / 1 / 2**, and is then immediately overridden by the remembered nib. If you want a bar preset's exact width to win, route the bar's ink activation through this module instead — one import, same signature shape:
+
+```tsx
+// excalidraw-app/goodnotes/taskbar/tools.ts — inside activateTool()
+import { applyPreset } from "../tool-menu";
+
+case "pen":
+  applyPreset(api, options.pen ?? DEFAULT_PEN);
+  return;
+case "highlighter":
+  applyPreset(api, options.highlighter ?? DEFAULT_HIGHLIGHTER);
+  return;
+```
+
+`applyPreset` sets the tool, the colour, the **exact** width, the opacity and the highlighter marker, and records the width as that tool's remembered nib. `goodnotes/taskbar/` is not owned by this module, so the change is left to you.
+
 ---
 
 ## 2. Public API
@@ -152,6 +182,24 @@ const applyShapeStyle: (api, { strokeColor?, backgroundColor?, widthKey?,
 const applyTextStyle: (api, { color?, fontSize?, fontFamily?, opacity? }) => void;
 const applyPreset: (api, preset: PenPreset) => void;
 const setToolLocked: (api, locked: boolean) => void;
+
+// ── continuous ink width ───────────────────────────────────────────────────
+// applyInk({ width })  writes the EXACT width (clamped to 0.1 – 6) and keeps
+// currentItemStrokeWidthKey on the nearest key.
+// applyInk({ widthKey }) writes the key and CLEARS the exact width.
+const readInkWidth: (appState) => number;             // what a stroke will use
+const applyRememberedInkWidth: (api, "pen"|"highlighter") => number | null;
+const restoreRememberedInkWidth: (api) => void;       // idempotent; on mount
+
+// ── engine tools the bar never surfaced ────────────────────────────────────
+const EXTRA_TOOLS: readonly ["laser", "lasso", "hand"];
+const POPOVER_EXTRA_TOOLS: readonly ["laser"];        // what the popover shows
+const EXTRA_TOOL_LABELS: Record<ExtraToolId, string>;
+const activateExtraTool: (api, tool: ExtraToolId) => void;
+const extraToolFromAppState: (appState) => ExtraToolId | null;
+const openEyeDropper: (api, container?) => boolean;   // false = no editor found
+const setObjectSnapping: (api, enabled: boolean) => void;
+const isObjectSnappingEnabled: (appState) => boolean;
 const toolFromAppState: (appState) => ToolMenuToolId | null;
 const shapeFromAppState: (appState) => ToolMenuShapeId | null;
 const isHighlighterActive: (appState) => boolean;
@@ -176,8 +224,10 @@ const loadToolMenuPosition / saveToolMenuPosition / placementToPixels /
       snapToEdge / moveByKeyboard / describePosition;
 
 // ── re-exported from goodnotes/pens (not redefined) ─────────────────────────
-PENS_STORAGE_KEY, PEN_WIDTHS, loadPenPresets, savePenPresets,
-resetPenPresets, snapPenWidth, type PenPreset;
+PENS_STORAGE_KEY, PEN_WIDTHS, PEN_WIDTH_STOPS, PEN_WIDTH_STEP,
+PEN_WIDTH_STORAGE_KEY, MIN_PEN_WIDTH, MAX_PEN_WIDTH, clampPenWidth,
+formatPenWidth, loadPenPresets, savePenPresets, resetPenPresets,
+loadPenWidths, savePenWidth, snapPenWidth, type PenPreset;
 ```
 
 ---
@@ -189,7 +239,7 @@ Every control writes a real `AppState` key that Excalidraw reads when it creates
 | Panel | Control | Editor state |
 | --- | --- | --- |
 | pen / highlighter | 5 ink swatches + `+` custom picker | `currentItemStrokeColor` |
-| pen / highlighter | 3 widths | `currentItemStrokeWidthKey` (→ `FREEDRAW_STROKE_WIDTH` 0.5/1/2) |
+| pen / highlighter | width: 5 stops + a 0.1–6.0 slider | `currentItemFreedrawStrokeWidth` (exact), with `currentItemStrokeWidthKey` kept at the nearest key |
 | pen / highlighter | saved-pen chips | tool + all three of the above, from `goodnotes-pens` |
 | pen | nib: Fountain / Ballpoint | `currentItemStrokeVariability` = `"variable"` / `"constant"` |
 | highlighter | opacity 10–100 | `currentItemOpacity` |
@@ -198,6 +248,8 @@ Every control writes a real `AppState` key that Excalidraw reads when it creates
 | shape | stroke / fill swatches | `currentItemStrokeColor` / `currentItemBackgroundColor` |
 | shape | width, edges, opacity | `currentItemStrokeWidthKey`, `currentItemRoundness`, `currentItemOpacity` |
 | text | colour, size, font, opacity | `currentItemStrokeColor`, `currentItemFontSize`, `currentItemFontFamily`, `currentItemOpacity` |
+| all (behind **More**) | Laser pointer | `setActiveTool({ type: "laser" })` |
+| all (behind **More**) | Match colour | Excalidraw's eye dropper, via its own <kbd>Shift</kbd>+<kbd>S</kbd> handler |
 | all | "Keep tool active" | `activeTool.locked` (Excalidraw's padlock) |
 
 ### What is NOT wired, and why
@@ -211,6 +263,27 @@ Three things the brief asked for have no honest backing in this editor. None of 
 3. **Highlighter "straight line" toggle.** The obvious implementation is to switch to the `line` tool while the highlighter is active. It does not work: `currentItemCustomData` is only stamped onto **freedraw** elements (`App.tsx`, the `newFreeDrawElement({ … })` call), so a `line` drawn in "highlighter mode" would come out as an ordinary translucent line that _washes out_ the ink underneath instead of multiplying over it — visibly different from every other highlighter stroke in the document. A toggle that silently changes the blend mode is worse than no toggle. _If you want it:_ one line in the linear-element branch of `handleCanvasPointerDown`, mirroring the freedraw one, plus the `isHighlighterElement` check already present in `renderElement.ts`.
 
 Smaller, deliberate omissions: the shape and text panels have no custom-colour `+` (the five stroke picks plus the editor's own property panel cover it), and no global `1`–`9` preset shortcuts (see § 1e).
+
+### Engine tools we did NOT surface, and why
+
+`packages/excalidraw/actions/` and `components/Toolbar.tsx` were read end to end. Everything the engine implements and the GoodNotes bar hides was considered; two shipped, the rest did not, and each refusal below is a judgement call you can overrule.
+
+**Shipped (behind More, 0 px of resting chrome):**
+
+- **Laser pointer** — `setActiveTool({ type: "laser" })`. Genuinely the best of the lot for a student: pointing at your own notes while explaining them in a study group, with no mark left behind. Measured: `appState.activeTool.type` becomes `"laser"`, the trail SVG gains a path with a 1600-character `d` during the drag and is back to 0 paths 1.6 s later, and the element count does not move.
+- **Eyedropper ("Match colour")** — matching the ink you used three pages ago. `App.openEyeDropper` is private and the imperative API has no wrapper, so this goes through the editor's own <kbd>Shift</kbd>+<kbd>S</kbd> handler: a `KeyboardEvent` dispatched on `.excalidraw-container`, i.e. literally the path a user pressing the key takes, with no `packages/` patch and no reach into editor internals. Measured: the overlay (`.excalidraw-eye-dropper-backdrop` / `-preview`) appears, and a pick moves `currentItemStrokeColor` from `#1e1e1e` to `#000000`.
+
+**Left out, with the reason:**
+
+| Feature | Verdict |
+| --- | --- |
+| **Shape snapping** (`objectsSnapModeEnabled`) | `setObjectSnapping()` is exported and **does** flip the real `appState` flag (measured `false → true`), but the popover ships no toggle. Reason: in this app a click on a shape with the selection tool selects nothing (measured: `selectedElementIds` stays `{}` after clicking a rectangle's centre at the correct screen coordinates), so nothing can be dragged and `appState.snapLines` never leaves `0`. A switch whose effect cannot be observed is a dead control. The export is there for whenever element selection works; alignment snapping also has thin value in a handwriting-first app. |
+| **Pan / hand tool** | In `EXTRA_TOOLS` and `activateExtraTool`, but **not** in the popover. Measured: the paged surface pins the viewport — `scrollX/scrollY` read `378.07 / 21.07` before _and_ after a wheel scroll, a space-drag and a hand-tool drag. A Pan button would be a dial wired to nothing today; it becomes real the moment a free-scrolling (whiteboard) mode ships. |
+| **Lasso select** | Real and useful — and the nav bar already has it ("Lasso select (smart selection)"). A second entry behind More is duplicate chrome. Still in `EXTRA_TOOLS`. |
+| **Search (`actionToggleSearchMenu`)** | Only finds _typed_ text. In a handwriting-first notebook that is a small slice of the page, and it opens Excalidraw's own sidebar, which fights the GoodNotes shell. Not worth the chrome. |
+| **Grid mode (`actionToggleGridMode`)** | The paper templates (`goodnotes/paper`) already draw ruling, grid and dots per page. A second, differently-aligned grid on top would be confusing. |
+| **Zen mode / view mode** | The shell _is_ zen mode — it is already on. |
+| **Stats panel, minimap, "show hints", text wrap, midpoint snapping, shape switch, bucket fill, frames, embeddables** | Each is either a developer/diagram affordance or already reachable, and none earns a line in a note-taker's tool popover. |
 
 ---
 
