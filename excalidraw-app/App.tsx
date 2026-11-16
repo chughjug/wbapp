@@ -98,6 +98,7 @@ import {
   getPageTemplate,
 } from "./goodnotes/pages";
 import { PaperBackgroundLayer } from "./goodnotes/paper";
+import { PagedViewControls, usePagedView } from "./goodnotes/paged";
 import {
   Shelf,
   getScene,
@@ -427,6 +428,8 @@ const ExcalidrawWrapper = ({
   const toolMenu = useActiveToolMenu({ excalidrawAPI });
   // palm rejection, page flick and tap gestures go live from here
   const input = useInputGestures(excalidrawAPI);
+  // one page at a time, fitted to the workspace; swipe/arrows move between
+  const paged = usePagedView(excalidrawAPI);
   const [isPagePanelOpen, setIsPagePanelOpen] = useState(true);
   const openDocs = useOpenDocs(docId ?? undefined);
   const { preference: themePreference, setPreference: setThemePreference } =
@@ -1465,6 +1468,7 @@ const ExcalidrawWrapper = ({
           </div>
         </div>
       )}
+      <PagedViewControls {...paged.controlsProps} />
       {newPage.dialog}
       <GlobalPdfDropOverlay mode="document" />
       <ObjectMenu
