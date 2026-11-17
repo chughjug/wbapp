@@ -26,7 +26,7 @@ Set that (or your own deploy) as `VITE_CANVAS_BRIDGE_URL` in the wbapp build.
 
 ## Extension
 
-Load `chrome-extension/canvas-bridge` unpacked in `chrome://extensions`. Set the bridge URL in the popup to your Heroku app. Keep a Canvas tab open while syncing.
+Load the `chrome-extension/` folder unpacked in `chrome://extensions` (it contains `manifest.json`). Set the bridge URL in the popup to your Heroku app. Keep a Canvas tab open while syncing.
 
 ## API sketch
 
