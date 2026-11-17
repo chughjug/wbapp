@@ -20,7 +20,7 @@ heroku open
 
 **Production host:** the relay is also mounted on the ratings Heroku app at
 
-`https://chess-tournament-director-6ce5e76147d7.herokuapp.com/canvas-bridge`
+`https://chess-tournament-director-6ce5e76147d7.herokuapp.com/api/canvas-bridge`
 
 Set that (or your own deploy) as `VITE_CANVAS_BRIDGE_URL` in the wbapp build.
 

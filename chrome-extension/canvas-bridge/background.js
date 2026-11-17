@@ -14,7 +14,7 @@ const MAX_INLINE_PDF = 4 * 1024 * 1024; // 4 MB per file
 const MAX_INLINE_FILES = 8;
 
 const defaultBridgeUrl = () =>
-  "https://chess-tournament-director-6ce5e76147d7.herokuapp.com/canvas-bridge";
+  "https://chess-tournament-director-6ce5e76147d7.herokuapp.com/api/canvas-bridge";
 
 const loadState = async () => {
   const data = await chrome.storage.local.get([
