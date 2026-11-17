@@ -136,6 +136,18 @@ export type InteractiveSceneRenderConfig = {
   deltaTime: number;
 };
 
+/**
+ * Predicted tip samples for the in-progress freedraw stroke. Appended only
+ * while rendering the wet-ink overlay — never written to `element.points`
+ * (autosave / collab / history must not see phantom tails).
+ */
+export type WetInkTail = {
+  /** Local points relative to the freedraw element's origin. */
+  points: readonly [number, number][];
+  /** Pressures aligned with `points` (empty when pressure is simulated). */
+  pressures: readonly number[];
+};
+
 export type NewElementSceneRenderConfig = {
   canvas: HTMLCanvasElement | null;
   rc: RoughCanvas;
@@ -145,6 +157,10 @@ export type NewElementSceneRenderConfig = {
   scale: number;
   appState: AppState;
   renderConfig: StaticCanvasRenderConfig;
+  /**
+   * Optional predicted tail for freedraw wet-ink. Merged for this paint only.
+   */
+  wetInkTail?: WetInkTail | null;
 };
 
 export type SceneScroll = {

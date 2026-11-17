@@ -92,6 +92,7 @@ export * from "./resizeTest";
 export * from "./Scene";
 export * from "./selection";
 export * from "./inkFeel";
+export * from "./strokeModelerSession";
 export * from "./shape";
 export * from "./showSelectedShapeActions";
 export * from "./sizeHelpers";

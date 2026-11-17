@@ -1,6 +1,6 @@
 # INK — integration notes
 
-Lower-latency, higher-fidelity handwriting with a stylus. **No new dependencies**: `perfect-freehand@1.2.0` was already in the tree and already draws every freedraw outline. The wins come from (a) not throwing away the pen's samples, and (b) letting the user pick how hard those samples are filtered.
+Lower-latency, higher-fidelity handwriting with a stylus. Outline rendering still uses `perfect-freehand@1.2.0` (already in the tree). Optional physics smoothing adds `ink-stroke-modeler-ts` (Google Ink Stroke Modeler port). The wins come from (a) not throwing away the pen's samples, (b) handwriting-tuned filtering defaults, (c) a wet-ink predicted tail that never touches `element.points`, and (d) optional physics modeling.
 
 ---
 
@@ -54,10 +54,10 @@ Three presets, mapped onto `streamline` / `smoothing` / `thinning` (`packages/el
 | preset | streamline (pen) | streamline (mouse) | smoothing | thinning |
 | --- | --- | --- | --- | --- |
 | Smooth | 0.45 | 0.6 | 0.65 | 0.5 |
-| **Balanced (default)** | **0.2** | **0.5** | **0.5** | **0.6** |
-| Precise | 0.08 | 0.3 | 0.35 | 0.7 |
+| Balanced | 0.2 | 0.5 | 0.5 | 0.6 |
+| **Precise (default)** | **0.08** | **0.3** | **0.35** | **0.7** |
 
-**Balanced is byte-for-byte the previous behaviour**, so the default cannot regress diagramming. The resolved values are baked into `element.strokeOptions` **at stroke creation time**, so changing the preference never re-shapes strokes already on the page. `smoothing`/`thinning` are only serialised when they differ from the renderer's own defaults, so Balanced strokes serialise exactly as they did before (verified: zero snapshot churn in the editor's test suite).
+**Balanced is byte-for-byte the historical Excalidraw behaviour**; the notebook app defaults to **Precise** because handwriting is the primary input. The resolved values are baked into `element.strokeOptions` **at stroke creation time**, so changing the preference never re-shapes strokes already on the page. `smoothing`/`thinning` are only serialised when they differ from the _renderer_'s hardcoded defaults (which still match Balanced), so Balanced strokes serialise exactly as they did before.
 
 ---
 
@@ -73,21 +73,23 @@ const simulatePressure = event.pressure === 0.5; // was, in App.tsx
 
 A mouse reports exactly `0.5` while a button is held, so this is a reasonable "no sensor" test — but **a stylus that happens to touch down at mid-force reports 0.5 too**, and the whole stroke then renders with simulated pressure and the pen's real force is thrown away. Confirmed empirically in Chromium: a synthetic pen stroke with `pressure: 0.5` at pointerdown and genuine varying pressure afterwards produced `simulatePressure: true` and **`pressures: []`** — every real pressure reading discarded.
 
-The fix is a user opt-in rather than a silent behaviour change, because the heuristic is _also_ right for digitizers (and virtualised/remote-desktop pen pipelines) that report a constant 0.5 for every sample; trusting those gives a dead, uniform-width line. With **"Always use real pen pressure"** on, the same stroke records 42/42 pressures ranging 0.00–0.80.
+**"Always use real pen pressure" is on by default** for this notebook app (Apple Pencil first). Turn it off in Settings → Ink & handwriting if a digitizer reports a constant 0.5 and strokes go flat. With it on, a mid-force touchdown stroke records real pressures instead of discarding them.
 
 ### Caveat worth knowing
 
-The app's default pen is **constant-width** (`appState.currentItemStrokeVariability === "constant"`), which renders via `LaserPointer` with pressure pinned to `1`. On that pen, pressure — real or simulated — does nothing at all, and `thinning`/`smoothing` are not consulted either; only `streamline` applies. Pressure work only shows up on the variable-width pen.
+The app's default pen is now **variable-width** (`appState.currentItemStrokeVariability === "variable"`), so pressure / thinning apply to handwriting. Switch to Constant in the properties panel for diagramming pens that should ignore pressure.
 
 ---
 
-## 4. Predicted events — NOT shipped
+## 4. Predicted events — wet-ink overlay (shipped)
 
-`getPredictedEvents()` is available in this browser and would hide perceived lag by drawing ahead of the nib. It is **deliberately not implemented**.
+`getPredictedEvents()` draws a **render-only** wet-ink tail on `NewElementCanvas`. Predicted points are **never** written to `element.points` (autosave / collab / history / hit-testing stay clean). When Google's Ink Stroke Modeler is enabled, its `predict()` output is preferred for the tail; otherwise browser predictions are used. The new-element canvas also requests `{ desynchronized: true }` once so supporting UAs can present wet ink with lower compositor latency.
 
-Predicted points would have to be appended to `element.points` and then removed again when the real samples land. But `element.points` is not a private render buffer — it is read mid-stroke by autosave/localStorage, the collaboration broadcast, history/versioning and hit-testing. A frame in which a phantom tail is visible to any of those produces a permanently wrong stroke, and a wrong stroke is far worse than a slightly laggy one.
+---
 
-Doing it safely needs a separate "wet ink" overlay that renders the predicted tail without committing it to the element — a renderer change well outside this patch. Skipped, as briefed.
+## 5. Physics stroke modeler (optional, on by default)
+
+`ink-stroke-modeler-ts` (TypeScript port of [google/ink-stroke-modeler](https://github.com/google/ink-stroke-modeler)) pre-filters coalesced samples before they become element points. Toggle **"Physics stroke smoothing"** in Settings → Ink & handwriting. When off, the raw coalesced path is kept (previous behaviour) and wet ink falls back to `getPredictedEvents()` only.
 
 ---
 

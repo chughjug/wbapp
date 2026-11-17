@@ -22,31 +22,23 @@ describe("freedraw mode action", () => {
   });
 
   it("applies currentItemStrokeVariability to newly drawn freedraw elements", () => {
-    // default app state draws constant-width strokes
-    expect(h.state.currentItemStrokeVariability).toBe("constant");
+    // default app state draws variable-width (pressure) strokes for handwriting
+    expect(h.state.currentItemStrokeVariability).toBe("variable");
 
     UI.createElement("freedraw", { x: 0, y: 0 });
 
     expect(
       (h.elements[0] as ExcalidrawFreeDrawElement).strokeOptions?.variability,
-    ).toBe("constant");
+    ).toBe("variable");
+    // default ink feel is "precise"; mouse streamline = 0.3
     expect(
       (h.elements[0] as ExcalidrawFreeDrawElement).strokeOptions?.streamline,
-    ).toBe(0.5);
+    ).toBe(0.3);
   });
 
   it("toggling the radio updates both the selected element and the default", () => {
     const element = UI.createElement("freedraw", { x: 0, y: 0 });
     API.setSelectedElements([element.get()] as NonDeletedExcalidrawElement[]);
-
-    fireEvent.click(screen.getByTitle("Variable"));
-    expect(
-      (h.elements[0] as ExcalidrawFreeDrawElement).strokeOptions?.variability,
-    ).toBe("variable");
-    expect(
-      (h.elements[0] as ExcalidrawFreeDrawElement).strokeOptions?.streamline,
-    ).toBe(0.5);
-    expect(h.state.currentItemStrokeVariability).toBe("variable");
 
     fireEvent.click(screen.getByTitle("Constant"));
     expect(
@@ -54,7 +46,16 @@ describe("freedraw mode action", () => {
     ).toBe("constant");
     expect(
       (h.elements[0] as ExcalidrawFreeDrawElement).strokeOptions?.streamline,
-    ).toBe(0.5);
+    ).toBe(0.3);
     expect(h.state.currentItemStrokeVariability).toBe("constant");
+
+    fireEvent.click(screen.getByTitle("Variable"));
+    expect(
+      (h.elements[0] as ExcalidrawFreeDrawElement).strokeOptions?.variability,
+    ).toBe("variable");
+    expect(
+      (h.elements[0] as ExcalidrawFreeDrawElement).strokeOptions?.streamline,
+    ).toBe(0.3);
+    expect(h.state.currentItemStrokeVariability).toBe("variable");
   });
 });

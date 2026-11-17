@@ -212,6 +212,8 @@ import {
   isNonDeletedElement,
   resolveFreedrawStrokeOptions,
   shouldSimulatePressure,
+  getUseStrokeModeler,
+  StrokeModelerSession,
 } from "@excalidraw/element";
 
 import type { throttleRAF } from "@excalidraw/common";
@@ -435,6 +437,7 @@ import type { ExcalidrawLibraryIds } from "../data/types";
 import type {
   RenderInteractiveSceneCallback,
   ScrollBars,
+  WetInkTail,
 } from "../scene/types";
 
 import type { ExportedElements } from "../data";
@@ -485,6 +488,8 @@ type FreedrawSample = {
   clientX: number;
   clientY: number;
   pressure: number;
+  /** `PointerEvent.timeStamp` in milliseconds (DOMHighResTimeStamp). */
+  timeStamp: number;
 };
 
 const AppContext = React.createContext<AppClassProperties>(null!);
@@ -2698,6 +2703,11 @@ class App extends React.Component<AppProps, AppState> {
                               rc={this.rc}
                               elementsMap={renderableElementsMap}
                               allElementsMap={allElementsMap}
+                              wetInkTail={
+                                previewElement.type === "freedraw"
+                                  ? this.wetInkTail
+                                  : null
+                              }
                               renderConfig={{
                                 imageCache: this.imageCache,
                                 isExporting: false,
@@ -8377,6 +8387,28 @@ class App extends React.Component<AppProps, AppState> {
 
     const strokeVariability = this.state.currentItemStrokeVariability;
 
+    // optional physics pre-filter (Google Ink Stroke Modeler)
+    this.freedrawModelerSession = null;
+    let startPoint = pointFrom<LocalPoint>(0, 0);
+    let startPressure = event.pressure;
+    if (getUseStrokeModeler()) {
+      const session = new StrokeModelerSession();
+      if (!session.isFailed) {
+        const modeled = session.down({
+          x: gridX,
+          y: gridY,
+          pressure: event.pressure,
+          time: (event.timeStamp || performance.now()) / 1000,
+        });
+        this.freedrawModelerSession = session;
+        const tip = modeled[modeled.length - 1];
+        if (tip) {
+          startPoint = pointFrom<LocalPoint>(tip.x - gridX, tip.y - gridY);
+          startPressure = tip.pressure;
+        }
+      }
+    }
+
     const element = newFreeDrawElement({
       type: elementType,
       x: gridX,
@@ -8399,14 +8431,16 @@ class App extends React.Component<AppProps, AppState> {
       }),
       locked: false,
       frameId: topLayerFrame ? topLayerFrame.id : null,
-      points: [pointFrom<LocalPoint>(0, 0)],
+      points: [startPoint],
       // pressures are only consumed when rendering a real-pressure stroke, so
       // skip persisting them while pressure is being simulated
-      pressures: simulatePressure ? [] : [event.pressure],
+      pressures: simulatePressure ? [] : [startPressure],
     });
 
-    // a fresh stroke starts with an empty sample bank
+    // a fresh stroke starts with an empty sample bank and no wet-ink tail
     this.freedrawSampleBuffer = [];
+    this.freedrawPredictedBuffer = [];
+    this.wetInkTail = null;
 
     this.insertNewElement(element);
 
@@ -9431,16 +9465,46 @@ class App extends React.Component<AppProps, AppState> {
             // every digitizer sample banked since the last frame, not just the
             // single event this throttled handler was called with
             const samples = this.drainFreedrawSamples(event);
+            const predicted = this.drainFreedrawPredictedSamples();
 
             const points = [...newElement.points];
             // pressures stay empty while pressure is simulated (see pointerdown)
             const pressures: number[] = [...newElement.pressures];
+            const modeler = this.freedrawModelerSession;
 
             for (const sample of samples) {
               const sampleCoords = viewportCoordsToSceneCoords(
                 sample,
                 this.state,
               );
+
+              if (modeler && !modeler.isFailed) {
+                const modeled = modeler.move({
+                  x: sampleCoords.x,
+                  y: sampleCoords.y,
+                  pressure: sample.pressure,
+                  time: sample.timeStamp / 1000,
+                });
+                for (const tip of modeled) {
+                  const dx = tip.x - newElement.x;
+                  const dy = tip.y - newElement.y;
+                  const lastPoint =
+                    points.length > 0 && points[points.length - 1];
+                  if (
+                    lastPoint &&
+                    lastPoint[0] === dx &&
+                    lastPoint[1] === dy
+                  ) {
+                    continue;
+                  }
+                  points.push(pointFrom<LocalPoint>(dx, dy));
+                  if (!newElement.simulatePressure) {
+                    pressures.push(tip.pressure);
+                  }
+                }
+                continue;
+              }
+
               const dx = sampleCoords.x - newElement.x;
               const dy = sampleCoords.y - newElement.y;
 
@@ -9458,7 +9522,16 @@ class App extends React.Component<AppProps, AppState> {
               }
             }
 
-            if (points.length !== newElement.points.length) {
+            // wet-ink prediction: prefer modeler prediction, else browser
+            // getPredictedEvents samples. Never written to element.points.
+            this.wetInkTail = this.buildWetInkTail(
+              newElement,
+              predicted,
+              modeler,
+            );
+
+            const pointsChanged = points.length !== newElement.points.length;
+            if (pointsChanged) {
               this.scene.mutateElement(
                 newElement,
                 {
@@ -9470,7 +9543,11 @@ class App extends React.Component<AppProps, AppState> {
                   isDragging: false,
                 },
               );
+            }
 
+            // always setState so the wet-ink overlay re-paints even when no
+            // real samples arrived this frame
+            if (pointsChanged || this.wetInkTail) {
               this.setState({
                 newElement,
               });
@@ -9566,6 +9643,21 @@ class App extends React.Component<AppProps, AppState> {
    */
   private freedrawSampleBuffer: FreedrawSample[] = [];
 
+  /**
+   * Browser-predicted tip samples (`getPredictedEvents`), kept separate from
+   * the real sample bank so they never commit into `element.points`.
+   */
+  private freedrawPredictedBuffer: FreedrawSample[] = [];
+
+  /** Optional physics modeler for the in-progress freedraw stroke. */
+  private freedrawModelerSession: StrokeModelerSession | null = null;
+
+  /**
+   * Predicted wet-ink tail for the current freedraw stroke. Render-only —
+   * never written to the element. Cleared on pointerup.
+   */
+  private wetInkTail: WetInkTail | null = null;
+
   private bufferFreedrawSamples = (event: PointerEvent) => {
     if (this.state.newElement?.type !== "freedraw") {
       return;
@@ -9588,7 +9680,30 @@ class App extends React.Component<AppProps, AppState> {
         clientX: sample.clientX,
         clientY: sample.clientY,
         pressure: sample.pressure,
+        timeStamp: sample.timeStamp || event.timeStamp || performance.now(),
       });
+    }
+
+    // Predicted events are for the wet-ink overlay only. Replace the buffer
+    // each move so the tail tracks the latest trajectory.
+    this.freedrawPredictedBuffer = [];
+    try {
+      const predicted =
+        typeof event.getPredictedEvents === "function"
+          ? event.getPredictedEvents()
+          : null;
+      if (predicted?.length) {
+        for (const sample of predicted) {
+          this.freedrawPredictedBuffer.push({
+            clientX: sample.clientX,
+            clientY: sample.clientY,
+            pressure: sample.pressure,
+            timeStamp: sample.timeStamp || event.timeStamp || performance.now(),
+          });
+        }
+      }
+    } catch {
+      // same trusted-event restriction as getCoalescedEvents
     }
   };
 
@@ -9604,12 +9719,66 @@ class App extends React.Component<AppProps, AppState> {
           clientX: event.clientX,
           clientY: event.clientY,
           pressure: event.pressure,
+          timeStamp: event.timeStamp || performance.now(),
         },
       ];
     }
     const samples = this.freedrawSampleBuffer;
     this.freedrawSampleBuffer = [];
     return samples;
+  };
+
+  private drainFreedrawPredictedSamples = (): FreedrawSample[] => {
+    const samples = this.freedrawPredictedBuffer;
+    this.freedrawPredictedBuffer = [];
+    return samples;
+  };
+
+  /**
+   * Build a render-only wet-ink tail from modeler prediction and/or browser
+   * predicted pointer events. Prefer the modeler when it has a prediction.
+   */
+  private buildWetInkTail = (
+    element: ExcalidrawFreeDrawElement,
+    predicted: FreedrawSample[],
+    modeler: StrokeModelerSession | null,
+  ): WetInkTail | null => {
+    if (modeler && modeler.isActive) {
+      const tips = modeler.predict();
+      if (tips.length) {
+        return {
+          points: tips.map((tip) =>
+            pointFrom<LocalPoint>(tip.x - element.x, tip.y - element.y),
+          ),
+          pressures: element.simulatePressure
+            ? []
+            : tips.map((tip) => tip.pressure),
+        };
+      }
+    }
+
+    if (!predicted.length) {
+      return null;
+    }
+
+    const points: [number, number][] = [];
+    const pressures: number[] = [];
+    for (const sample of predicted) {
+      const scene = viewportCoordsToSceneCoords(sample, this.state);
+      points.push(
+        pointFrom<LocalPoint>(scene.x - element.x, scene.y - element.y),
+      );
+      if (!element.simulatePressure) {
+        pressures.push(sample.pressure);
+      }
+    }
+    return { points, pressures };
+  };
+
+  private clearFreedrawWetInk = () => {
+    this.freedrawPredictedBuffer = [];
+    this.wetInkTail = null;
+    this.freedrawModelerSession = null;
   };
 
   // Returns whether the pointer move happened over either scrollbar
@@ -9925,28 +10094,69 @@ class App extends React.Component<AppProps, AppState> {
           this.state,
         );
 
-        const points = newElement.points;
-        let dx = pointerCoords.x - newElement.x;
-        let dy = pointerCoords.y - newElement.y;
-
-        // Allows dots to avoid being flagged as infinitely small
-        if (dx === points[0][0] && dy === points[0][1]) {
-          dy += 0.0001;
-          dx += 0.0001;
-        }
-
         // the throttled move handler was flushed above, so anything still in
         // the bank is at most one frame old and is superseded by this final
         // point; drop it so it cannot leak into the next stroke
         this.freedrawSampleBuffer = [];
 
-        const pressures = newElement.simulatePressure
+        const nextPoints = [...newElement.points];
+        const nextPressures = newElement.simulatePressure
           ? []
-          : [...newElement.pressures, childEvent.pressure];
+          : [...newElement.pressures];
+
+        const appendLocal = (lx: number, ly: number, pressure: number) => {
+          const last = nextPoints.length > 0 && nextPoints[nextPoints.length - 1];
+          if (last && last[0] === lx && last[1] === ly) {
+            return;
+          }
+          nextPoints.push(pointFrom<LocalPoint>(lx, ly));
+          if (!newElement.simulatePressure) {
+            nextPressures.push(pressure);
+          }
+        };
+
+        const modeler = this.freedrawModelerSession;
+        if (modeler && !modeler.isFailed) {
+          const modeled = modeler.up({
+            x: pointerCoords.x,
+            y: pointerCoords.y,
+            pressure: childEvent.pressure,
+            time: (childEvent.timeStamp || performance.now()) / 1000,
+          });
+          for (const tip of modeled) {
+            appendLocal(
+              tip.x - newElement.x,
+              tip.y - newElement.y,
+              tip.pressure,
+            );
+          }
+        } else {
+          let dx = pointerCoords.x - newElement.x;
+          let dy = pointerCoords.y - newElement.y;
+
+          // Allows dots to avoid being flagged as infinitely small
+          if (
+            nextPoints[0] &&
+            dx === nextPoints[0][0] &&
+            dy === nextPoints[0][1]
+          ) {
+            dy += 0.0001;
+            dx += 0.0001;
+          }
+          appendLocal(dx, dy, childEvent.pressure);
+        }
+
+        // if modeler/path produced nothing new (degenerate), force a tiny tip
+        if (nextPoints.length === newElement.points.length) {
+          const last = nextPoints[nextPoints.length - 1] ?? [0, 0];
+          appendLocal(last[0] + 0.0001, last[1] + 0.0001, childEvent.pressure);
+        }
+
+        this.clearFreedrawWetInk();
 
         this.scene.mutateElement(newElement, {
-          points: [...points, pointFrom<LocalPoint>(dx, dy)],
-          pressures,
+          points: nextPoints,
+          pressures: nextPressures,
         });
 
         this.actionManager.executeAction(actionFinalize);

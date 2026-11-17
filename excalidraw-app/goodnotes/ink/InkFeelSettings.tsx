@@ -7,10 +7,8 @@
  *     another module owns: pass `settings` + `onChange` and own the state.
  *   - UNCONTROLLED: omit both and it drives `useInkFeel()` internally.
  *
- * The control is deliberately plain: a radiogroup of three presets plus one
- * checkbox. It carries its own description text because the trade-off
- * ("precise keeps small letters, smooth hides jitter") is not guessable from
- * the names alone.
+ * The control is deliberately plain: a radiogroup of three presets plus
+ * checkboxes for real pressure and the physics stroke modeler.
  */
 
 import clsx from "clsx";
@@ -35,6 +33,8 @@ export interface InkFeelSettingsProps {
   compact?: boolean;
   /** Hide the "use real pen pressure" checkbox. */
   hidePressureOption?: boolean;
+  /** Hide the stroke-modeler checkbox. */
+  hideModelerOption?: boolean;
   className?: string;
   label?: string;
 }
@@ -44,6 +44,7 @@ export const InkFeelSettings = ({
   onChange,
   compact = false,
   hidePressureOption = false,
+  hideModelerOption = false,
   className,
   label = "Ink feel",
 }: InkFeelSettingsProps) => {
@@ -62,6 +63,7 @@ export const InkFeelSettings = ({
       } else {
         internal.setFeel(next.feel);
         internal.setPreferRealPenPressure(next.preferRealPenPressure);
+        internal.setUseStrokeModeler(next.useStrokeModeler);
       }
     },
     [isControlled, onChange, internal],
@@ -127,6 +129,33 @@ export const InkFeelSettings = ({
               <span className="goodnotes-ink-feel__option-description">
                 Stops the editor guessing that a stylus has no pressure sensor.
                 Turn off if your pen draws a flat, uniform line.
+              </span>
+            )}
+          </span>
+        </label>
+      )}
+
+      {!hideModelerOption && (
+        <label className="goodnotes-ink-feel__pressure">
+          <input
+            type="checkbox"
+            checked={current.useStrokeModeler}
+            onChange={(event) =>
+              commit({
+                ...current,
+                useStrokeModeler: event.target.checked,
+              })
+            }
+          />
+          <span>
+            <span className="goodnotes-ink-feel__pressure-label">
+              Physics stroke smoothing
+            </span>
+            {!compact && (
+              <span className="goodnotes-ink-feel__option-description">
+                Uses Google&apos;s Ink Stroke Modeler to calm digitizer jitter
+                and predict the tip for lower perceived lag. Turn off for raw
+                input.
               </span>
             )}
           </span>

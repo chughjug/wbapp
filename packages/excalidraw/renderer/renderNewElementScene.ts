@@ -7,6 +7,12 @@ import {
   shouldApplyFrameClip,
 } from "@excalidraw/element";
 
+import type {
+  ExcalidrawFreeDrawElement,
+  NonDeleted,
+} from "@excalidraw/element/types";
+import type { LocalPoint } from "@excalidraw/math";
+
 import {
   bootstrapCanvas,
   getNormalizedCanvasDimensions,
@@ -15,7 +21,38 @@ import {
 
 import { frameClip } from "./staticScene";
 
-import type { NewElementSceneRenderConfig } from "../scene/types";
+import type { NewElementSceneRenderConfig, WetInkTail } from "../scene/types";
+
+/**
+ * Build a render-only copy of an in-progress freedraw with the wet-ink
+ * prediction appended. The real element is left untouched so phantom points
+ * never reach autosave / collab / history.
+ */
+const withWetInkTail = (
+  element: NonDeleted<ExcalidrawFreeDrawElement>,
+  wetInkTail: WetInkTail | null | undefined,
+): NonDeleted<ExcalidrawFreeDrawElement> => {
+  if (!wetInkTail?.points.length) {
+    return element;
+  }
+
+  const points = [
+    ...element.points,
+    ...(wetInkTail.points as LocalPoint[]),
+  ] as ExcalidrawFreeDrawElement["points"];
+
+  const pressures = element.simulatePressure
+    ? []
+    : [...element.pressures, ...wetInkTail.pressures];
+
+  // fresh object so ShapeCache (WeakMap) never poisons the live element
+  return {
+    ...element,
+    points,
+    pressures,
+    isDeleted: false,
+  };
+};
 
 const _renderNewElementScene = ({
   canvas,
@@ -26,6 +63,7 @@ const _renderNewElementScene = ({
   scale,
   appState: unsnappedAppState,
   renderConfig,
+  wetInkTail,
 }: NewElementSceneRenderConfig) => {
   if (canvas) {
     // the same whole-device-pixel scroll the static scene draws at
@@ -73,7 +111,13 @@ const _renderNewElementScene = ({
         }
       }
 
-      const renderTargetElement = newElement;
+      const renderTargetElement =
+        newElement.type === "freedraw"
+          ? withWetInkTail(
+              newElement as NonDeleted<ExcalidrawFreeDrawElement>,
+              wetInkTail,
+            )
+          : newElement;
 
       renderElement(
         renderTargetElement,

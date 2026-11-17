@@ -72,6 +72,11 @@
 import { clear, createStore, del, get, set } from "idb-keyval";
 
 import { DARK_MODE_STORAGE_KEY } from "../dark";
+import {
+  INK_FEEL_STORAGE_KEY,
+  INK_MODELER_STORAGE_KEY,
+  INK_PRESSURE_STORAGE_KEY,
+} from "../ink";
 import { listDocs, getScene } from "../library";
 import { INPUT_SETTINGS_STORAGE_KEY } from "../input";
 import { VIEW_MODE_STORAGE_KEY } from "../paged";
@@ -132,6 +137,9 @@ export const BACKED_UP_PREFERENCE_KEYS: readonly string[] = [
   PENS_STORAGE_KEY,
   DARK_MODE_STORAGE_KEY,
   DEFAULT_PAPER_STORAGE_KEY,
+  INK_FEEL_STORAGE_KEY,
+  INK_PRESSURE_STORAGE_KEY,
+  INK_MODELER_STORAGE_KEY,
 ];
 
 /** Suggested filename, e.g. `notebook-backup-2026-11-16.json`. */
