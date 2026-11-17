@@ -73,7 +73,7 @@ import {
 import { getContainingFrame } from "./frame";
 import { getCornerRadius } from "./utils";
 
-import { getFreedrawUniformInkWidth, ShapeCache } from "./shape";
+import { getFreedrawHairlineInkWidth, ShapeCache } from "./shape";
 import {
   getStickyNoteFooter,
   getStickyNotePathCommands,
@@ -257,6 +257,16 @@ const cappedElementCanvasSize = (
   let height = elementHeight * deviceScale + padding * 2;
 
   let scale: number = zoom.value;
+
+  // Fine pens: rasterize the cache hotter than the screen so the blit can
+  // antialias a sub-pixel ribbon instead of painting a broken 1-px chain.
+  if (isFreeDrawElement(element)) {
+    const inkWidth = getFreedrawHairlineInkWidth(element);
+    const devicePx = inkWidth * zoom.value * deviceScale;
+    if (devicePx > 0 && devicePx < FREEDRAW_THIN_SUPERSAMPLE_BELOW_DEVICE_PX) {
+      scale = zoom.value * FREEDRAW_THIN_SUPERSAMPLE_FACTOR;
+    }
+  }
 
   // rescale to ensure width and height is within limits
   if (
@@ -456,13 +466,26 @@ const strokeStickyNoteEdge = (
  * stroke. The identical stroke magnified to 2.24 device px is smooth
  * (variation 5%) — which is what rules out the geometry as the cause.
  *
- * So: when the ribbon would be thinner than a device pixel, widen it to one
- * device pixel and scale alpha down by the same factor. Total ink is
- * conserved, the line stays as light as it should be, and it is uniform
- * instead of patchy. This is the standard hairline rule; it is the only
- * thing that can be done, because thinner than a pixel does not exist.
+ * So: when the ribbon would be thinner than {@link FREEDRAW_HAIRLINE_MIN_DEVICE_PX}
+ * device pixels, widen it to that floor and scale alpha down by the same
+ * factor. Total ink is conserved, the line stays as light as it should be,
+ * and it is uniform instead of patchy. This is the standard hairline rule.
+ *
+ * The floor is **2 device pixels** (not 1): measured CV along a thin stroke
+ * drops from ~0.25 at sub-pixel width to ~0.05 once the ribbon covers ~2.2
+ * device pixels. One pixel still splits across neighbors and looks grainy;
+ * two pixels is the quality floor for fine pens.
  */
-const FREEDRAW_HAIRLINE_MIN_DEVICE_PX = 1;
+const FREEDRAW_HAIRLINE_MIN_DEVICE_PX = 2;
+
+/**
+ * When a freedraw stroke would paint thinner than this many device pixels at
+ * the current zoom, rasterize its element cache at 2× and blit with
+ * smoothing. Extra samples turn sub-pixel ribbons into antialiased coverage
+ * instead of patchy single-pixel chains.
+ */
+const FREEDRAW_THIN_SUPERSAMPLE_BELOW_DEVICE_PX = 2.5;
+const FREEDRAW_THIN_SUPERSAMPLE_FACTOR = 2;
 
 /**
  * Ceiling on the widening, as a multiple of `strokeWidth`, so that it always
@@ -491,8 +514,7 @@ const getFreedrawHairlineCompensation = (
   ) {
     return null;
   }
-  // pressure-varying strokes have no single width to floor; left alone
-  const inkWidth = getFreedrawUniformInkWidth(element);
+  const inkWidth = getFreedrawHairlineInkWidth(element);
   if (!(inkWidth > 0)) {
     return null;
   }

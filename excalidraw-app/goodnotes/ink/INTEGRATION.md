@@ -245,11 +245,10 @@ This is what a user actually sees on a page-fitted sheet, and it is where the pr
 
 ## 4. What this does _not_ fix, honestly
 
-- **A hairline is lighter, not thinner.** Below ~0.36 (1× / 100%) or ~0.18 (2× / 100%) the slider stops changing the line's thickness and starts changing its opacity. That is physics, not a bug: a line thinner than a pixel cannot exist. `HAIRLINE_PEN_WIDTH` in `goodnotes/pens` exports the 1× / 100% threshold so UI can say so.
-- **Residual unevenness.** At 0.1 the CV is 0.136, not the 0.036 of a thick stroke. A 1-pixel line at an arbitrary sub-pixel phase still splits across two pixels, and how it splits still varies along the stroke. Removing that needs a ≥ 2 device-pixel floor, which would visibly fatten the old `thin` pen — not an acceptable trade.
-- **It changes already-drawn strokes below 0.4.** Those widths only became reachable when the continuous slider shipped, so the blast radius is notes taken since then, and the change is in the direction of the complaint. Nothing at 0.4 or above moves by a single pixel.
-- **SVG export is unaffected** and should be: an SVG has no device pixels, so a 0.1 stroke exports as a true 0.28-unit ribbon and renders correctly at whatever resolution it is finally drawn. PNG export _does_ get the floor, via the same `getTransform()` path, which matches the screen.
-- **Pressure-varying strokes are left alone.** `getFreedrawUniformInkWidth()` returns 0 for them because their width is not uniform, so there is no single number to floor. The app's pen is constant-width (`currentItemStrokeVariability === "constant"`), so this does not affect the shipped pens; a thin variable pen would still look rough (measured: CV 0.255 at 0.1).
+- **A hairline is lighter, not thinner.** Below ~0.71 (1× / 100%) or ~0.36 (2× / 100%) the slider stops changing the line's thickness and starts changing its opacity — the quality floor is **2 device pixels** (was 1), which is where measured roughness collapses. `HAIRLINE_PEN_WIDTH` in `goodnotes/pens` exports the 1× / 100% threshold so UI can say so.
+- **Thin caches are supersampled.** Freedraw element bitmaps whose ink would be &lt; 2.5 device pixels are rasterized at 2× and blit with smoothing, so committed fine strokes antialias instead of stair-stepping.
+- **Variable-width pens are floored too.** `getFreedrawHairlineInkWidth()` uses the perfect-freehand base diameter, so pressure pens get the same hairline treatment as constant ones.
+- **SVG export is unaffected** and should be: an SVG has no device pixels, so a 0.1 stroke exports as a true thin ribbon and renders correctly at whatever resolution it is finally drawn. PNG export _does_ get the floor, via the same `getTransform()` path, which matches the screen.
 - **No real hardware.** As with the rest of this module, everything here was measured with synthesised trusted pen events in headless Chromium, not an Apple Pencil.
 
 ## 5. `packages/` lines added for this
