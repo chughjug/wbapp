@@ -46,7 +46,7 @@
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
-import { getActivePagedView } from "../paged";
+import { getActivePagedView, playPageTurnAnimation } from "../paged";
 
 import {
   HAND_PAGE_TURN_COOLDOWN_MS,
@@ -212,18 +212,26 @@ export const createHandOverdrag = (
         zoom,
       );
 
-      // pages stack vertically, so only a vertical overdrag means "the next
-      // page"; a sideways one is someone bumping the edge of a zoomed page
-      if (
-        Math.abs(overdragY) < HAND_PAGE_TURN_PX ||
-        Math.abs(overdragY) < Math.abs(overdragX) * HAND_PAGE_TURN_DOMINANCE
-      ) {
+      // accept a decisive vertical OR horizontal overdrag as a page turn —
+      // horizontal matches swipe-left / swipe-right notebook flicks
+      const horizontal =
+        Math.abs(overdragX) >= HAND_PAGE_TURN_PX &&
+        Math.abs(overdragX) >= Math.abs(overdragY) * HAND_PAGE_TURN_DOMINANCE;
+      const vertical =
+        Math.abs(overdragY) >= HAND_PAGE_TURN_PX &&
+        Math.abs(overdragY) >= Math.abs(overdragX) * HAND_PAGE_TURN_DOMINANCE;
+      if (!horizontal && !vertical) {
         return;
       }
 
-      // dragging the paper UP pulls the next page into view, the way a
-      // scroll does; dragging it DOWN reaches back for the previous one
-      const direction: -1 | 1 = overdragY < 0 ? 1 : -1;
+      // horizontal: drag left → next; vertical: drag up → next
+      const direction: -1 | 1 = horizontal
+        ? overdragX < 0
+          ? 1
+          : -1
+        : overdragY < 0
+        ? 1
+        : -1;
       const from = paged.getPageIndex();
       const moved =
         direction === 1
@@ -231,6 +239,9 @@ export const createHandOverdrag = (
           : paged.prev({ animate: true, cause: "swipe" });
       if (moved) {
         lastTurnAt = now;
+        // horizontal slide cue even when the overdrag that claimed the turn
+        // was vertical — keeps page changes feeling like notebook flips
+        playPageTurnAnimation(direction);
         options.onPageTurn?.(direction, from, from + direction);
       }
     },

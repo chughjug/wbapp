@@ -1,0 +1,38 @@
+/* Horizontal page-turn cue for swipe navigation. */
+
+.gn-shell-canvas.gn-page-turn--next {
+  animation: gn-page-turn-next 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gn-shell-canvas.gn-page-turn--prev {
+  animation: gn-page-turn-prev 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes gn-page-turn-next {
+  from {
+    transform: translateX(18%);
+    opacity: 0.72;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes gn-page-turn-prev {
+  from {
+    transform: translateX(-18%);
+    opacity: 0.72;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-shell-canvas.gn-page-turn--next,
+  .gn-shell-canvas.gn-page-turn--prev {
+    animation: none;
+  }
+}

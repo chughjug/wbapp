@@ -76,7 +76,6 @@ import {
   ImportPdfIcon,
   LassoIcon,
   LineIcon,
-  MoreIcon,
   NewDocumentIcon,
   PagesPanelIcon,
   PenIcon,
@@ -561,7 +560,7 @@ export const FloatingBar = ({
     "select",
   );
   const [activeShape, setActiveShape] = useState<TaskbarShapeId>("rectangle");
-  const [openMenu, setOpenMenu] = useState<"insert" | "more" | null>(null);
+  const [openMenu, setOpenMenu] = useState<"insert" | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [editorTheme, setEditorTheme] = useState<"light" | "dark">("light");
   /**
@@ -775,7 +774,6 @@ export const FloatingBar = ({
   // ---- menus --------------------------------------------------------------
 
   const insertId = `${reactId}-insert`;
-  const moreId = `${reactId}-more`;
   const pagesId = `${reactId}-pages`;
 
   const insertSections = useMemo<TaskbarMenuSection[]>(() => {
@@ -1014,6 +1012,16 @@ export const FloatingBar = ({
     isPinned,
   ]);
 
+  /**
+   * The "…" control is gone: document actions fold into the "+" overflow so
+   * the dock stays one row of tools. Present / settings / theme / share stay
+   * reachable from that same menu.
+   */
+  const overflowSections = useMemo<TaskbarMenuSection[]>(
+    () => [...insertSections, ...moreSections],
+    [insertSections, moreSections],
+  );
+
   const showPinnedTitle = isPinned("title") && !!documentTitle?.trim();
   const showPinnedText = isPinned("text");
   const showPinnedImage = isPinned("image");
@@ -1055,7 +1063,7 @@ export const FloatingBar = ({
     if (showPinnedSticky) {
       ids.push("pin-sticky");
     }
-    if (insertSections.length) {
+    if (overflowSections.length) {
       ids.push(insertId);
     }
     if (showPinnedUndo) {
@@ -1076,18 +1084,13 @@ export const FloatingBar = ({
     if (showPinnedSearch) {
       ids.push("pin-search");
     }
-    if (moreSections.length) {
-      ids.push(moreId);
-    }
     return ids;
   }, [
     onHome,
     onTogglePagePanel,
     pagesId,
-    insertSections.length,
+    overflowSections.length,
     insertId,
-    moreSections.length,
-    moreId,
     showPinnedText,
     showPinnedImage,
     showPinnedSticky,
@@ -1430,8 +1433,8 @@ export const FloatingBar = ({
             </button>
           )}
 
-          {/* ---- "+" secondary inserts -------------------------------------- */}
-          {insertSections.length > 0 && (
+          {/* ---- "+" overflow (insert + former "…" document actions) -------- */}
+          {overflowSections.length > 0 && (
             <div className="gn-bar__slot">
               <button
                 type="button"
@@ -1445,7 +1448,7 @@ export const FloatingBar = ({
                 aria-controls={
                   openMenu === "insert" ? `${insertId}-menu` : undefined
                 }
-                title="Insert"
+                title="Insert and document actions"
                 onFocus={() => setFocusId(insertId)}
                 onClick={() => {
                   setFocusId(insertId);
@@ -1454,14 +1457,14 @@ export const FloatingBar = ({
               >
                 <PlusIcon />
                 <span className="gn-bar__sr">
-                  Insert — text, shapes and more
+                  Insert, share, settings and more
                 </span>
               </button>
               {openMenu === "insert" && (
                 <TaskbarMenu
                   id={`${insertId}-menu`}
                   labelledBy={insertId}
-                  sections={insertSections}
+                  sections={overflowSections}
                   onClose={(opts) => {
                     setOpenMenu(null);
                     if (opts?.restoreFocus !== false) {
@@ -1599,48 +1602,6 @@ export const FloatingBar = ({
               <SearchIcon />
               <span className="gn-bar__sr">Search</span>
             </button>
-          )}
-
-          {/* ---- "…" document actions ---------------------------------------- */}
-          {moreSections.length > 0 && (
-            <div className="gn-bar__slot">
-              <button
-                type="button"
-                id={moreId}
-                ref={registerRef(moreId)}
-                className="gn-bar__button"
-                data-control="more"
-                tabIndex={tabIndexFor(moreId)}
-                aria-haspopup="menu"
-                aria-expanded={openMenu === "more"}
-                aria-controls={
-                  openMenu === "more" ? `${moreId}-menu` : undefined
-                }
-                title="Document actions"
-                onFocus={() => setFocusId(moreId)}
-                onClick={() => {
-                  setFocusId(moreId);
-                  setOpenMenu((open) => (open === "more" ? null : "more"));
-                }}
-              >
-                <MoreIcon />
-                <span className="gn-bar__sr">Document actions</span>
-              </button>
-              {openMenu === "more" && (
-                <TaskbarMenu
-                  id={`${moreId}-menu`}
-                  labelledBy={moreId}
-                  align="end"
-                  sections={moreSections}
-                  onClose={(opts) => {
-                    setOpenMenu(null);
-                    if (opts?.restoreFocus !== false) {
-                      buttonRefs.current.get(moreId)?.focus();
-                    }
-                  }}
-                />
-              )}
-            </div>
           )}
         </div>
         {!readMode && (
