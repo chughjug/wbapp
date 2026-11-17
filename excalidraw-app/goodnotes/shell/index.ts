@@ -45,7 +45,8 @@
  * | fuzzy select | the lasso slot (`onFuzzySelect`) |
  * | text / shapes / image / sticky | "+" |
  * | import PDF, insert graph | "+" |
- * | new document, add page, undo, redo | "…" (undo/redo also on the zoom pill) |
+ * | new document | dedicated New control on the bar (also under "…") |
+ * | add page, undo, redo | "…" (undo/redo also on the zoom pill) |
  * | share, export PDF, backdrops | "…" |
  * | search, read mode, theme, settings | "…" |
  *

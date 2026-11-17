@@ -59,6 +59,8 @@ export interface UsePagesResult {
   seedFirstPage: (opts?: {
     size?: PageSizeName;
     template?: PaperTemplateId;
+    landscape?: boolean;
+    image?: PageImageBackground | null;
   }) => void;
 }
 

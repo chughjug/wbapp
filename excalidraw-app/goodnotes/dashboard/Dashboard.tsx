@@ -46,6 +46,11 @@ export interface DashboardProps {
   /** Called when the user opens — or creates — a document. Same contract as
    *  `Shelf`'s own prop; the deadline cards route through it too. */
   onOpenDocument: (doc: DocMeta) => void;
+  /**
+   * When set, Shelf New / empty-state create open the host's create flow
+   * (format picker) instead of creating immediately.
+   */
+  onCreateDocument?: (init: Partial<DocMeta>) => void;
   /** Drives the Excalidraw CSS custom properties. Defaults to `"light"`. */
   theme?: "light" | "dark";
   /** Passed straight through to `Shelf`'s header slot. */
@@ -62,6 +67,7 @@ export interface DashboardProps {
 
 export const Dashboard = ({
   onOpenDocument,
+  onCreateDocument,
   theme = "light",
   headerExtra,
   className,
@@ -130,6 +136,7 @@ export const Dashboard = ({
         <Shelf
           theme={theme}
           onOpenDocument={onOpenDocument}
+          onCreateDocument={onCreateDocument}
           headerExtra={headerExtra}
           defaultView={defaultView}
           menuExtra={

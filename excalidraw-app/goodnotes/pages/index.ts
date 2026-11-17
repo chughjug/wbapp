@@ -98,6 +98,24 @@ export type {
   NewPageRequest,
 } from "./useNewPage";
 
+/**
+ * React hook owning the "new document" flow: format picker, createDoc, and a
+ * pending first-page seed consumed after navigation.
+ */
+export { useNewDocument, NEW_DOCUMENT_CHOICE_KEY } from "./useNewDocument";
+export type {
+  UseNewDocumentOptions,
+  UseNewDocumentResult,
+} from "./useNewDocument";
+
+/** Stash / take the first-page seed across the create → open remount. */
+export {
+  setPendingNewDocumentSeed,
+  takePendingNewDocumentSeed,
+  clearPendingNewDocumentSeeds,
+} from "./pendingNewDocument";
+export type { PendingNewDocumentSeed } from "./pendingNewDocument";
+
 /** The dialog itself, if you would rather drive the open state yourself. */
 export { NewPageDialog, IMAGE_FORMAT_ID } from "./NewPageDialog";
 export type {

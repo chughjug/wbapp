@@ -27,11 +27,13 @@ import {
   getVersion,
   getFrame,
   isTestEnv,
+  isWritableElement,
   preventUnload,
   resolvablePromise,
   isRunningInIframe,
   isDevEnv,
 } from "@excalidraw/common";
+import { getShortcutKey } from "@excalidraw/excalidraw/shortcut";
 import polyfill from "@excalidraw/excalidraw/polyfill";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadFromBlob } from "@excalidraw/excalidraw/data/blob";
@@ -96,15 +98,18 @@ import { BackdropPanel, useBackdropPanel } from "./goodnotes/backdrops";
 import {
   usePages,
   useNewPage,
+  useNewDocument,
   isPageFrame,
   getPageTemplate,
+  attachPageImageFile,
+  readNewPageChoice,
+  takePendingNewDocumentSeed,
 } from "./goodnotes/pages";
-import { PaperBackgroundLayer } from "./goodnotes/paper";
+import { PaperBackgroundLayer, syncPageImageCache } from "./goodnotes/paper";
 import { PagedViewControls, usePagedView } from "./goodnotes/paged";
 import { Dashboard } from "./goodnotes/dashboard";
 import { CourseBrowser, useCanvasConnect } from "./goodnotes/canvas";
 import {
-  createDoc,
   getScene,
   saveSceneDebounced,
   flushSceneSaves,
@@ -479,6 +484,10 @@ const ExcalidrawWrapper = ({
   // every new document starts with one page, so the canvas is never an
   // unbounded void; idempotent, so reopening a document does not add pages.
   //
+  // Format comes from the create-dialog stash (including an optional image
+  // File) or the remembered per-document choice — never a hard-coded Letter
+  // lined page that ignores what the student just picked.
+  //
   // A transient scene (`docId === null`) is deliberately excluded: it is
   // somebody else's `#room=` session or an imported `#json=` drawing, not a
   // notebook in this user's library. Seeding there would inject a `page:1`
@@ -488,9 +497,42 @@ const ExcalidrawWrapper = ({
     if (!excalidrawAPI || !docId) {
       return;
     }
-    initialStatePromiseRef.current.promise.then(() => {
-      seedFirstPage({ size: "LETTER", template: "lined" });
+    let cancelled = false;
+    initialStatePromiseRef.current.promise.then(async () => {
+      if (cancelled) {
+        return;
+      }
+      const pending = takePendingNewDocumentSeed(docId);
+      const choice = pending ?? readNewPageChoice(docId);
+      let image = null;
+      if (pending?.imageFile) {
+        try {
+          image = await attachPageImageFile(excalidrawAPI, pending.imageFile, {
+            fit: pending.imageFit ?? "cover",
+          });
+        } catch (error) {
+          console.error("goodnotes: failed to attach first-page image", error);
+        }
+      }
+      if (cancelled) {
+        return;
+      }
+      seedFirstPage({
+        size: choice.size,
+        template: choice.template,
+        landscape: choice.landscape,
+        image,
+      });
+      if (image) {
+        syncPageImageCache(
+          excalidrawAPI.getSceneElementsIncludingDeleted(),
+          excalidrawAPI.getFiles(),
+        );
+      }
     });
+    return () => {
+      cancelled = true;
+    };
   }, [excalidrawAPI, docId, seedFirstPage]);
 
   // flush any debounced scene write before the tab goes away
@@ -1363,6 +1405,7 @@ const ExcalidrawWrapper = ({
               refresh={() => forceRefresh((prev) => !prev)}
               onExportPdf={() => setIsPdfExportOpen(true)}
               onCloseDocument={onCloseDocument}
+              onNewDocument={onNewDocument}
             />
             <AppWelcomeScreen
               onCollabDialogOpen={onCollabDialogOpen}
@@ -1424,6 +1467,15 @@ const ExcalidrawWrapper = ({
 
             <CommandPalette
               customCommandPaletteItems={[
+                {
+                  label: "New document",
+                  category: DEFAULT_CATEGORIES.app,
+                  shortcut: getShortcutKey("CtrlOrCmd+N"),
+                  keywords: ["new", "create", "notebook", "document", "blank"],
+                  perform: () => {
+                    onNewDocument();
+                  },
+                },
                 {
                   label: t("labels.liveCollaboration"),
                   category: DEFAULT_CATEGORIES.app,
@@ -1588,15 +1640,12 @@ const GoodNotesRoot = () => {
     setDocId(doc.id);
   }, []);
 
-  const createAndOpenDocument = useCallback(async () => {
-    // straight into a brand-new document. Going via the library made
-    // "new document" look like it reopened the last one, because the
-    // editor has no New button and the tab strip's "+" went home.
-    await flushSceneSaves();
-    const doc = await createDoc({});
-    window.history.pushState({}, "", `/d/${encodeURIComponent(doc.id)}`);
-    setDocId(doc.id);
-  }, []);
+  // format picker → createDoc → stash first-page seed → navigate. One path
+  // for the shelf, floating bar, tab "+", Cmd/Ctrl+N and the command palette.
+  const newDocument = useNewDocument({
+    theme: editorTheme,
+    onCreated: openDocument,
+  });
 
   const closeDocument = useCallback(() => {
     void flushSceneSaves();
@@ -1615,10 +1664,37 @@ const GoodNotesRoot = () => {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  // Ctrl/Cmd+N — new document from shelf or editor (never while typing).
+  const openNewDocument = newDocument.open;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        !(event.metaKey || event.ctrlKey) ||
+        event.altKey ||
+        event.shiftKey ||
+        event.key.toLowerCase() !== "n"
+      ) {
+        return;
+      }
+      if (isWritableElement(event.target)) {
+        return;
+      }
+      event.preventDefault();
+      openNewDocument();
+    };
+    window.addEventListener(EVENT.KEYDOWN, onKeyDown);
+    return () => window.removeEventListener(EVENT.KEYDOWN, onKeyDown);
+  }, [openNewDocument]);
+
   // the receive screen consumes the shared file, imports it and navigates
   // to /d/<newDocId> itself
   if (isShareTarget) {
-    return <ShareTargetReceiver theme={editorTheme} />;
+    return (
+      <>
+        <ShareTargetReceiver theme={editorTheme} />
+        {newDocument.dialog}
+      </>
+    );
   }
 
   if (isCanvasRoute) {
@@ -1630,6 +1706,7 @@ const GoodNotesRoot = () => {
           onConnect={canvasConnect.open}
         />
         {canvasConnect.dialog}
+        {newDocument.dialog}
       </>
     );
   }
@@ -1640,22 +1717,27 @@ const GoodNotesRoot = () => {
         <Dashboard
           theme={editorTheme}
           onOpenDocument={openDocument}
+          onCreateDocument={(init) => newDocument.open(init)}
           headerExtra={<PdfDropZone variant="inline" />}
           onConnectCanvas={canvasConnect.open}
         />
         <GlobalPdfDropOverlay mode="library" />
         {canvasConnect.dialog}
+        {newDocument.dialog}
       </>
     );
   }
 
   return (
-    <ExcalidrawWrapper
-      key={docId ?? "transient"}
-      docId={docId}
-      onCloseDocument={closeDocument}
-      onNewDocument={() => void createAndOpenDocument()}
-    />
+    <>
+      <ExcalidrawWrapper
+        key={docId ?? "transient"}
+        docId={docId}
+        onCloseDocument={closeDocument}
+        onNewDocument={() => newDocument.open()}
+      />
+      {newDocument.dialog}
+    </>
   );
 };
 
