@@ -8,7 +8,7 @@
 const PAIR_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const ROOM_TTL_MS = 1000 * 60 * 60 * 12; // 12h
 const JOB_TTL_MS = 1000 * 60 * 30; // 30m
-const MAX_PAYLOAD_BYTES = 12 * 1024 * 1024; // 12 MB JSON ceiling
+const MAX_PAYLOAD_BYTES = 20 * 1024 * 1024; // 20 MB JSON ceiling
 
 /** @type {Map<string, import("./types.js").Room>} */
 const roomsById = new Map();
@@ -91,12 +91,18 @@ export const touchAgent = (room, canvasHost) => {
 export const agentOnline = (room, maxAgeMs = 15_000) =>
   now() - room.lastAgentSeenAt <= maxAgeMs;
 
-export const createJob = (room, { courseId } = {}) => {
+export const createJob = (room, { courseId, fileIds } = {}) => {
   const job = {
     id: randomId(10),
     roomId: room.id,
     status: "waiting",
     courseId: courseId ? String(courseId) : undefined,
+    fileIds: Array.isArray(fileIds)
+      ? [...new Set(fileIds.map((id) => String(id)).filter(Boolean))].slice(
+          0,
+          40,
+        )
+      : undefined,
     createdAt: now(),
     updatedAt: now(),
   };
