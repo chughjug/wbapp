@@ -9490,11 +9490,7 @@ class App extends React.Component<AppProps, AppState> {
                   const dy = tip.y - newElement.y;
                   const lastPoint =
                     points.length > 0 && points[points.length - 1];
-                  if (
-                    lastPoint &&
-                    lastPoint[0] === dx &&
-                    lastPoint[1] === dy
-                  ) {
+                  if (lastPoint && lastPoint[0] === dx && lastPoint[1] === dy) {
                     continue;
                   }
                   points.push(pointFrom<LocalPoint>(dx, dy));
@@ -10105,7 +10101,8 @@ class App extends React.Component<AppProps, AppState> {
           : [...newElement.pressures];
 
         const appendLocal = (lx: number, ly: number, pressure: number) => {
-          const last = nextPoints.length > 0 && nextPoints[nextPoints.length - 1];
+          const last =
+            nextPoints.length > 0 && nextPoints[nextPoints.length - 1];
           if (last && last[0] === lx && last[1] === ly) {
             return;
           }

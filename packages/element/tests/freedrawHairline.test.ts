@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import type { LocalPoint } from "@excalidraw/math";
+
 import { newFreeDrawElement } from "../src/newElement";
 import {
   getFreedrawHairlineInkWidth,
   getFreedrawUniformInkWidth,
 } from "../src/shape";
-
-import type { LocalPoint } from "@excalidraw/math";
 
 const baseOpts = {
   type: "freedraw" as const,
