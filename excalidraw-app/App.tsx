@@ -1249,6 +1249,9 @@ const ExcalidrawWrapper = ({
           onUndo={input.undo}
           onRedo={input.redo}
           onAddPage={newPage.open}
+          onShare={() =>
+            setShareDialogState({ isOpen: true, type: "share" })
+          }
           pageCount={pages.length}
           currentPage={currentPageNumber ?? undefined}
           moreItems={[

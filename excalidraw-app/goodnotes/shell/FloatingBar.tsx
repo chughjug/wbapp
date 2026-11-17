@@ -189,6 +189,7 @@ const DEFAULT_PINNED_CONTROLS: readonly FloatingBarPinnedControl[] = [
   "image",
   "addPage",
   "share",
+  "exportPdf",
 ];
 
 const resolvePinnedControls = (
