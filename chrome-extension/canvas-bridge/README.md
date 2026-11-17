@@ -1,8 +1,6 @@
 # wbapp Canvas Bridge — Chrome extension
 
-MV3 extension that keeps a pairing room open on the Heroku relay and fulfills
-iPad sync jobs using your **logged-in Canvas tab** (cookies). No Canvas access
-token or developer key.
+MV3 extension that keeps a pairing room open on the Heroku relay and fulfills iPad sync jobs using your **logged-in Canvas tab** (cookies). No Canvas access token or developer key.
 
 ## Load unpacked
 

@@ -30,13 +30,13 @@ Load `chrome-extension/canvas-bridge` unpacked in `chrome://extensions`. Set the
 
 ## API sketch
 
-| Method | Path | Who |
-| --- | --- | --- |
-| POST | `/v1/rooms` | Extension — create pair room |
-| POST | `/v1/rooms/join` | iPad — `{ pairCode }` |
-| POST | `/v1/rooms/:id/jobs` | iPad — `{ courseId? }` |
-| GET | `/v1/rooms/:id/jobs/:jobId` | iPad — poll until `ready` |
-| GET | `/v1/rooms/:id/jobs/waiting` | Extension |
-| POST | `/v1/rooms/:id/jobs/:jobId/complete` | Extension — upload payload |
+| Method | Path                                 | Who                          |
+| ------ | ------------------------------------ | ---------------------------- |
+| POST   | `/v1/rooms`                          | Extension — create pair room |
+| POST   | `/v1/rooms/join`                     | iPad — `{ pairCode }`        |
+| POST   | `/v1/rooms/:id/jobs`                 | iPad — `{ courseId? }`       |
+| GET    | `/v1/rooms/:id/jobs/:jobId`          | iPad — poll until `ready`    |
+| GET    | `/v1/rooms/:id/jobs/waiting`         | Extension                    |
+| POST   | `/v1/rooms/:id/jobs/:jobId/complete` | Extension — upload payload   |
 
 Single-dyno in-memory store (12h rooms, 30m jobs). For multi-dyno, replace `store.js` with Redis.
