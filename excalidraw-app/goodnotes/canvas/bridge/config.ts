@@ -16,7 +16,9 @@ const readEnv = (): string => {
   }
 };
 
-export const DEFAULT_BRIDGE_URL = "http://127.0.0.1:8787";
+/** Live ratings Heroku dyno (canvas-bridge mount). Override with env/localStorage. */
+export const DEFAULT_BRIDGE_URL =
+  "https://chess-tournament-director-6ce5e76147d7.herokuapp.com/canvas-bridge";
 
 export const getBridgeUrl = (): string => {
   const fromEnv = readEnv();

@@ -18,7 +18,11 @@ git subtree push --prefix canvas-bridge heroku main
 heroku open
 ```
 
-Set the public URL as `VITE_CANVAS_BRIDGE_URL` in the wbapp build (e.g. `https://your-wbapp-canvas-bridge.herokuapp.com`).
+**Production host:** the relay is also mounted on the ratings Heroku app at
+
+`https://chess-tournament-director-6ce5e76147d7.herokuapp.com/canvas-bridge`
+
+Set that (or your own deploy) as `VITE_CANVAS_BRIDGE_URL` in the wbapp build.
 
 ## Extension
 
