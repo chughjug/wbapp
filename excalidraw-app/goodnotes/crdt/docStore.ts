@@ -46,7 +46,8 @@ export const openCrdtDoc = (docId: string): CrdtDocHandle => {
   const meta = ydoc.getMap("meta");
 
   if (!meta.has("role")) {
-    meta.set("role", "owner" satisfies CrdtRole);
+    const defaultRole: CrdtRole = "owner";
+    meta.set("role", defaultRole);
   }
 
   const whenSynced = new Promise<void>((resolve) => {

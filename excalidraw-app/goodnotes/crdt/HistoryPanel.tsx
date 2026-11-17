@@ -5,9 +5,9 @@
 
 import React from "react";
 
-import type { CrdtRole, CrdtSnapshot } from "./docStore";
-
 import "./HistoryPanel.scss";
+
+import type { CrdtRole, CrdtSnapshot } from "./docStore";
 
 export interface HistoryPanelProps {
   ready: boolean;

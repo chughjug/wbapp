@@ -555,16 +555,7 @@ const ExcalidrawWrapper = ({
         ) : null}
       </>
     ),
-    [
-      crdt.ready,
-      crdt.role,
-      crdt.snapshots,
-      crdt.setDocRole,
-      crdt.saveSnapshot,
-      docId,
-      editorTheme,
-      excalidrawAPI,
-    ],
+    [crdt, docId, editorTheme, excalidrawAPI],
   );
   const settings = useSettingsScreen({
     theme: editorTheme,
