@@ -205,9 +205,20 @@ export const BridgePairPanel: React.FC<BridgePairPanelProps> = ({
         importPdfs: true,
         onProgress: setStatus,
       });
+      const fileCount =
+        job.payload && "files" in job.payload
+          ? job.payload.files?.length ?? 0
+          : 0;
+      setCourses(
+        bridgeCoursesAsCanvas().map((c) => ({
+          id: c.id,
+          name: c.name,
+          courseCode: c.course_code,
+        })),
+      );
       setStatus(
         result.courseLabel
-          ? `Imported ${result.notebooksCreated} notebooks and ${result.filesImported} PDFs for ${result.courseLabel}.`
+          ? `Synced ${result.courseLabel}: ${fileCount} files listed, ${result.notebooksCreated} notebooks, ${result.filesImported} PDFs imported.`
           : "Course synced.",
       );
       onSynced?.();

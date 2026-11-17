@@ -41,16 +41,34 @@ export const findCanvasTab = async () => {
 /**
  * @param {number} tabId
  * @param {string} apiPath e.g. "courses" or "courses/1/assignments"
- * @param {Record<string, string | number | undefined>} [query]
+ * @param {Record<string, string | number | string[] | undefined>} [query]
+ * @param {{ maxPages?: number }} [options]
  */
-export const canvasApiInTab = async (tabId, apiPath, query = {}) => {
+export const canvasApiInTab = async (
+  tabId,
+  apiPath,
+  query = {},
+  options = {},
+) => {
+  const maxPages = options.maxPages ?? 40;
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
-    func: async (path, q) => {
+    func: async (path, q, pageCap) => {
       const params = new URLSearchParams();
       for (const [k, v] of Object.entries(q || {})) {
-        if (v !== undefined && v !== null && v !== "") {
+        if (v === undefined || v === null || v === "") {
+          continue;
+        }
+        if (Array.isArray(v)) {
+          for (const item of v) {
+            if (item !== undefined && item !== null && item !== "") {
+              // Canvas uses include[]=… / content_types[]=…
+              const key = k.endsWith("[]") ? k : `${k}[]`;
+              params.append(key, String(item));
+            }
+          }
+        } else {
           params.set(k, String(v));
         }
       }
@@ -63,14 +81,14 @@ export const canvasApiInTab = async (tabId, apiPath, query = {}) => {
           ?.getAttribute("content") || "";
 
       const headers = {
-        Accept: "application/json",
+        Accept: "application/json+canvas-string-ids, application/json",
         ...(csrf ? { "X-CSRF-Token": csrf } : {}),
       };
 
       const all = [];
       let nextUrl = url;
       let pages = 0;
-      while (nextUrl && pages < 10) {
+      while (nextUrl && pages < pageCap) {
         pages += 1;
         const res = await fetch(nextUrl, {
           credentials: "same-origin",
@@ -103,13 +121,33 @@ export const canvasApiInTab = async (tabId, apiPath, query = {}) => {
       }
       return all;
     },
-    args: [apiPath, query],
+    args: [apiPath, query, maxPages],
   });
 
   if (result && typeof result === "object" && "error" in /** @type {any} */ (result)) {
     throw new Error(String(/** @type {any} */ (result).error));
   }
   return result;
+};
+
+/**
+ * Soft-fail wrapper — returns [] / null instead of throwing.
+ * @param {number} tabId
+ * @param {string} apiPath
+ * @param {Record<string, string | number | string[] | undefined>} [query]
+ * @param {{ maxPages?: number }} [options]
+ */
+export const canvasApiInTabSoft = async (
+  tabId,
+  apiPath,
+  query = {},
+  options = {},
+) => {
+  try {
+    return await canvasApiInTab(tabId, apiPath, query, options);
+  } catch {
+    return null;
+  }
 };
 
 /**

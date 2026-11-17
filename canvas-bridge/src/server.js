@@ -31,7 +31,7 @@ const app = express();
 const PORT = Number(process.env.PORT || 8787);
 
 app.use(cors({ origin: true }));
-app.use(express.json({ limit: "15mb" }));
+app.use(express.json({ limit: "25mb" }));
 
 const requireAgent = (req, res, next) => {
   const room = getRoom(req.params.roomId);

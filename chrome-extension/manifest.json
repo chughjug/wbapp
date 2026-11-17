@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "wbapp Canvas Bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "When open, your laptop fulfills Canvas sync requests from your iPad — no access token required.",
   "action": {
     "default_title": "wbapp Canvas Bridge",

@@ -67,9 +67,9 @@ export const applyBridgePayload = async (
     throw new Error("Unexpected bridge payload.");
   }
 
+  // Caches metadata (no base64) and merges into the course-list picker.
   saveCoursePayload(payload);
 
-  // also merge into courses list cache so the picker has this course
   const courseLabel =
     payload.courseCode?.trim() || payload.courseName || payload.courseId;
 
@@ -148,9 +148,11 @@ export const applyBridgePayload = async (
   }
 
   options.onProgress?.(
-    `Synced ${courseLabel}: ${notebooksCreated} new notebook${
+    `Synced ${courseLabel}: ${payload.files.length} file${
+      payload.files.length === 1 ? "" : "s"
+    }, ${notebooksCreated} new notebook${
       notebooksCreated === 1 ? "" : "s"
-    }, ${filesImported} PDF${filesImported === 1 ? "" : "s"}.`,
+    }, ${filesImported} PDF${filesImported === 1 ? "" : "s"} imported.`,
   );
 
   return {

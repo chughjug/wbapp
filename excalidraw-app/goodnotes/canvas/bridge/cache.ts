@@ -19,11 +19,23 @@ export const subscribeBridgeCache = (listener: Listener) => {
   return () => listeners.delete(listener);
 };
 
+/** Drop inlined PDF bytes before localStorage — they blow the ~5MB quota. */
+const withoutInlineBytes = (
+  payload: BridgeCoursePayload,
+): BridgeCoursePayload => ({
+  ...payload,
+  files: payload.files.map((file) => {
+    const { dataBase64, ...rest } = file;
+    void dataBase64;
+    return rest;
+  }),
+});
+
 export const saveCoursesPayload = (payload: BridgeCoursesPayload) => {
   try {
     localStorage.setItem(COURSES_KEY, JSON.stringify(payload));
   } catch {
-    // ignore
+    // ignore quota errors
   }
   notify();
 };
@@ -37,12 +49,45 @@ export const loadCoursesPayload = (): BridgeCoursesPayload | null => {
   }
 };
 
-export const saveCoursePayload = (payload: BridgeCoursePayload) => {
-  try {
-    localStorage.setItem(courseKey(payload.courseId), JSON.stringify(payload));
-  } catch {
-    // ignore
+/** Ensure a pulled course also appears in the course-list picker. */
+export const mergeCourseIntoCoursesList = (payload: BridgeCoursePayload) => {
+  const existing = loadCoursesPayload();
+  const summary = {
+    id: payload.courseId,
+    name: payload.courseName,
+    courseCode: payload.courseCode,
+  };
+  if (!existing) {
+    saveCoursesPayload({
+      kind: "courses",
+      host: payload.host,
+      courses: [summary],
+      syncedAt: payload.syncedAt,
+    });
+    return;
   }
+  const others = existing.courses.filter((c) => c.id !== payload.courseId);
+  saveCoursesPayload({
+    ...existing,
+    host: payload.host || existing.host,
+    courses: [...others, summary].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+    ),
+    syncedAt: Math.max(existing.syncedAt, payload.syncedAt),
+  });
+};
+
+export const saveCoursePayload = (payload: BridgeCoursePayload) => {
+  const slim = withoutInlineBytes(payload);
+  try {
+    localStorage.setItem(
+      courseKey(payload.courseId),
+      JSON.stringify(slim),
+    );
+  } catch {
+    // Still notify so UI can refresh from any prior metadata.
+  }
+  mergeCourseIntoCoursesList(slim);
   notify();
 };
 
@@ -55,6 +100,22 @@ export const loadCoursePayload = (
   } catch {
     return null;
   }
+};
+
+/** All course ids that have a cached course payload (not just the list). */
+export const listCachedCourseIds = (): string[] => {
+  const ids: string[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith("goodnotes:canvas-bridge-course:")) {
+        ids.push(k.slice("goodnotes:canvas-bridge-course:".length));
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return ids;
 };
 
 export const clearBridgeCache = () => {
@@ -113,9 +174,9 @@ export const bridgeFilesAsCanvas = (courseId: string): CanvasFile[] => {
     display_name: f.displayName,
     "content-type": f.contentType,
     size: f.size,
-    url: f.dataBase64
-      ? `data:${f.contentType || "application/pdf"};base64,${f.dataBase64}`
-      : f.downloadUrl,
+    // Prefer authenticated Canvas download URL for later import attempts;
+    // inlined bytes are imported during applyBridgePayload, not stored here.
+    url: f.downloadUrl,
     updated_at: f.updatedAt,
   }));
 };
