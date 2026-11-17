@@ -144,17 +144,25 @@
   align-items: center;
   gap: 2px;
 
-  max-width: min(calc(100% - 1rem), 56rem);
+  /* always one row — expand to fit every control instead of wrapping */
+  width: max-content;
+  max-width: calc(100vw - 1rem);
   min-height: var(--gn-bar-height);
-  height: auto;
-  flex-wrap: wrap;
-  row-gap: 0.125rem;
-  padding: 0.125rem 0.375rem;
+  height: var(--gn-bar-height);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  padding: 0.125rem 0.5rem;
 
   border: 1px solid var(--gn-bar-border);
   border-radius: calc(var(--gn-bar-height) / 2);
   background-color: var(--gn-bar-bg);
   box-shadow: var(--gn-bar-shadow);
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 
   font-size: 0.75rem;
   line-height: 1.2;
