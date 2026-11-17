@@ -172,9 +172,7 @@ export const BridgePairPanel: React.FC<BridgePairPanelProps> = ({
       onSynced?.();
     } catch (caught) {
       setError(
-        caught instanceof BridgeError
-          ? caught.message
-          : "Course sync failed.",
+        caught instanceof BridgeError ? caught.message : "Course sync failed.",
       );
       setStatus("");
     } finally {
@@ -215,9 +213,7 @@ export const BridgePairPanel: React.FC<BridgePairPanelProps> = ({
       onSynced?.();
     } catch (caught) {
       setError(
-        caught instanceof BridgeError
-          ? caught.message
-          : "Course sync failed.",
+        caught instanceof BridgeError ? caught.message : "Course sync failed.",
       );
       setStatus("");
     } finally {
@@ -251,8 +247,8 @@ export const BridgePairPanel: React.FC<BridgePairPanelProps> = ({
           {agentOnline == null
             ? "checking…"
             : agentOnline
-              ? "online"
-              : "offline — open the extension"}
+            ? "online"
+            : "offline — open the extension"}
           {active?.canvasHost ? ` · ${active.canvasHost}` : null}
         </p>
 
@@ -301,8 +297,8 @@ export const BridgePairPanel: React.FC<BridgePairPanelProps> = ({
                 {busy
                   ? "Syncing…"
                   : cachedCourse
-                    ? "Re-sync this course"
-                    : "Pull course to iPad"}
+                  ? "Re-sync this course"
+                  : "Pull course to iPad"}
               </button>
             </div>
           </div>
@@ -330,8 +326,9 @@ export const BridgePairPanel: React.FC<BridgePairPanelProps> = ({
   return (
     <form className="gn-canvas-form gn-canvas-bridge" onSubmit={onJoin}>
       <p className="gn-canvas-lede">
-        On your laptop: open Chrome, load the <strong>wbapp Canvas Bridge</strong>{" "}
-        extension, stay logged into Canvas, then enter the pairing code here.
+        On your laptop: open Chrome, load the{" "}
+        <strong>wbapp Canvas Bridge</strong> extension, stay logged into Canvas,
+        then enter the pairing code here.
       </p>
 
       <div className="gn-canvas-field">

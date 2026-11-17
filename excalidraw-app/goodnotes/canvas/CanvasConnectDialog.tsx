@@ -264,8 +264,8 @@ export const CanvasConnectDialog: React.FC<CanvasConnectDialogProps> = ({
                   </strong>{" "}
                   Canvas offers no scopes for personal tokens, so the one you
                   paste carries the{" "}
-                  <strong>full access of your Canvas account</strong> —
-                  anything you can do in Canvas, that token can do.
+                  <strong>full access of your Canvas account</strong> — anything
+                  you can do in Canvas, that token can do.
                 </li>
                 <li>
                   <strong>It is stored in this browser</strong> (localStorage on

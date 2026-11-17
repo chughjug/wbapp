@@ -8,10 +8,7 @@ import { loadBridgeSession, saveBridgeSession } from "./session";
 import type { BridgeJobView, BridgeSession } from "./types";
 
 export class BridgeError extends Error {
-  constructor(
-    message: string,
-    readonly status?: number,
-  ) {
+  constructor(message: string, readonly status?: number) {
     super(message);
     this.name = "BridgeError";
   }
@@ -59,7 +56,9 @@ export const joinBridgeRoom = async (
 ): Promise<BridgeSession> => {
   const code = pairCode.replace(/[^a-z0-9]/gi, "").toUpperCase();
   if (code.length < 4) {
-    throw new BridgeError("Enter the 6-character code from the Chrome extension.");
+    throw new BridgeError(
+      "Enter the 6-character code from the Chrome extension.",
+    );
   }
 
   const joined = await request<{

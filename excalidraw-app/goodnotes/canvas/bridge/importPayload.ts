@@ -6,13 +6,14 @@ import { createDoc, getDoc, listDocs, updateDocMeta } from "../../library";
 import { importPdfAsNewDocument } from "../../share-target";
 import { canvasAssignmentTag, canvasFileTag } from "../sync";
 
+import { saveCoursePayload, saveCoursesPayload } from "./cache";
+
 import type { DocMeta } from "../../types";
 import type {
   BridgeCoursePayload,
   BridgeCoursesPayload,
   BridgePayload,
 } from "./types";
-import { saveCoursePayload, saveCoursesPayload } from "./cache";
 
 const isCourses = (p: BridgePayload): p is BridgeCoursesPayload =>
   (p as BridgeCoursesPayload).kind === "courses" ||

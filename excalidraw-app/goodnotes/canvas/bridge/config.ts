@@ -8,8 +8,9 @@
 
 const readEnv = (): string => {
   try {
-    const raw = (import.meta.env.VITE_CANVAS_BRIDGE_URL as string | undefined)
-      ?.trim();
+    const raw = (
+      import.meta.env.VITE_CANVAS_BRIDGE_URL as string | undefined
+    )?.trim();
     return raw || "";
   } catch {
     return "";

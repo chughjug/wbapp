@@ -205,11 +205,7 @@ export const listCourses = async (): Promise<CanvasCourse[]> => {
       "not-connected",
     );
   }
-  throw new CanvasError(
-    "Canvas is not connected.",
-    undefined,
-    "not-connected",
-  );
+  throw new CanvasError("Canvas is not connected.", undefined, "not-connected");
 };
 
 export const listAssignments = async (
@@ -230,11 +226,7 @@ export const listAssignments = async (
     }
     return bridgeAssignmentsAsCanvas(courseId);
   }
-  throw new CanvasError(
-    "Canvas is not connected.",
-    undefined,
-    "not-connected",
-  );
+  throw new CanvasError("Canvas is not connected.", undefined, "not-connected");
 };
 
 export const listCourseFiles = async (
@@ -255,11 +247,7 @@ export const listCourseFiles = async (
     }
     return bridgeFilesAsCanvas(courseId);
   }
-  throw new CanvasError(
-    "Canvas is not connected.",
-    undefined,
-    "not-connected",
-  );
+  throw new CanvasError("Canvas is not connected.", undefined, "not-connected");
 };
 
 /** A single file record, whose `url` is a short-lived direct download. */

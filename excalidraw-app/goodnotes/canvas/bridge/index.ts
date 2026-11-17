@@ -1,4 +1,8 @@
-export { getBridgeUrl, setBridgeUrlOverride, DEFAULT_BRIDGE_URL } from "./config";
+export {
+  getBridgeUrl,
+  setBridgeUrlOverride,
+  DEFAULT_BRIDGE_URL,
+} from "./config";
 export {
   loadBridgeSession,
   saveBridgeSession,
