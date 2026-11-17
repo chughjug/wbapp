@@ -1,6 +1,6 @@
 # goodnotes/dashboard — integration
 
-> **Updated for the home-screen redesign.** The required `App.tsx` change is _unchanged_ — if you already render `<Dashboard />` at `/`, there is nothing to do. §3 and the new §4 describe what moved.
+> **Updated for the Up-next timeline redesign.** The required `App.tsx` change is _unchanged_ — if you already render `<Dashboard />` at `/`, there is nothing to do. Canvas deadlines render as a vertical timeline (not horizontal cards); courses are quiet chips.
 
 The dashboard **replaces the `<Shelf />` call site** at `/`. It renders `Shelf` itself, so do not render both.
 

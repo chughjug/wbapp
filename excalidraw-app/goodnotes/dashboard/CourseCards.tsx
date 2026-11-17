@@ -1,15 +1,9 @@
 /**
- * "Your courses" — one card per Canvas course: how many notebooks you have,
- * how much Canvas work it carries, and how urgent the nearest piece is.
+ * "Your courses" — quiet filter chips (colour + name), not card islands.
  *
- * Activating a card selects that course in the library's own sidebar below
+ * Activating a chip selects that course in the library's own sidebar below
  * (see shelfBridge.ts), so the dashboard and the grid can never disagree
  * about which course is being shown.
- *
- * NOTE ON "Canvas files": the mockup counts files. goodnotes/canvas pins
- * only four functions as stable, and none of them lists files, so this
- * counts the course's dated Canvas *assignments* instead and says so in the
- * label rather than mislabelling the number.
  */
 
 import React from "react";
@@ -50,13 +44,12 @@ export const CourseCards = ({
         </h2>
       </div>
 
-      <ul className="gn-dash__courses">
+      <ul className="gn-dash__course-rail">
         {loading
           ? Array.from({ length: 3 }, (_, index) => (
               <li className="gn-dash__cell" key={index} aria-hidden="true">
-                <div className="gn-dash__course gn-dash__course--skeleton">
-                  <span className="gn-dash__sk gn-dash__sk--title" />
-                  <span className="gn-dash__sk gn-dash__sk--foot" />
+                <div className="gn-dash__course-chip gn-dash__course-chip--skeleton">
+                  <span className="gn-dash__sk gn-dash__sk--chip" />
                 </div>
               </li>
             ))
@@ -79,7 +72,7 @@ export const CourseCards = ({
                 <li className="gn-dash__cell" key={summary.course}>
                   <button
                     type="button"
-                    className="gn-dash__course"
+                    className="gn-dash__course-chip"
                     aria-label={`Show ${
                       summary.course
                     } in the library. ${notebooks}, ${canvas}${
@@ -87,32 +80,23 @@ export const CourseCards = ({
                     }.`}
                     onClick={() => onSelectCourse(summary.course)}
                   >
-                    <span className="gn-dash__course-head">
+                    <span
+                      className="gn-dash__dot"
+                      aria-hidden="true"
+                      style={{ backgroundColor: style.color }}
+                    >
+                      {style.emoji}
+                    </span>
+                    <span className="gn-dash__course-name">
+                      {summary.course}
+                    </span>
+                    {urgency && summary.urgency && (
                       <span
-                        className="gn-dash__dot"
-                        aria-hidden="true"
-                        style={{ backgroundColor: style.color }}
+                        className={`gn-dash__chip gn-dash__chip--${summary.urgency}`}
                       >
-                        {style.emoji}
+                        {urgency}
                       </span>
-                      <span className="gn-dash__course-name">
-                        {summary.course}
-                      </span>
-                      {urgency && summary.urgency && (
-                        <span
-                          className={`gn-dash__chip gn-dash__chip--${summary.urgency}`}
-                        >
-                          <span
-                            className="gn-dash__chip-mark"
-                            aria-hidden="true"
-                          />
-                          {urgency}
-                        </span>
-                      )}
-                    </span>
-                    <span className="gn-dash__course-meta">
-                      {notebooks} · {canvas}
-                    </span>
+                    )}
                   </button>
                 </li>
               );

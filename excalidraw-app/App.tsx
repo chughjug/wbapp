@@ -109,6 +109,12 @@ import {
   saveSceneDebounced,
   flushSceneSaves,
 } from "./goodnotes/library";
+import { CollabHostPanel } from "./goodnotes/collab-host";
+import { HistoryPanel, useCrdtDoc } from "./goodnotes/crdt";
+import {
+  PresentationOverlay,
+  usePresentation,
+} from "./goodnotes/present";
 
 import CustomStats from "./CustomStats";
 import {
@@ -438,6 +444,8 @@ const ExcalidrawWrapper = ({
   const paged = usePagedView(excalidrawAPI);
   const [isPagePanelOpen, setIsPagePanelOpen] = useState(false);
   const openDocs = useOpenDocs(docId ?? undefined);
+  const presentation = usePresentation(excalidrawAPI, pages);
+  const crdt = useCrdtDoc(docId);
 
   const onActivateTab = useCallback(
     (id: string) => {
@@ -499,11 +507,74 @@ const ExcalidrawWrapper = ({
   }, []);
 
   const { editorTheme, appTheme, setAppTheme } = useDarkMode();
+  const settingsExtraSections = useMemo(
+    () => (
+      <>
+        <section className="gn-settings-section" aria-label="Collaboration">
+          <h2 className="gn-settings-section__title">Collaboration</h2>
+          <CollabHostPanel theme={editorTheme} />
+        </section>
+        {docId ? (
+          <section className="gn-settings-section" aria-label="History">
+            <HistoryPanel
+              theme={editorTheme}
+              ready={crdt.ready}
+              role={crdt.role}
+              snapshots={crdt.snapshots}
+              onRoleChange={crdt.setDocRole}
+              onSaveSnapshot={() => {
+                if (!excalidrawAPI) {
+                  return;
+                }
+                const elements = excalidrawAPI.getSceneElements();
+                crdt.saveSnapshot(
+                  `Version ${crdt.snapshots.length + 1}`,
+                  JSON.stringify({
+                    elements,
+                    name: excalidrawAPI.getName(),
+                  }),
+                );
+              }}
+              onRestoreSnapshot={(snapshot) => {
+                if (!excalidrawAPI) {
+                  return;
+                }
+                try {
+                  const parsed = JSON.parse(snapshot.payload) as {
+                    elements?: ExcalidrawInitialDataState["elements"];
+                  };
+                  if (parsed.elements) {
+                    excalidrawAPI.updateScene({
+                      elements: restoreElements(parsed.elements, null),
+                      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+                    });
+                  }
+                } catch {
+                  // corrupt snapshot — leave the scene alone
+                }
+              }}
+            />
+          </section>
+        ) : null}
+      </>
+    ),
+    [
+      crdt.ready,
+      crdt.role,
+      crdt.snapshots,
+      crdt.setDocRole,
+      crdt.saveSnapshot,
+      docId,
+      editorTheme,
+      excalidrawAPI,
+    ],
+  );
   const settings = useSettingsScreen({
     theme: editorTheme,
     // a restore writes straight to IndexedDB, which the library's in-process
     // listeners never see, so re-reading the whole app is the honest answer
     onRestored: () => window.location.reload(),
+    extraSections: settingsExtraSections,
   });
   // one shared new-page dialog, used by both the nav bar and the page panel
   const newPage = useNewPage(excalidrawAPI, {
@@ -1182,11 +1253,27 @@ const ExcalidrawWrapper = ({
           currentPage={currentPageNumber ?? undefined}
           moreItems={[
             {
+              id: "present",
+              label: "Present pages",
+              onSelect: () => {
+                const startAt = Math.max(0, (currentPageNumber ?? 1) - 1);
+                presentation.start(startAt);
+              },
+            },
+            {
               id: "settings",
               label: "Settings…",
               onSelect: () => settings.open(),
             },
           ]}
+        />
+        <PresentationOverlay
+          active={presentation.active}
+          index={presentation.index}
+          pageCount={pages.length}
+          onPrev={presentation.prev}
+          onNext={presentation.next}
+          onExit={presentation.stop}
         />
         <PagePanel
           open={isPagePanelOpen}

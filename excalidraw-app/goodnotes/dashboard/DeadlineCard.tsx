@@ -1,10 +1,10 @@
 /**
- * One deadline. A single real `<button>` — the whole card — so there is
- * exactly one tab stop and exactly one action, as the design requires.
+ * One deadline as a timeline row — a single real `<button>` so there is
+ * exactly one tab stop and exactly one action.
  *
  * Accessible name is composed, not inferred: it always states the action,
- * the assignment, its course and its urgency in words, because the chip's
- * colour carries no meaning on its own.
+ * the assignment, its course and its urgency in words, because the left
+ * urgency mark's colour carries no meaning on its own.
  */
 
 import React from "react";
@@ -47,34 +47,34 @@ export const DeadlineCard = React.memo(
       <li className="gn-dash__cell">
         <button
           type="button"
-          className={`gn-dash__card gn-dash__card--${item.urgency}`}
+          className={`gn-dash__row-item gn-dash__row-item--${item.urgency}`}
           aria-label={name}
           aria-busy={busy || undefined}
           disabled={busy}
           onClick={() => onActivate(item)}
         >
-          <span className="gn-dash__chip">
-            <span className="gn-dash__chip-mark" aria-hidden="true" />
-            {urgencyLabel(item.urgency)}
+          <span className="gn-dash__urgency" aria-hidden="true" />
+          <span className="gn-dash__row-main">
+            <span className="gn-dash__row-title">{item.title}</span>
+            <span className="gn-dash__row-meta">
+              <span
+                className="gn-dash__dot"
+                aria-hidden="true"
+                style={{ backgroundColor: color }}
+              >
+                {emoji}
+              </span>
+              <span className="gn-dash__card-course-name">{item.course}</span>
+              <span className="gn-dash__row-sep" aria-hidden="true">
+                ·
+              </span>
+              <span className="gn-dash__card-when">
+                {urgencyLabel(item.urgency)} · {formatDeadline(item.dueAt)}
+              </span>
+            </span>
           </span>
-          <span className="gn-dash__card-title">{item.title}</span>
-          <span className="gn-dash__card-course">
-            <span
-              className="gn-dash__dot"
-              aria-hidden="true"
-              style={{ backgroundColor: color }}
-            >
-              {emoji}
-            </span>
-            <span className="gn-dash__card-course-name">{item.course}</span>
-          </span>
-          <span className="gn-dash__card-foot">
-            <span className="gn-dash__card-when">
-              {formatDeadline(item.dueAt)}
-            </span>
-            <span className="gn-dash__card-action">
-              {busy ? "Creating…" : action}
-            </span>
+          <span className="gn-dash__card-action">
+            {busy ? "Creating…" : action}
           </span>
         </button>
       </li>
@@ -84,18 +84,20 @@ export const DeadlineCard = React.memo(
 DeadlineCard.displayName = "DeadlineCard";
 
 /**
- * Placeholder with the *same* box as a real card. The strip reserves its
+ * Placeholder with the *same* box as a real row. The strip reserves its
  * height from the first paint, so deadlines arriving later never push the
  * document grid down.
  */
 export const DeadlineSkeleton = ({ index }: { index: number }) => (
   <li className="gn-dash__cell" aria-hidden="true">
     <div
-      className={`gn-dash__card gn-dash__card--skeleton gn-dash__card--s${index}`}
+      className={`gn-dash__row-item gn-dash__row-item--skeleton gn-dash__card--s${index}`}
     >
-      <span className="gn-dash__sk gn-dash__sk--chip" />
-      <span className="gn-dash__sk gn-dash__sk--title" />
-      <span className="gn-dash__sk gn-dash__sk--course" />
+      <span className="gn-dash__urgency gn-dash__urgency--sk" />
+      <span className="gn-dash__row-main">
+        <span className="gn-dash__sk gn-dash__sk--title" />
+        <span className="gn-dash__sk gn-dash__sk--course" />
+      </span>
       <span className="gn-dash__sk gn-dash__sk--foot" />
     </div>
   </li>

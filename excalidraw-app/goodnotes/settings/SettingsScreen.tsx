@@ -34,7 +34,14 @@
  * - Animations are disabled under `prefers-reduced-motion: reduce`.
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { DarkModeToggle, useDarkMode } from "../dark";
 import {
@@ -78,6 +85,11 @@ export interface SettingsScreenProps {
   initialSection?: SettingsSectionId;
   /** Called after a restore writes to the library; the host should reload. */
   onRestored?: () => void;
+  /**
+   * Optional host-owned sections (collab host, CRDT history, …) rendered
+   * after Storage. Keep them self-labelled `<section>`s.
+   */
+  extraSections?: ReactNode;
   className?: string;
 }
 
@@ -112,6 +124,7 @@ export const SettingsScreen = ({
   presentation = "modal",
   initialSection,
   onRestored,
+  extraSections,
   className,
 }: SettingsScreenProps) => {
   const idPrefix = useId();
@@ -402,6 +415,8 @@ export const SettingsScreen = ({
           headingId={headingId("storage")}
           onRestored={onRestored}
         />
+
+        {extraSections}
       </div>
     </>
   );

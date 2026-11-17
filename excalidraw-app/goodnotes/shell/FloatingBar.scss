@@ -277,6 +277,30 @@
   }
 }
 
+/* Quickdraw-style responsive shedding: drop the page counter text first,
+   then the separators, so the pill stays one row on narrow tablets. */
+@media (max-width: 52rem) {
+  .gn-bar__count {
+    display: none;
+  }
+}
+
+@media (max-width: 40rem) {
+  .gn-bar__separator {
+    display: none;
+  }
+
+  .gn-bar {
+    gap: 0;
+    padding-inline: 0.25rem;
+  }
+
+  .gn-bar__button {
+    min-width: 2rem;
+    padding-inline: 0.25rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gn-bar,
   .gn-bar * {
