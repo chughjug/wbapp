@@ -27,9 +27,12 @@
  *   onClose={actions.close}
  *   onReorder={actions.reorder}
  *   onCloseOthers={actions.closeOthers}
- *   onNewTab={closeDocument}                    // back to the shelf
+ *   onNewTab={openNewDocument}                  // create + open a notebook
  * />
  * ```
+ *
+ * The "+" control creates a new document (it does **not** return to the
+ * shelf). Pair it with the same handler as the floating bar's New button.
  *
  * NOT in scope: keeping several editors mounted. The host remounts
  * `ExcalidrawWrapper` per document (it is keyed on `docId`) by design; this

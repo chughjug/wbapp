@@ -1,5 +1,6 @@
 import { eyeIcon } from "@excalidraw/excalidraw/components/icons";
 import { MainMenu } from "@excalidraw/excalidraw/index";
+import { getShortcutKey } from "@excalidraw/excalidraw/shortcut";
 import React from "react";
 
 import { isDevEnv } from "@excalidraw/common";
@@ -18,6 +19,7 @@ export const AppMainMenu: React.FC<{
   refresh: () => void;
   onExportPdf: () => void;
   onCloseDocument: () => void;
+  onNewDocument?: () => void;
 }> = React.memo((props) => {
   return (
     <MainMenu>
@@ -27,6 +29,15 @@ export const AppMainMenu: React.FC<{
       >
         All documents
       </MainMenu.Item>
+      {props.onNewDocument && (
+        <MainMenu.Item
+          onSelect={props.onNewDocument}
+          data-testid="goodnotes-menu-new-document"
+          shortcut={getShortcutKey("CtrlOrCmd+N")}
+        >
+          New document
+        </MainMenu.Item>
+      )}
       <MainMenu.Item
         onSelect={props.onExportPdf}
         data-testid="goodnotes-export-pdf"

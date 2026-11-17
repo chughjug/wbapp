@@ -122,6 +122,12 @@ const SORT_STORAGE_KEY = "goodnotes-library-sort";
 export interface ShelfProps {
   /** Called when the user activates a card or creates a document. */
   onOpenDocument: (doc: DocMeta) => void;
+  /**
+   * When set, New / empty-state create call this with the usual create init
+   * (e.g. the active course filter) instead of creating immediately. The host
+   * can open a format picker, then create + `onOpenDocument`.
+   */
+  onCreateDocument?: (init: Partial<DocMeta>) => void;
   /** Drives the dark-theme CSS custom properties. Defaults to `"light"`. */
   theme?: "light" | "dark";
   /** Optional slot rendered at the far right of the header (e.g. a menu). */
@@ -311,6 +317,7 @@ const readStoredSort = (): ShelfSortKey => {
 
 export const Shelf = ({
   onOpenDocument,
+  onCreateDocument,
   theme = "light",
   headerExtra,
   className,
@@ -633,10 +640,14 @@ export const Shelf = ({
   const handleCreate = useCallback(async () => {
     const init: Partial<DocMeta> =
       filter.kind === "course" ? { course: filter.course } : {};
+    if (onCreateDocument) {
+      onCreateDocument(init);
+      return;
+    }
     const doc = await actions.create(init);
     await actions.touch(doc.id);
     onOpenDocument(doc);
-  }, [actions, onOpenDocument, filter]);
+  }, [actions, onOpenDocument, onCreateDocument, filter]);
 
   const handleOpen = useCallback(
     (doc: DocMeta) => {

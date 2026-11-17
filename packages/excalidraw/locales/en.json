@@ -102,7 +102,7 @@
     "canvasColors": "Used on canvas",
     "canvasBackground": "Canvas background",
     "drawingCanvas": "Drawing canvas",
-    "clearCanvas": "Clear canvas",
+    "clearCanvas": "Clear this page",
     "layers": "Layers",
     "actions": "Actions",
     "language": "Language",
@@ -236,7 +236,7 @@
     "texts": "Texts"
   },
   "buttons": {
-    "clearReset": "Reset the canvas",
+    "clearReset": "Clear this page…",
     "exportJSON": "Export to file",
     "exportImage": "Export image...",
     "export": "Save to...",
@@ -279,7 +279,7 @@
     "embeddableInteractionButton": "Click to interact"
   },
   "alerts": {
-    "clearReset": "This will clear the whole canvas. Are you sure?",
+    "clearReset": "This will clear everything on the current pages. To start a fresh notebook, use New document instead. Continue?",
     "couldNotCreateShareableLink": "Couldn't create shareable link.",
     "couldNotCreateShareableLinkTooBig": "Couldn't create shareable link: the scene is too big",
     "couldNotLoadInvalidFile": "Couldn't load invalid file",
@@ -497,7 +497,7 @@
     "cropFinish": "Finish image cropping"
   },
   "clearCanvasDialog": {
-    "title": "Clear canvas"
+    "title": "Clear this page"
   },
   "publishDialog": {
     "title": "Publish library",

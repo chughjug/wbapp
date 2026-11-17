@@ -44,7 +44,11 @@ export interface TabBarProps {
   onClose: (docId: string) => void;
   /** Move a tab to a new index (drag-and-drop, or Ctrl/Cmd+Shift+Arrow). */
   onReorder?: (docId: string, toIndex: number) => void;
-  /** The "+" button: send the user back to the library to pick a document. */
+  /**
+   * The "+" button: create a new document (same path as the floating bar's
+   * New control). Hosts that want "browse the library" instead should wire
+   * their own control — this strip's + means *new*.
+   */
   onNewTab?: () => void;
   /** Optional "close other tabs", offered on a close button's Alt+click. */
   onCloseOthers?: (docId: string) => void;
@@ -457,8 +461,9 @@ export const TabBar = ({
           <button
             type="button"
             className="gn-tabbar__new"
-            aria-label="Open a document from the library"
-            title="Open a document from the library"
+            aria-label="New document"
+            title="New document"
+            data-testid="goodnotes-tabbar-new"
             onClick={onNewTab}
           >
             <PlusIcon />

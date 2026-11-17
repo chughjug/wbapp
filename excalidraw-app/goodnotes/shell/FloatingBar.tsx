@@ -352,7 +352,10 @@ export interface FloatingBarProps {
 
   // ---- "…" (document actions) ---------------------------------------------
 
-  /** Create a brand-new document and open it. Item hidden when absent. */
+  /**
+   * Create a brand-new document and open it. Renders a dedicated bar button
+   * (one tap) and a matching "…" menu item when set. Hidden when absent.
+   */
   onNewDocument?: () => void;
   /** Undo. Item hidden when absent. */
   onUndo?: () => void;
@@ -931,6 +934,9 @@ export const FloatingBar = ({
     if (onHome) {
       ids.push("home");
     }
+    if (onNewDocument) {
+      ids.push("new-document");
+    }
     if (onTogglePagePanel) {
       ids.push(pagesId);
     }
@@ -947,6 +953,7 @@ export const FloatingBar = ({
     return ids;
   }, [
     onHome,
+    onNewDocument,
     onTogglePagePanel,
     pagesId,
     insertSections.length,
@@ -1097,6 +1104,31 @@ export const FloatingBar = ({
           <span id={titleDescId} className="gn-bar__sr">
             {`Open document: ${documentTitle!.trim()}`}
           </span>
+        )}
+
+        {onNewDocument && (
+          <button
+            type="button"
+            ref={registerRef("new-document")}
+            className="gn-bar__button"
+            data-control="new-document"
+            data-testid="goodnotes-new-document"
+            tabIndex={tabIndexFor("new-document")}
+            title={
+              typeof navigator !== "undefined" &&
+              /Mac|iPhone|iPad|iPod/i.test(
+                navigator.platform || navigator.userAgent,
+              )
+                ? "New document (⌘N)"
+                : "New document (Ctrl+N)"
+            }
+            aria-keyshortcuts="Control+N Meta+N"
+            onFocus={() => setFocusId("new-document")}
+            onClick={onNewDocument}
+          >
+            <NewDocumentIcon />
+            <span className="gn-bar__sr">New document</span>
+          </button>
         )}
 
         {onTogglePagePanel && (
