@@ -113,6 +113,11 @@ export interface BarToolSubmenuProps {
   excalidrawAPI: ExcalidrawImperativeAPI | null;
   /** Host-driven tool override (mirrors FloatingBar). */
   activeTool?: ToolMenuToolId | null;
+  /**
+   * Compact under-dock: no legends / saved-pen chips — just colour + size
+   * chips for one-thumb reach. Defaults to `true`.
+   */
+  compact?: boolean;
   className?: string;
 }
 
@@ -164,6 +169,7 @@ const readLiveStyle = (api: ExcalidrawImperativeAPI | null): LiveStyle => {
 export const BarToolSubmenu = ({
   excalidrawAPI,
   activeTool: controlledTool,
+  compact = true,
   className,
 }: BarToolSubmenuProps) => {
   const [style, setStyle] = useState<LiveStyle>(() =>
@@ -266,9 +272,12 @@ export const BarToolSubmenu = ({
 
   return (
     <div
-      className={`gn-bar-sub${className ? ` ${className}` : ""}`}
+      className={`gn-bar-sub${compact ? " gn-bar-sub--compact" : ""}${
+        className ? ` ${className}` : ""
+      }`}
       data-testid="goodnotes-bar-submenu"
       data-tool={tool}
+      data-compact={compact || undefined}
       role="toolbar"
       aria-label={title}
     >
@@ -348,7 +357,7 @@ export const BarToolSubmenu = ({
             </div>
           </fieldset>
 
-          {inkPresets.length > 0 && (
+          {!compact && inkPresets.length > 0 && (
             <>
               <span className="gn-bar-sub__rule" aria-hidden="true" />
               <fieldset className="gn-bar-sub__group gn-bar-sub__group--presets">
@@ -413,7 +422,6 @@ export const BarToolSubmenu = ({
                 </button>
               );
             })}
-            {/* keep live id in sync for tests / first paint */}
             <span
               className="gn-bar-sub__sr"
               data-eraser-size={getEraserSizeId()}

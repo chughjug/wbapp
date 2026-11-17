@@ -117,6 +117,10 @@ export type {
 export { BarToolSubmenu } from "./BarToolSubmenu";
 export type { BarToolSubmenuProps } from "./BarToolSubmenu";
 
+/** Lower-right circular colour / eraser-size control. */
+export { DockInkOrb } from "./DockInkOrb";
+export type { DockInkOrbProps } from "./DockInkOrb";
+
 /**
  * @deprecated The three-zone band is gone. `NavBar` is an alias for
  * {@link FloatingBar} so existing importers keep compiling; `NavBarProps` is

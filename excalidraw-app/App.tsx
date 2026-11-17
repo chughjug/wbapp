@@ -1184,6 +1184,7 @@ const ExcalidrawWrapper = ({
         onReorder={openDocs.actions.reorder}
         onCloseOthers={openDocs.actions.closeOthers}
         onNewTab={onNewDocument}
+        showWhenSingle
       />
       {/* band 3 — page panel + canvas */}
       {/* the active tool's settings, docked as a band under the bar */}

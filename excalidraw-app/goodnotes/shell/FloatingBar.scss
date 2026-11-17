@@ -121,20 +121,18 @@
      rather than displacing it. The page therefore gets the full height. */
   &.gn-bar-scope--floating {
     position: absolute;
+    /* fill the stage so the corner ink orb can pin to bottom-right while the
+       dock stack stays top-centred */
+    inset: 0;
     top: var(--gn-bar-inset);
-    left: 0;
-    right: 0;
-    bottom: auto;
   }
 
   /* anchored to the viewport instead — for hosts that mount the bar outside
      the stage */
   &.gn-bar-scope--fixed {
     position: fixed;
+    inset: 0;
     top: var(--gn-bar-inset);
-    left: 0;
-    right: 0;
-    bottom: auto;
   }
 }
 

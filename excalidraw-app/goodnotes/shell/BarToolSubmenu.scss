@@ -22,6 +22,54 @@
   min-height: 2.5rem;
   padding: 0.3rem 0.55rem;
 
+  &--compact {
+    min-height: 2rem;
+    gap: 0.2rem 0.35rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 999px;
+
+    .gn-bar-sub__legend {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .gn-bar-sub__group {
+      gap: 0;
+    }
+
+    .gn-bar-sub__swatch,
+    .gn-bar-sub__width {
+      width: 1.35rem;
+      height: 1.35rem;
+    }
+
+    .gn-bar-sub__swatch::before {
+      width: 0.85rem;
+      height: 0.85rem;
+    }
+
+    .gn-bar-sub__size {
+      min-width: 2.1rem;
+      padding: 0.1rem 0.25rem;
+    }
+
+    .gn-bar-sub__size-label {
+      font-size: 0.55rem;
+    }
+
+    .gn-bar-sub__chip {
+      height: 1.45rem;
+      padding: 0 0.4rem;
+    }
+  }
+
   border: 1px solid
     var(--gn-bar-border, var(--color-border-outline-variant, #c5c5d0));
   border-radius: 999px;

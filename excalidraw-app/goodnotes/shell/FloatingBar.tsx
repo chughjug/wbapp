@@ -104,6 +104,7 @@ import {
 } from "./icons";
 
 import { BarToolSubmenu } from "./BarToolSubmenu";
+import { DockInkOrb } from "./DockInkOrb";
 
 import "./FloatingBar.scss";
 
@@ -183,16 +184,10 @@ const ALL_PINNED_CONTROLS: readonly FloatingBarPinnedControl[] = [
   "search",
 ];
 
-/** Default: more on the bar, always shown — menus keep the long-tail. */
+/** Default: slim always-on dock — colour/size live on the under-dock + orb. */
 const DEFAULT_PINNED_CONTROLS: readonly FloatingBarPinnedControl[] = [
-  "title",
   "undo",
   "redo",
-  "text",
-  "image",
-  "addPage",
-  "share",
-  "exportPdf",
 ];
 
 const resolvePinnedControls = (
@@ -1652,9 +1647,13 @@ export const FloatingBar = ({
           <BarToolSubmenu
             excalidrawAPI={excalidrawAPI}
             activeTool={submenuTool}
+            compact
           />
         )}
       </div>
+      {!readMode && (
+        <DockInkOrb excalidrawAPI={excalidrawAPI} activeTool={submenuTool} />
+      )}
     </div>
   );
 };
