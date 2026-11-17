@@ -1365,7 +1365,7 @@ const getConstantWidthFreedrawOutline = (
  * covers 5.64 px.
  *
  * Returns 0 for pressure-varying strokes, whose width is not uniform and so
- * has no single answer. Used by the renderer's sub-pixel (hairline) floor.
+ * has no single answer.
  */
 export const getFreedrawUniformInkWidth = (
   element: ExcalidrawFreeDrawElement,
@@ -1373,6 +1373,22 @@ export const getFreedrawUniformInkWidth = (
   element.strokeOptions?.variability === "constant"
     ? element.strokeWidth * CONSTANT_WIDTH_FREEDRAW.SIZE_FACTOR * 2
     : 0;
+
+/**
+ * Representative ink width for the sub-pixel (hairline) floor — works for
+ * both constant-width and pressure-varying strokes.
+ *
+ * Constant: measured full ribbon width (`SIZE_FACTOR * 2`).
+ * Variable: perfect-freehand's base `size` (diameter at mid pressure). Thin
+ * pressure dips can still go narrower, but flooring the base diameter stops
+ * the whole stroke from dissolving into patchy sub-pixel coverage.
+ */
+export const getFreedrawHairlineInkWidth = (
+  element: ExcalidrawFreeDrawElement,
+): number =>
+  element.strokeOptions?.variability === "constant"
+    ? element.strokeWidth * CONSTANT_WIDTH_FREEDRAW.SIZE_FACTOR * 2
+    : element.strokeWidth * VARIABLE_WIDTH_FREEDRAW.SIZE_FACTOR;
 
 export const getFreedrawOutlinePoints = (
   element: ExcalidrawFreeDrawElement,

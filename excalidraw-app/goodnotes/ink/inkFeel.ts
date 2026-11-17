@@ -17,6 +17,9 @@
  *      letterforms and leaves the ink visibly trailing the nib. There is no
  *      single right answer here — it is a feel preference — so it is exposed.
  *
+ *   3. PHYSICS MODELING (optional). Google's Ink Stroke Modeler further
+ *      smooths digitizer noise and predicts the tip for wet-ink lag masking.
+ *
  * This module owns the preference (persisted) and pushes it into the element
  * package, which bakes the resulting perfect-freehand options into each
  * stroke AT CREATION TIME. Changing the preference therefore never re-shapes
@@ -30,6 +33,7 @@ import {
   INK_FEEL_TUNING,
   setInkFeel,
   setPreferRealPenPressure,
+  setUseStrokeModeler,
 } from "@excalidraw/element";
 
 import type { InkFeel } from "@excalidraw/element";
@@ -62,6 +66,7 @@ export const INK_FEEL_LABELS: Record<
 
 export const INK_FEEL_STORAGE_KEY = "goodnotes-ink-feel";
 export const INK_PRESSURE_STORAGE_KEY = "goodnotes-ink-real-pressure";
+export const INK_MODELER_STORAGE_KEY = "goodnotes-ink-stroke-modeler";
 
 export type InkFeelSettings = {
   feel: InkFeel;
@@ -69,32 +74,49 @@ export type InkFeelSettings = {
    * Trust `PointerEvent.pressure` for `pointerType: "pen"` instead of the
    * editor's `pressure === 0.5 means no sensor` heuristic.
    *
-   * Off by default: the heuristic is right for mice and for digitizers that
-   * report a constant 0.5, and getting it wrong in that direction produces a
-   * dead, uniform-width line.
+   * On by default for Apple Pencil / stylus. Turn off if your pen draws a
+   * flat, uniform-width line (digitizers that report constant 0.5).
    */
   preferRealPenPressure: boolean;
+  /**
+   * Pre-filter digitizer samples through Google's Ink Stroke Modeler before
+   * they become stroke points, and use its prediction for the wet-ink tail.
+   */
+  useStrokeModeler: boolean;
 };
 
 export const DEFAULT_INK_FEEL_SETTINGS: InkFeelSettings = {
   feel: DEFAULT_INK_FEEL,
-  preferRealPenPressure: false,
+  preferRealPenPressure: true,
+  useStrokeModeler: true,
 };
 
 const isInkFeel = (value: unknown): value is InkFeel =>
   value === "smooth" || value === "balanced" || value === "precise";
+
+const readBool = (raw: string | null, fallback: boolean): boolean => {
+  if (raw === null) {
+    return fallback;
+  }
+  return raw === "true";
+};
 
 /** Read the persisted settings. Never throws (private mode / quota). */
 export const getStoredInkFeelSettings = (): InkFeelSettings => {
   try {
     const feel = localStorage.getItem(INK_FEEL_STORAGE_KEY);
     const pressure = localStorage.getItem(INK_PRESSURE_STORAGE_KEY);
+    const modeler = localStorage.getItem(INK_MODELER_STORAGE_KEY);
     return {
       feel: isInkFeel(feel) ? feel : DEFAULT_INK_FEEL_SETTINGS.feel,
-      preferRealPenPressure:
-        pressure === null
-          ? DEFAULT_INK_FEEL_SETTINGS.preferRealPenPressure
-          : pressure === "true",
+      preferRealPenPressure: readBool(
+        pressure,
+        DEFAULT_INK_FEEL_SETTINGS.preferRealPenPressure,
+      ),
+      useStrokeModeler: readBool(
+        modeler,
+        DEFAULT_INK_FEEL_SETTINGS.useStrokeModeler,
+      ),
     };
   } catch {
     return { ...DEFAULT_INK_FEEL_SETTINGS };
@@ -107,6 +129,10 @@ export const setStoredInkFeelSettings = (settings: InkFeelSettings) => {
     localStorage.setItem(
       INK_PRESSURE_STORAGE_KEY,
       String(settings.preferRealPenPressure),
+    );
+    localStorage.setItem(
+      INK_MODELER_STORAGE_KEY,
+      String(settings.useStrokeModeler),
     );
   } catch {
     // ignore: the preference is a nicety, not worth failing a stroke over
@@ -127,6 +153,7 @@ let current: InkFeelSettings = { ...DEFAULT_INK_FEEL_SETTINGS };
 const applyInkFeelSettings = (settings: InkFeelSettings) => {
   setInkFeel(settings.feel);
   setPreferRealPenPressure(settings.preferRealPenPressure);
+  setUseStrokeModeler(settings.useStrokeModeler);
 };
 
 export const getInkFeelSettings = (): InkFeelSettings => current;

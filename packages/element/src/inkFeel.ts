@@ -23,12 +23,12 @@ import type { StrokeOptions, StrokeVariability } from "./types";
  * - `smoothing`  — curve fitting applied to the outline.
  * - `thinning`   — how strongly pressure modulates stroke width.
  *
- * `BALANCED` is byte-for-byte what the editor did before this preference
- * existed, so the default cannot regress diagramming.
+ * `BALANCED` is byte-for-byte what the editor did historically. The notebook
+ * app defaults to `precise` because handwriting is the primary input.
  */
 export type InkFeel = "smooth" | "balanced" | "precise";
 
-export const DEFAULT_INK_FEEL: InkFeel = "balanced";
+export const DEFAULT_INK_FEEL: InkFeel = "precise";
 
 export type InkFeelTuning = {
   /** streamline for pen / touch input */
@@ -47,7 +47,7 @@ export const INK_FEEL_TUNING: Record<InkFeel, InkFeelTuning> = {
     smoothing: 0.65,
     thinning: 0.5,
   },
-  /** The editor's historical behaviour. Default. */
+  /** The editor's historical behaviour. */
   balanced: {
     streamlinePen: DEFAULT_STROKE_STREAMLINE_PRECISE, // 0.2
     streamlineMouse: DEFAULT_STROKE_STREAMLINE, // 0.5
@@ -67,17 +67,34 @@ export const INK_FEEL_TUNING: Record<InkFeel, InkFeelTuning> = {
   },
 };
 
+/**
+ * Renderer hardcoded defaults in `shape.ts` match the balanced tuning. When
+ * serialising strokeOptions we omit smoothing/thinning that equal these so
+ * historical scenes stay byte-identical — regardless of which preset is the
+ * *app* default.
+ */
+const RENDERER_DEFAULT_TUNING = INK_FEEL_TUNING.balanced;
+
 let currentInkFeel: InkFeel = DEFAULT_INK_FEEL;
 
 /**
- * When `false` (default) we keep the editor's original heuristic: a pointer
- * reporting exactly `0.5` at pointerdown is assumed to have no pressure
- * sensor, and pressure is simulated from velocity instead.
+ * When `false` we keep the editor's original heuristic: a pointer reporting
+ * exactly `0.5` at pointerdown is assumed to have no pressure sensor, and
+ * pressure is simulated from velocity instead.
  *
  * When `true`, pen input is always taken at its word. See
- * `shouldSimulatePressure` for why this is a preference and not just a fix.
+ * `shouldSimulatePressure` for why this is a preference.
+ *
+ * Default is `true` for the notebook app (Apple Pencil / stylus first).
  */
-let preferRealPenPressure = false;
+let preferRealPenPressure = true;
+
+/**
+ * When `true`, coalesced samples are pre-filtered through Google's Ink Stroke
+ * Modeler (via `ink-stroke-modeler-ts`) before they become element points.
+ * Off keeps the raw coalesced path (previous behaviour).
+ */
+let useStrokeModeler = true;
 
 export const getInkFeel = (): InkFeel => currentInkFeel;
 
@@ -89,6 +106,12 @@ export const getPreferRealPenPressure = () => preferRealPenPressure;
 
 export const setPreferRealPenPressure = (prefer: boolean) => {
   preferRealPenPressure = prefer;
+};
+
+export const getUseStrokeModeler = () => useStrokeModeler;
+
+export const setUseStrokeModeler = (use: boolean) => {
+  useStrokeModeler = use;
 };
 
 /**
@@ -103,18 +126,17 @@ export const resolveFreedrawStrokeOptions = ({
   variability: StrokeVariability;
 }): StrokeOptions => {
   const tuning = INK_FEEL_TUNING[currentInkFeel];
-  const defaults = INK_FEEL_TUNING[DEFAULT_INK_FEEL];
 
   return {
     variability,
     streamline:
       pointerType === "mouse" ? tuning.streamlineMouse : tuning.streamlinePen,
     // only persisted when they differ from the renderer's own defaults, so
-    // the default preset serialises exactly as it did before this existed
-    ...(tuning.smoothing === defaults.smoothing
+    // balanced strokes serialise exactly as they did before this existed
+    ...(tuning.smoothing === RENDERER_DEFAULT_TUNING.smoothing
       ? {}
       : { smoothing: tuning.smoothing }),
-    ...(tuning.thinning === defaults.thinning
+    ...(tuning.thinning === RENDERER_DEFAULT_TUNING.thinning
       ? {}
       : { thinning: tuning.thinning }),
   };
@@ -133,9 +155,9 @@ export const resolveFreedrawStrokeOptions = ({
  * thrown away.
  *
  * `preferRealPenPressure` opts out of the heuristic for `pointerType: "pen"`
- * only. It is not the default because some pens (and some remote-desktop /
- * virtualised digitizers) report a constant `0.5` for every sample, and
- * trusting that yields a dead, uniform-width line.
+ * only. Some pens (and some remote-desktop / virtualised digitizers) report a
+ * constant `0.5` for every sample; trusting that yields a dead, uniform-width
+ * line — hence the Settings toggle.
  */
 export const shouldSimulatePressure = ({
   pointerType,

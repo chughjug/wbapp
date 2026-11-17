@@ -43,7 +43,9 @@ export const getDefaultAppState = (): Omit<
     currentItemOpacity: DEFAULT_ELEMENT_PROPS.opacity,
     currentItemRoughness: DEFAULT_ELEMENT_PROPS.roughness,
     currentItemCustomData: null,
-    currentItemStrokeVariability: "constant",
+    // variable-width by default so stylus pressure / thinning are visible;
+    // the pressure radio still lets users switch to constant-width pens
+    currentItemStrokeVariability: "variable",
     currentItemStartArrowhead: null,
     currentItemStrokeColor: DEFAULT_ELEMENT_PROPS.strokeColor,
     currentItemStickynoteStrokeColor: DEFAULT_ELEMENT_PROPS.strokeColor,

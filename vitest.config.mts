@@ -72,6 +72,12 @@ export default defineConfig({
       },
     ],
   },
+  // ink-stroke-modeler-ts ships TypeScript source only
+  server: {
+    deps: {
+      inline: ["ink-stroke-modeler-ts"],
+    },
+  },
   //@ts-ignore
   test: {
     // Since hooks are running in stack in v2, which means all hooks run serially whereas
@@ -84,6 +90,13 @@ export default defineConfig({
     environment: "jsdom",
     // don't list skipped tests in the failure tree — keeps output readable
     hideSkippedTests: true,
+    deps: {
+      optimizer: {
+        web: {
+          include: ["ink-stroke-modeler-ts"],
+        },
+      },
+    },
     coverage: {
       reporter: ["text", "json-summary", "json", "html", "lcovonly"],
       // Since v2, it ignores empty lines by default and we need to disable it as it affects the coverage

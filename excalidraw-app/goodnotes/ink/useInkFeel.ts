@@ -21,6 +21,7 @@ export interface UseInkFeelResult extends InkFeelSettings {
   settings: InkFeelSettings;
   setFeel: (feel: InkFeel) => void;
   setPreferRealPenPressure: (prefer: boolean) => void;
+  setUseStrokeModeler: (use: boolean) => void;
 }
 
 export const useInkFeel = (): UseInkFeelResult => {
@@ -43,10 +44,16 @@ export const useInkFeel = (): UseInkFeelResult => {
     [],
   );
 
+  const setUseStrokeModeler = useCallback(
+    (useStrokeModeler: boolean) => updateInkFeelSettings({ useStrokeModeler }),
+    [],
+  );
+
   return {
     ...settings,
     settings,
     setFeel,
     setPreferRealPenPressure,
+    setUseStrokeModeler,
   };
 };

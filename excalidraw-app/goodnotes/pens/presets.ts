@@ -40,31 +40,31 @@ export type PenWidthKey = keyof typeof PEN_WIDTHS;
  * highlighter needs).
  *
  * **Read {@link HAIRLINE_PEN_WIDTH} before changing the floor.** Below about
- * 0.36 the ink is thinner than a screen pixel, so the slider stops making the
- * line *thinner* and starts making it *lighter*. That is a property of the
- * display, not of this module — see `goodnotes/ink/INTEGRATION.md` § "The
- * sub-pixel floor".
+ * 0.71 the ink would render thinner than the quality floor (2 device pixels),
+ * so the slider stops making the line *thinner* and starts making it
+ * *lighter*. That is a property of the display, not of this module — see
+ * `goodnotes/ink/INTEGRATION.md` § "The sub-pixel floor".
  */
 export const MIN_PEN_WIDTH = 0.1;
 export const MAX_PEN_WIDTH = 6;
 
 /**
- * The width below which a pen stroke is a *hairline*: its ink is narrower
- * than one device pixel, so the renderer draws it one device pixel wide and
- * proportionally lighter instead (`FREEDRAW_HAIRLINE_MIN_DEVICE_PX` in
- * `packages/element/src/renderElement.ts`).
+ * The width below which a pen stroke is a *hairline*: its ink would render
+ * narrower than the renderer's quality floor (`FREEDRAW_HAIRLINE_MIN_DEVICE_PX`
+ * = 2 device pixels in `packages/element/src/renderElement.ts`), so the
+ * stroke is widened to that floor and made proportionally lighter.
  *
- * The number is `1 / (2.8 * devicePixelRatio * zoom)`: a stroke lays down
- * `strokeWidth * 2.8` scene units of ink (measured, see the ink notes), and
- * one scene unit is `devicePixelRatio * zoom` device pixels. The constant
- * below is the value at 1× and 100%; on a 2× display (iPad) the threshold
- * halves to ~0.18.
+ * The number is `2 / (2.8 * devicePixelRatio * zoom)`: a constant-width stroke
+ * lays down `strokeWidth * 2.8` scene units of ink (measured, see the ink
+ * notes), and one scene unit is `devicePixelRatio * zoom` device pixels. The
+ * constant below is the value at 1× and 100%; on a 2× display (iPad) the
+ * threshold halves to ~0.36.
  *
- * Exported so UI can say so rather than implying 0.1 and 0.3 differ in
+ * Exported so UI can say so rather than implying 0.1 and 0.5 differ only in
  * thickness. Nothing in this module clamps to it — hairlines are a legitimate
  * annotation weight, they are just light rather than thin.
  */
-export const HAIRLINE_PEN_WIDTH = 0.36;
+export const HAIRLINE_PEN_WIDTH = 0.71;
 /** Slider granularity. 0.1 keeps every stop expressible as one decimal. */
 export const PEN_WIDTH_STEP = 0.1;
 

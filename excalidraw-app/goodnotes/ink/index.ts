@@ -39,6 +39,7 @@ export {
   DEFAULT_INK_FEEL_SETTINGS,
   INK_FEEL_STORAGE_KEY,
   INK_PRESSURE_STORAGE_KEY,
+  INK_MODELER_STORAGE_KEY,
 } from "./inkFeel";
 
 export type {

@@ -37,6 +37,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { DarkModeToggle, useDarkMode } from "../dark";
+import { InkFeelSettings, useInkFeel, updateInkFeelSettings } from "../ink";
 import {
   InputSettingsPanel,
   loadInputSettings,
@@ -84,6 +85,7 @@ export interface SettingsScreenProps {
 /** Ids of the screen's sections, in display order. */
 export const SETTINGS_SECTIONS = [
   "input",
+  "ink",
   "appearance",
   "paper",
   "pens",
@@ -99,6 +101,7 @@ export type SettingsSectionId = SettingsSections[number];
 
 const SECTION_LABELS: Record<SettingsSectionId, string> = {
   input: "Pen & touch",
+  ink: "Ink & handwriting",
   appearance: "Appearance",
   paper: "Paper",
   pens: "Pens",
@@ -126,6 +129,9 @@ export const SettingsScreen = ({
   const [inputSettings, setInputSettings] =
     useState<InputSettings>(loadInputSettings);
   useEffect(() => subscribeInputSettings(setInputSettings), []);
+
+  // goodnotes/ink — handwriting feel / pressure / stroke modeler
+  const ink = useInkFeel();
 
   // goodnotes/dark
   const dark = useDarkMode();
@@ -242,6 +248,26 @@ export const SettingsScreen = ({
               // local copy of the switch exists to go stale.
               saveInputSettings({ [key]: value } as Partial<InputSettings>);
             }}
+          />
+        </section>
+
+        {/* ---- ink & handwriting ---- */}
+        <section
+          className="gn-settings-section"
+          id={sectionId("ink")}
+          aria-labelledby={headingId("ink")}
+        >
+          <h2 className="gn-settings-section__title" id={headingId("ink")}>
+            Ink &amp; handwriting
+          </h2>
+          <p className="gn-settings-section__blurb">
+            How freehand strokes are filtered and whether the stylus&apos;s real
+            pressure and physics smoothing are used. Changes apply to new
+            strokes only.
+          </p>
+          <InkFeelSettings
+            settings={ink.settings}
+            onChange={updateInkFeelSettings}
           />
         </section>
 
