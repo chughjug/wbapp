@@ -4,8 +4,8 @@ MV3 extension that keeps a pairing room open on the Heroku relay and fulfills iP
 
 ## Load unpacked
 
-1. Deploy `canvas-bridge/` to Heroku (or run `npm start` locally on port 8787).
-2. Open `chrome://extensions` → Developer mode → **Load unpacked** → select this folder.
+1. Deploy `canvas-bridge/` to Heroku (or use the ratings mount at `/api/canvas-bridge`).
+2. Open `chrome://extensions` → Developer mode → **Load unpacked** → select this `chrome-extension` folder (must contain `manifest.json`).
 3. Open your school Canvas and stay logged in.
 4. Click the extension icon — note the **6-character pairing code**.
 5. On the iPad, open wbapp → Connect Canvas → **Laptop extension** → enter the code → Sync.

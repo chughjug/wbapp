@@ -4,7 +4,7 @@ Connect a student's Canvas instance, browse one course at a time, turn an assign
 
 ## Two ways to connect
 
-1. **Laptop Chrome extension (recommended on iPad)** — load `chrome-extension/canvas-bridge`, keep Canvas logged in, enter the pairing code in **Connect Canvas → Laptop extension**. Course data is pulled through the Heroku relay in `canvas-bridge/` (`VITE_CANVAS_BRIDGE_URL`). No access token on the iPad.
+1. **Laptop Chrome extension (recommended on iPad)** — load the `chrome-extension/` folder (contains `manifest.json`), keep Canvas logged in, enter the pairing code in **Connect Canvas → Laptop extension**. Course data is pulled through the Heroku relay in `canvas-bridge/` (`VITE_CANVAS_BRIDGE_URL`). No access token on the iPad.
 2. **Access token** — classic PAT + `/api/canvas/proxy` path (see warning copy in the dialog).
 
 **Nothing else to install for the token path.** `pdfjs-dist` is already configured at app startup, and the read-only relay (`api/canvas/proxy.ts`) is in the repo.
