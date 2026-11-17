@@ -17,6 +17,7 @@ export {
   createBridgeJob,
   getBridgeJob,
   runBridgeSync,
+  runBridgeCoursePull,
 } from "./api";
 export { applyBridgePayload } from "./importPayload";
 export type { BridgeImportResult } from "./importPayload";
@@ -36,6 +37,7 @@ export type {
   BridgePayload,
   BridgeCoursePayload,
   BridgeCoursesPayload,
+  BridgeFilesPayload,
   BridgeJobView,
   BridgeFile,
   BridgeAssignment,

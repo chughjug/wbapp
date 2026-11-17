@@ -8,6 +8,7 @@ import {
   BridgeError,
   getBridgeRoomStatus,
   joinBridgeRoom,
+  runBridgeCoursePull,
   runBridgeSync,
 } from "./api";
 import {
@@ -187,27 +188,28 @@ export const BridgePairPanel: React.FC<BridgePairPanelProps> = ({
     }
     setBusy(true);
     setError(null);
-    setStatus("Syncing course from laptop…");
+    setStatus("Pulling course files into a folder…");
     try {
-      const job = await runBridgeSync(selectedCourseId, {
-        onStatus: (j) => {
+      const result = await runBridgeCoursePull(selectedCourseId, {
+        onStatus: setStatus,
+        onJob: (j) => {
           if (j.status === "waiting") {
             setStatus("Waiting for laptop extension…");
           } else if (j.status === "running") {
-            setStatus("Laptop is packing assignments & files…");
+            setStatus("Laptop is reading Canvas files…");
           }
         },
       });
-      if (job.status === "error" || !job.payload) {
-        throw new BridgeError(job.error || "Sync failed.");
-      }
-      const result = await applyBridgePayload(job.payload, {
-        importPdfs: true,
-        onProgress: setStatus,
-      });
+      setCourses(
+        bridgeCoursesAsCanvas().map((c) => ({
+          id: c.id,
+          name: c.name,
+          courseCode: c.course_code,
+        })),
+      );
       setStatus(
         result.courseLabel
-          ? `Imported ${result.notebooksCreated} notebooks and ${result.filesImported} PDFs for ${result.courseLabel}.`
+          ? `Saved to folder “${result.courseLabel}”: ${result.filesImported} PDFs, ${result.filesPlaceholder} other files, ${result.notebooksCreated} assignment notebooks.`
           : "Course synced.",
       );
       onSynced?.();
@@ -295,10 +297,10 @@ export const BridgePairPanel: React.FC<BridgePairPanelProps> = ({
                 onClick={() => void syncCourse()}
               >
                 {busy
-                  ? "Syncing…"
+                  ? "Pulling files…"
                   : cachedCourse
-                  ? "Re-sync this course"
-                  : "Pull course to iPad"}
+                  ? "Re-pull all files"
+                  : "Pull all files to folder"}
               </button>
             </div>
           </div>

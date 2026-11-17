@@ -5,13 +5,16 @@
 
 import {
   canvasApiInTab,
+  canvasApiInTabSoft,
   fetchFileBase64InTab,
   findCanvasTab,
 } from "./canvasFetch.js";
 
 const ALARM = "canvas-bridge-poll";
-const MAX_INLINE_PDF = 4 * 1024 * 1024; // 4 MB per file
-const MAX_INLINE_FILES = 8;
+/** Per-file / per-chunk caps so the Heroku relay (20–25mb) accepts uploads. */
+const MAX_INLINE_FILE = 8 * 1024 * 1024; // 8 MB per file
+const MAX_CHUNK_FILES = 6;
+const MAX_PAYLOAD_CHARS = 10 * 1024 * 1024;
 
 const defaultBridgeUrl = () =>
   "https://chess-tournament-director-6ce5e76147d7.herokuapp.com/api/canvas-bridge";
@@ -88,82 +91,249 @@ const mapFile = (f) => ({
   downloadUrl: f.url,
 });
 
-const buildCoursesPayload = async (tabId, host) => {
-  const courses = await canvasApiInTab(tabId, "courses", {
-    enrollment_state: "active",
-    include: "term",
-    per_page: 100,
-  });
-  const list = Array.isArray(courses) ? courses : [];
-  return {
-    kind: "courses",
-    host,
-    courses: list.map((c) => ({
-      id: String(c.id),
-      name: c.name || `Course ${c.id}`,
-      courseCode: c.course_code,
-      term: c.term?.name,
-    })),
-    syncedAt: Date.now(),
-  };
+const courseLabel = (c) => {
+  const name = (c?.name || "").trim();
+  const code = (c?.course_code || "").trim();
+  if (name) {
+    return name;
+  }
+  if (code) {
+    return code;
+  }
+  return `Course ${c?.id}`;
 };
 
-const buildCoursePayload = async (tabId, host, courseId) => {
-  const [course, assignments, files] = await Promise.all([
-    canvasApiInTab(tabId, `courses/${courseId}`, {}),
-    canvasApiInTab(tabId, `courses/${courseId}/assignments`, {
-      order_by: "due_at",
+/** Canvas only allows one enrollment_state per request — merge all. */
+const fetchAllCourses = async (tabId) => {
+  const states = ["active", "completed", "invited_or_pending"];
+  const byId = new Map();
+  for (const enrollment_state of states) {
+    const page = await canvasApiInTabSoft(tabId, "courses", {
+      enrollment_state,
+      include: ["term"],
       per_page: 100,
-    }),
-    canvasApiInTab(tabId, `courses/${courseId}/files`, {
-      sort: "updated_at",
-      per_page: 100,
-    }),
-  ]);
+    });
+    if (!Array.isArray(page)) {
+      continue;
+    }
+    for (const c of page) {
+      if (c?.id == null) {
+        continue;
+      }
+      const id = String(c.id);
+      // Prefer the richer "active" record if we already saw a stub.
+      if (!byId.has(id) || enrollment_state === "active") {
+        byId.set(id, c);
+      }
+    }
+  }
 
-  const mappedFiles = (Array.isArray(files) ? files : []).map(mapFile);
-  const pdfs = mappedFiles.filter(
-    (f) =>
-      (f.contentType || "").includes("pdf") ||
-      /\.pdf$/i.test(f.displayName || ""),
+  // Fallback: unfiltered list (some schools reject enrollment_state).
+  if (byId.size === 0) {
+    const page = await canvasApiInTabSoft(tabId, "courses", {
+      include: ["term"],
+      per_page: 100,
+    });
+    if (Array.isArray(page)) {
+      for (const c of page) {
+        if (c?.id != null) {
+          byId.set(String(c.id), c);
+        }
+      }
+    }
+  }
+
+  return [...byId.values()].sort((a, b) =>
+    courseLabel(a).localeCompare(courseLabel(b), undefined, {
+      sensitivity: "base",
+    }),
+  );
+};
+
+/** Collect files from course root, folders, and module items. */
+const fetchAllCourseFiles = async (tabId, courseId) => {
+  const byId = new Map();
+  const add = (list) => {
+    if (!Array.isArray(list)) {
+      return;
+    }
+    for (const f of list) {
+      if (f?.id == null) {
+        continue;
+      }
+      byId.set(String(f.id), f);
+    }
+  };
+
+  add(
+    await canvasApiInTabSoft(tabId, `courses/${courseId}/files`, {
+      sort: "updated_at",
+      order: "desc",
+      per_page: 100,
+    }),
   );
 
+  const folders = await canvasApiInTabSoft(tabId, `courses/${courseId}/folders`, {
+    per_page: 100,
+  });
+  if (Array.isArray(folders)) {
+    // Cap folder walks so a huge course still finishes.
+    for (const folder of folders.slice(0, 80)) {
+      if (folder?.id == null) {
+        continue;
+      }
+      add(
+        await canvasApiInTabSoft(tabId, `folders/${folder.id}/files`, {
+          per_page: 100,
+        }),
+      );
+    }
+  }
+
+  const modules = await canvasApiInTabSoft(tabId, `courses/${courseId}/modules`, {
+    include: ["items"],
+    per_page: 100,
+  });
+  if (Array.isArray(modules)) {
+    const missingIds = [];
+    for (const mod of modules) {
+      const items = Array.isArray(mod?.items) ? mod.items : [];
+      for (const item of items) {
+        if (item?.type === "File" && item.content_id != null) {
+          const id = String(item.content_id);
+          if (!byId.has(id)) {
+            missingIds.push(id);
+          }
+        }
+      }
+    }
+    for (const fileId of missingIds.slice(0, 100)) {
+      const file = await canvasApiInTabSoft(tabId, `files/${fileId}`, {});
+      if (file && file.id != null) {
+        byId.set(String(file.id), file);
+      }
+    }
+  }
+
+  return [...byId.values()];
+};
+
+const stripInlineData = (payload) => ({
+  ...payload,
+  files: (payload.files || []).map(({ dataBase64, ...rest }) => rest),
+  pendingFileIds: (payload.files || []).map((f) => f.id),
+});
+
+/** Download file bytes into mapped file records until the chunk budget fills. */
+const inlineFileBytes = async (tabId, mappedFiles) => {
+  const ordered = [...mappedFiles].sort(
+    (a, b) => (a.size || 0) - (b.size || 0),
+  );
   let inlined = 0;
-  for (const file of pdfs) {
-    if (inlined >= MAX_INLINE_FILES) {
+  let approxChars = 0;
+  for (const file of ordered) {
+    if (inlined >= MAX_CHUNK_FILES) {
       break;
     }
-    if (!file.downloadUrl) {
+    if (!file.downloadUrl || file.dataBase64) {
       continue;
     }
     try {
       const got = await fetchFileBase64InTab(
         tabId,
         file.downloadUrl,
-        MAX_INLINE_PDF,
+        MAX_INLINE_FILE,
       );
       if (got && !got.skipped && got.dataBase64) {
+        const next = approxChars + got.dataBase64.length;
+        if (next > MAX_PAYLOAD_CHARS) {
+          break;
+        }
         file.dataBase64 = got.dataBase64;
         if (got.contentType) {
           file.contentType = got.contentType;
         }
+        approxChars = next;
         inlined += 1;
+      } else if (got?.skipped) {
+        file.skippedTooLarge = true;
+        file.size = got.size || file.size;
       }
     } catch {
-      // leave metadata only
+      // leave metadata only — iPad can retry later
     }
   }
+};
+
+const buildCoursesPayload = async (tabId, host) => {
+  const list = await fetchAllCourses(tabId);
+  return {
+    kind: "courses",
+    host,
+    courses: list.map((c) => ({
+      id: String(c.id),
+      name: courseLabel(c),
+      courseCode: c.course_code || undefined,
+      term: c.term?.name,
+    })),
+    syncedAt: Date.now(),
+  };
+};
+
+/**
+ * Full course catalog (assignments + every file's metadata). Bytes come in
+ * follow-up fileIds chunk jobs so nothing is dropped for size.
+ */
+const buildCoursePayload = async (tabId, host, courseId) => {
+  const [course, assignments, rawFiles] = await Promise.all([
+    canvasApiInTabSoft(tabId, `courses/${courseId}`, {}),
+    canvasApiInTabSoft(tabId, `courses/${courseId}/assignments`, {
+      order_by: "due_at",
+      per_page: 100,
+    }),
+    fetchAllCourseFiles(tabId, courseId),
+  ]);
+
+  const mappedFiles = rawFiles.map(mapFile);
+  const pendingFileIds = mappedFiles
+    .filter((f) => f.downloadUrl)
+    .map((f) => f.id);
 
   return {
     kind: "course",
     courseId: String(courseId),
-    courseName: course?.name || `Course ${courseId}`,
-    courseCode: course?.course_code,
+    courseName: courseLabel(course || { id: courseId }),
+    courseCode: course?.course_code || undefined,
     host,
     assignments: (Array.isArray(assignments) ? assignments : []).map(
       mapAssignment,
     ),
     files: mappedFiles,
+    pendingFileIds,
+    syncedAt: Date.now(),
+  };
+};
+
+/** Chunk job: download specific file ids and return their bytes. */
+const buildFilesChunkPayload = async (tabId, host, courseId, fileIds) => {
+  const course = courseId
+    ? await canvasApiInTabSoft(tabId, `courses/${courseId}`, {})
+    : null;
+  const mapped = [];
+  for (const fileId of fileIds) {
+    const raw = await canvasApiInTabSoft(tabId, `files/${fileId}`, {});
+    if (raw && raw.id != null) {
+      mapped.push(mapFile(raw));
+    }
+  }
+  await inlineFileBytes(tabId, mapped);
+  return {
+    kind: "files",
+    courseId: courseId ? String(courseId) : undefined,
+    courseName: course ? courseLabel(course) : undefined,
+    courseCode: course?.course_code || undefined,
+    host,
+    files: mapped,
     syncedAt: Date.now(),
   };
 };
@@ -182,18 +352,40 @@ const fulfillJob = async (state, job) => {
     { method: "POST", headers: agentHeaders(state.agentSecret) },
   );
 
-  const payload = job.courseId
-    ? await buildCoursePayload(canvas.tabId, canvas.host, job.courseId)
-    : await buildCoursesPayload(canvas.tabId, canvas.host);
+  let payload;
+  if (Array.isArray(job.fileIds) && job.fileIds.length > 0) {
+    if (!job.courseId) {
+      throw new Error("File chunk job is missing courseId.");
+    }
+    payload = await buildFilesChunkPayload(
+      canvas.tabId,
+      canvas.host,
+      job.courseId,
+      job.fileIds,
+    );
+  } else if (job.courseId) {
+    payload = await buildCoursePayload(canvas.tabId, canvas.host, job.courseId);
+  } else {
+    payload = await buildCoursesPayload(canvas.tabId, canvas.host);
+  }
 
-  const res = await fetch(
-    `${state.bridgeUrl}/v1/rooms/${state.roomId}/jobs/${job.id}/complete`,
-    {
-      method: "POST",
-      headers: agentHeaders(state.agentSecret),
-      body: JSON.stringify({ payload }),
-    },
-  );
+  const upload = async (body) =>
+    fetch(
+      `${state.bridgeUrl}/v1/rooms/${state.roomId}/jobs/${job.id}/complete`,
+      {
+        method: "POST",
+        headers: agentHeaders(state.agentSecret),
+        body: JSON.stringify({ payload: body }),
+      },
+    );
+
+  let res = await upload(payload);
+  // If the relay rejects a huge body, retry with metadata only so the iPad
+  // still gets the full course/file list.
+  if (!res.ok && payload.files?.some((f) => f.dataBase64)) {
+    payload = stripInlineData(payload);
+    res = await upload(payload);
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Upload failed (${res.status}): ${text.slice(0, 200)}`);

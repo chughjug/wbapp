@@ -31,7 +31,7 @@ const app = express();
 const PORT = Number(process.env.PORT || 8787);
 
 app.use(cors({ origin: true }));
-app.use(express.json({ limit: "15mb" }));
+app.use(express.json({ limit: "25mb" }));
 
 const requireAgent = (req, res, next) => {
   const room = getRoom(req.params.roomId);
@@ -106,11 +106,15 @@ app.post("/v1/rooms/:roomId/jobs", (req, res) => {
     });
     return;
   }
-  const job = createJob(room, { courseId: req.body?.courseId });
+  const job = createJob(room, {
+    courseId: req.body?.courseId,
+    fileIds: req.body?.fileIds,
+  });
   res.status(201).json({
     id: job.id,
     status: job.status,
     courseId: job.courseId ?? null,
+    fileIds: job.fileIds ?? null,
     createdAt: job.createdAt,
   });
 });
@@ -146,6 +150,7 @@ app.post("/v1/rooms/:roomId/agent/ping", requireAgent, (req, res) => {
     waiting: listWaitingJobs(req.room).map((j) => ({
       id: j.id,
       courseId: j.courseId ?? null,
+      fileIds: j.fileIds ?? null,
       createdAt: j.createdAt,
     })),
   });
@@ -158,6 +163,7 @@ app.get("/v1/rooms/:roomId/jobs/waiting", requireAgent, (req, res) => {
     jobs: listWaitingJobs(req.room).map((j) => ({
       id: j.id,
       courseId: j.courseId ?? null,
+      fileIds: j.fileIds ?? null,
       createdAt: j.createdAt,
     })),
   });

@@ -11,6 +11,7 @@ import {
   bridgeAssignmentsAsCanvas,
   bridgeCoursesAsCanvas,
   bridgeFilesAsCanvas,
+  listCachedCourseIds,
   loadCoursePayload,
 } from "./bridge/cache";
 import { loadBridgeSession } from "./bridge/session";
@@ -189,10 +190,33 @@ export const checkCanvasConnection = async (
 
 export const listCourses = async (): Promise<CanvasCourse[]> => {
   if (loadCanvasConnection()) {
-    return requestAll<CanvasCourse>("courses", {
-      enrollment_state: "active",
-      include: "term",
-    });
+    // Match the extension: active + completed + invited, not active-only.
+    const states = ["active", "completed", "invited_or_pending"] as const;
+    const byId = new Map<string, CanvasCourse>();
+    for (const enrollment_state of states) {
+      try {
+        const page = await requestAll<CanvasCourse>("courses", {
+          enrollment_state,
+          include: "term",
+        });
+        for (const course of page) {
+          const id = String(course.id);
+          if (!byId.has(id) || enrollment_state === "active") {
+            byId.set(id, { ...course, id });
+          }
+        }
+      } catch {
+        // some tenants reject certain enrollment_state values
+      }
+    }
+    if (byId.size === 0) {
+      return requestAll<CanvasCourse>("courses", { include: "term" });
+    }
+    return [...byId.values()].sort((a, b) =>
+      (a.name || "").localeCompare(b.name || "", undefined, {
+        sensitivity: "base",
+      }),
+    );
   }
   if (loadBridgeSession()) {
     const cached = bridgeCoursesAsCanvas();
@@ -253,15 +277,16 @@ export const listCourseFiles = async (
 /** A single file record, whose `url` is a short-lived direct download. */
 export const getFile = async (fileId: string): Promise<CanvasFile> => {
   if (loadBridgeSession() && !loadCanvasConnection()) {
-    const courses = bridgeCoursesAsCanvas();
-    for (const course of courses) {
-      const files = bridgeFilesAsCanvas(course.id);
-      const hit = files.find((f) => f.id === fileId);
+    const courseIds = new Set([
+      ...bridgeCoursesAsCanvas().map((c) => c.id),
+      ...listCachedCourseIds(),
+    ]);
+    for (const courseId of courseIds) {
+      const hit = bridgeFilesAsCanvas(courseId).find((f) => f.id === fileId);
       if (hit) {
         return hit;
       }
     }
-    // course may be cached without being in the courses list
     throw new CanvasError(
       "That file isn’t in the last laptop sync.",
       404,
