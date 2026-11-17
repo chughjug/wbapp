@@ -1,3 +1,5 @@
+import "./pageTurnAnimation.scss";
+
 /**
  * `goodnotes/paged` — one page at a time, filling the workspace.
  *
@@ -127,3 +129,7 @@ export {
   resolveInsets,
 } from "./pagedView";
 export type { CanvasBox, Insets, Rect, Viewport } from "./pagedView";
+
+/** Horizontal slide cue for swipe page turns. */
+export { playPageTurnAnimation } from "./pageTurnAnimation";
+export type { PageTurnDirection } from "./pageTurnAnimation";

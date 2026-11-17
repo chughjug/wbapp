@@ -55,3 +55,18 @@ The `anon` key is designed to be public and ships in the client bundle. What pro
 ## Still pointing at Excalidraw's infrastructure
 
 `.env.production` currently sends collaboration, shareable links, the font/library service and AI requests to Excalidraw's own servers, using their Firebase credentials. Fine locally, not fine for a public deployment. Override per service in Vercel, or run your own.
+
+---
+
+## Self-host live collaboration (excalidraw-room)
+
+1. Deploy [excalidraw/excalidraw-room](https://github.com/excalidraw/excalidraw-room) (or a compatible socket.io room server).
+2. In Vercel / `.env.local` set:
+
+   | Name                     | Value                              |
+   | ------------------------ | ---------------------------------- |
+   | `VITE_APP_WS_SERVER_URL` | `https://your-room-server.example` |
+
+3. Open **Settings → Collaboration** in the app: you should see the server URL and can mint classroom room codes.
+
+Offline version history uses **Yjs + IndexedDB** locally (`goodnotes/crdt`) and does not require the room server.

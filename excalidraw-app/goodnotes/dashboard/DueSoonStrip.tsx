@@ -1,11 +1,11 @@
 /**
- * "Due soon" — the headline of the home screen.
+ * "Up next" — the headline of the home screen.
  *
  * Renders only when Canvas is connected; the disconnected screen has no
  * deadline strip at all (see Dashboard.tsx for why that is the point).
  *
- * The strip owns a fixed-height row from its first paint, so the three
- * states (skeleton, cards, failure) occupy the same box and the document
+ * The strip owns a fixed-height timeline from its first paint, so the three
+ * states (skeleton, rows, failure) occupy the same box and the document
  * grid below never moves as deadlines arrive.
  */
 
@@ -88,7 +88,7 @@ export const DueSoonStrip = ({
     <section className="gn-dash__section" aria-labelledby={headingId}>
       <div className="gn-dash__section-head">
         <h2 className="gn-dash__h2" id={headingId}>
-          Due soon
+          Up next
         </h2>
         <div className="gn-dash__section-end">
           <span className="gn-dash__muted">
@@ -116,7 +116,7 @@ export const DueSoonStrip = ({
 
       <div className="gn-dash__strip">
         {isFirstLoad ? (
-          <ul className="gn-dash__row">
+          <ul className="gn-dash__timeline">
             {Array.from({ length: SKELETON_COUNT }, (_, index) => (
               <DeadlineSkeleton key={index} index={index} />
             ))}
@@ -141,7 +141,7 @@ export const DueSoonStrip = ({
             Nothing due in the next two weeks. Enjoy it.
           </p>
         ) : (
-          <ul className="gn-dash__row">
+          <ul className="gn-dash__timeline">
             {deadlines.map((item) => {
               const style = styleOf(item.course);
               return (

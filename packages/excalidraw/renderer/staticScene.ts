@@ -141,6 +141,16 @@ const strokeGrid = (
 
   context.save();
 
+  // Quickdraw-style fade: grid softens when zoomed out so the board reads as
+  // a surface, then comes back to full strength near reading zoom.
+  const zoomFade =
+    zoom.value <= 0.35
+      ? 0.28
+      : zoom.value >= 1.25
+      ? 1
+      : 0.28 + ((zoom.value - 0.35) / (1.25 - 0.35)) * 0.72;
+  context.globalAlpha *= zoomFade;
+
   // vertical lines
   for (let x = offsetX; x < offsetX + width + gridSize * 2; x += gridSize) {
     const isBold =

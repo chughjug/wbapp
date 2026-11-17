@@ -109,9 +109,18 @@
 export { FloatingBar } from "./FloatingBar";
 export type {
   FloatingBarProps,
+  FloatingBarPinnedControl,
   ShellMode,
   ShellPlacement,
 } from "./FloatingBar";
+
+/** Always-visible tool options strip under the floating bar. */
+export { BarToolSubmenu } from "./BarToolSubmenu";
+export type { BarToolSubmenuProps } from "./BarToolSubmenu";
+
+/** Lower-right circular colour / eraser-size control. */
+export { DockInkOrb } from "./DockInkOrb";
+export type { DockInkOrbProps } from "./DockInkOrb";
 
 /**
  * @deprecated The three-zone band is gone. `NavBar` is an alias for

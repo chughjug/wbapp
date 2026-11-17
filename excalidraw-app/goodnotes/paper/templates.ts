@@ -323,6 +323,23 @@ export const getPaperTemplate = (
 ): PaperTemplate =>
   (id && PAPER_TEMPLATES[id as PaperTemplateId]) || PAPER_TEMPLATES.blank;
 
+/**
+ * Quickdraw-style zoom fade for paper rulings: quiet when zoomed out so the
+ * page reads as a sheet, full strength near reading zoom.
+ */
+export const rulingOpacityForZoom = (zoom: number): number => {
+  if (!Number.isFinite(zoom) || zoom <= 0) {
+    return 1;
+  }
+  if (zoom <= 0.35) {
+    return 0.28;
+  }
+  if (zoom >= 1.25) {
+    return 1;
+  }
+  return 0.28 + ((zoom - 0.35) / (1.25 - 0.35)) * 0.72;
+};
+
 /** Options accepted by {@link renderPaper}. */
 export interface RenderPaperOptions {
   theme: PaperTheme;
@@ -338,6 +355,11 @@ export interface RenderPaperOptions {
    * `onPageImageReady` fires once the decode lands.
    */
   image?: PageImageBackground;
+  /**
+   * Multiplier applied only to the template rulings (not the sheet/border).
+   * Defaults to `1`. Prefer {@link rulingOpacityForZoom}.
+   */
+  rulingOpacity?: number;
 }
 
 /**
@@ -370,6 +392,10 @@ export const renderPaper = (
   ctx.beginPath();
   ctx.rect(0, 0, width, height);
   ctx.clip();
+  const rulingOpacity = opts.rulingOpacity ?? 1;
+  if (rulingOpacity !== 1) {
+    ctx.globalAlpha *= Math.max(0, Math.min(1, rulingOpacity));
+  }
   getPaperTemplate(templateId).render(ctx, width, height, {
     theme: opts.theme,
   });

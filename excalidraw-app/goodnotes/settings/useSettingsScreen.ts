@@ -24,7 +24,7 @@ import { GesturesFirstRunHint } from "./FirstRunHint";
 import { SettingsScreen } from "./SettingsScreen";
 
 import type { SettingsSectionId } from "./SettingsScreen";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 export interface UseSettingsScreenOptions {
   /** Resolved editor theme, from `useDarkMode().theme`. */
@@ -39,6 +39,8 @@ export interface UseSettingsScreenOptions {
   hint?: boolean;
   /** Delay before the hint appears, in ms. Defaults to 1200. */
   hintDelayMs?: number;
+  /** Host-owned sections appended after Storage (collab, history, …). */
+  extraSections?: ReactNode;
 }
 
 export interface UseSettingsScreenResult {
@@ -55,7 +57,13 @@ export interface UseSettingsScreenResult {
 export const useSettingsScreen = (
   options: UseSettingsScreenOptions = {},
 ): UseSettingsScreenResult => {
-  const { theme = "light", onRestored, hint = true, hintDelayMs } = options;
+  const {
+    theme = "light",
+    onRestored,
+    hint = true,
+    hintDelayMs,
+    extraSections,
+  } = options;
 
   const [openSection, setOpenSection] = useState<
     SettingsSectionId | null | false
@@ -76,9 +84,10 @@ export const useSettingsScreen = (
             theme,
             onRestored,
             initialSection: openSection ?? undefined,
+            extraSections,
           })
         : null,
-    [isOpen, openSection, close, theme, onRestored],
+    [isOpen, openSection, close, theme, onRestored, extraSections],
   );
 
   const firstRunHint = useMemo(

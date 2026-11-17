@@ -48,7 +48,7 @@ import {
   prefersReducedMotion,
   scrollToPage,
 } from "../pages";
-import { getActivePagedView } from "../paged";
+import { getActivePagedView, playPageTurnAnimation } from "../paged";
 
 import {
   PEN_ACTIVE_WINDOW_MS,
@@ -181,7 +181,8 @@ export const attachInputGestures = (
   // facts it needs (stylus down, palm rejected, gesture in flight) already are
   const chrome = createChromeAutoHide({
     document: doc,
-    isEnabled: () => getSettings().autoHideChrome,
+    // Auto-hide removed: chrome (dock, tabs, …) stays visible while writing.
+    isEnabled: () => false,
   });
   const pan = createOneFingerPan(api, {
     window: win,
@@ -381,9 +382,10 @@ export const attachInputGestures = (
       const from = paged.getPageIndex();
       const moved =
         direction === 1
-          ? paged.next({ cause: "swipe" })
-          : paged.prev({ cause: "swipe" });
+          ? paged.next({ animate: true, cause: "swipe" })
+          : paged.prev({ animate: true, cause: "swipe" });
       if (moved) {
+        playPageTurnAnimation(direction);
         options.onGesture?.({
           type: "swipe",
           direction,
@@ -404,6 +406,7 @@ export const attachInputGestures = (
       animate: !prefersReducedMotion(),
     });
     if (moved) {
+      playPageTurnAnimation(direction);
       options.onGesture?.({ type: "swipe", direction, from, to });
     }
     return moved;
@@ -445,6 +448,16 @@ export const attachInputGestures = (
     return true;
   };
 
+  const canOneFingerPageSwipe = (): boolean => {
+    if (!api || api.isDestroyed) {
+      return false;
+    }
+    // one-finger flicks only when we are not mid-ink — otherwise a stroke
+    // start would fight the page turn
+    const type = api.getAppState().activeTool.type;
+    return type === "hand" || type === "selection" || type === "lasso";
+  };
+
   const recogniseSwipe = (now: number): boolean => {
     const settings = getSettings();
     if (!settings.swipePages || !session || session.sawPen) {
@@ -456,7 +469,9 @@ export const attachInputGestures = (
     if (now - lastSwipeAt < SWIPE_COOLDOWN_MS) {
       return false;
     }
-    if (session.maxTouchPointers !== SWIPE_POINTER_COUNT) {
+    const fingers = session.maxTouchPointers;
+    const allowOneFinger = fingers === 1 && canOneFingerPageSwipe();
+    if (fingers !== SWIPE_POINTER_COUNT && !allowOneFinger) {
       return false;
     }
     const duration = now - session.startedAt;

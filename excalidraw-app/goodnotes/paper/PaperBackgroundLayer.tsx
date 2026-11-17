@@ -17,7 +17,11 @@ import type { ExcalidrawElement } from "@excalidraw/element/types";
 import { PAGE_FRAME_PREFIX } from "../types";
 
 import { getPageImageBackground, onPageImageReady } from "./pageImages";
-import { PAPER_TEMPLATES, renderPaper } from "./templates";
+import {
+  PAPER_TEMPLATES,
+  renderPaper,
+  rulingOpacityForZoom,
+} from "./templates";
 
 import "./PaperBackgroundLayer.scss";
 
@@ -251,6 +255,7 @@ export const PaperBackgroundLayer = (props: PaperBackgroundLayerProps) => {
       renderPaper(ctx, templateId, page.width, page.height, {
         theme: currentTheme,
         image,
+        rulingOpacity: rulingOpacityForZoom(z),
       });
       ctx.restore();
     }

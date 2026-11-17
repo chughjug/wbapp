@@ -62,11 +62,6 @@ const ROWS: Row[] = [
     hint: "Two-finger tap undoes, three-finger tap redoes. Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z keep working.",
   },
   {
-    key: "autoHideChrome",
-    label: "Hide the toolbars while writing",
-    hint: "The bars fade out when a stroke starts and come back on a tap, on any pointer that is not drawing, or as soon as anything is focused. They never hide while a menu, a dialog or a text field is open.",
-  },
-  {
     key: "hoverPreview",
     label: "Stylus hover preview",
     hint: "Shows where the nib will land while the stylus hovers — only on hardware that reports hover.",

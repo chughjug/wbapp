@@ -53,6 +53,8 @@ export {
   getPaperPalette,
   /** Draw sheet + (image) + rulings + border into an already-placed ctx. */
   renderPaper,
+  /** Zoom → ruling opacity (Quickdraw-style fade). */
+  rulingOpacityForZoom,
   /** `renderPaper` that reads ruling AND image background off a page frame. */
   renderPaperForFrame,
   /** Geometry constants, exported for callers that need to align to them. */

@@ -3,13 +3,13 @@
  * it.
  *
  * Layout
- *   [ Due soon        — deadline cards, soonest first ]   <- Canvas only
- *   [ Your courses    — notebooks + Canvas work       ]   <- Canvas only
- *   [ <Shelf/>        — the home screen               ]   <- always
+ *   [ Up next         — deadline timeline, soonest first ]  <- Canvas only
+ *   [ Your courses    — quiet course chips               ]  <- Canvas only
+ *   [ <Shelf/>        — the home screen                  ]  <- always
  *
  * DEGRADING GRACEFULLY IS THE DESIGN, NOT A FALLBACK.
  * With no Canvas connection the top region is not rendered at all: no strip,
- * no course cards, no empty states, no error, no spinner, no request. What
+ * no course chips, no empty states, no error, no spinner, no request. What
  * remains is the library — which already has its own due dates, its own
  * "Due this week" filter and its own course folders — plus one dismissible
  * sentence inviting the user to connect. That screen is complete on its own
