@@ -181,7 +181,8 @@ export const attachInputGestures = (
   // facts it needs (stylus down, palm rejected, gesture in flight) already are
   const chrome = createChromeAutoHide({
     document: doc,
-    isEnabled: () => getSettings().autoHideChrome,
+    // Auto-hide removed: chrome (dock, tabs, …) stays visible while writing.
+    isEnabled: () => false,
   });
   const pan = createOneFingerPan(api, {
     window: win,

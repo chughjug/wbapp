@@ -34,10 +34,9 @@ export interface InputSettings {
   /** Show a nib-sized dot under a hovering stylus (if the browser reports hover). */
   hoverPreview: boolean;
   /**
-   * Fade the editor chrome out while a stroke is being drawn, and bring it
-   * back on a tap, on any pointer that is not drawing, or on keyboard focus.
-   * Never hides while a menu or dialog is open, while a text field has focus,
-   * or while the user is navigating by keyboard. See `chromeVisibility.ts`.
+   * Formerly: fade chrome while writing. Auto-hide is removed — this flag is
+   * kept on the settings object for storage compatibility and is always forced
+   * off in {@link coerce}.
    */
   autoHideChrome: boolean;
 }
@@ -49,7 +48,7 @@ export const DEFAULT_INPUT_SETTINGS: InputSettings = {
   swipePages: true,
   tapGestures: true,
   hoverPreview: true,
-  autoHideChrome: true,
+  autoHideChrome: false,
 };
 
 export const INPUT_SETTINGS_STORAGE_KEY = "goodnotes:input-settings";
@@ -68,6 +67,8 @@ const coerce = (raw: unknown): InputSettings => {
       }
     },
   );
+  // Auto-hide was removed: never honour a persisted "on" from older builds.
+  next.autoHideChrome = false;
   return next;
 };
 
