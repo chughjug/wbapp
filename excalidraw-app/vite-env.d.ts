@@ -38,6 +38,9 @@ interface ImportMetaEnv {
 
   VITE_APP_GIT_SHA: string;
 
+  /** Heroku (or local) URL for iPad ↔ Chrome extension Canvas sync. */
+  VITE_CANVAS_BRIDGE_URL?: string;
+
   MODE: string;
 
   DEV: string;

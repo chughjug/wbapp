@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>wbapp Canvas Bridge</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Canvas Bridge</h1>
+      <p class="lede">
+        Keep this extension open with Canvas logged in. Enter the code on your
+        iPad to sync course data — no access token.
+      </p>
+    </header>
+
+    <section class="pair">
+      <div class="label">Pairing code</div>
+      <div id="pairCode" class="code" aria-live="polite">······</div>
+      <button type="button" id="copyCode" class="secondary">Copy code</button>
+      <button type="button" id="newCode" class="secondary">New code</button>
+    </section>
+
+    <section class="status" aria-live="polite">
+      <div><span class="k">Status</span> <span id="status">…</span></div>
+      <div><span class="k">Canvas</span> <span id="canvasHost">—</span></div>
+      <p id="error" class="error" hidden></p>
+    </section>
+
+    <section class="settings">
+      <label for="bridgeUrl">Bridge URL (Heroku)</label>
+      <input id="bridgeUrl" type="url" spellcheck="false" />
+      <button type="button" id="saveUrl" class="primary">
+        Save &amp; reconnect
+      </button>
+    </section>
+
+    <footer>
+      <button type="button" id="refresh" class="secondary">Refresh now</button>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

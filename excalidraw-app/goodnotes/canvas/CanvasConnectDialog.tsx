@@ -16,12 +16,15 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { BridgePairPanel } from "./bridge";
 import { useCanvasConnection } from "./useCanvasConnection";
 
 import "./canvas.scss";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+type ConnectTab = "bridge" | "token";
 
 export interface CanvasConnectDialogProps {
   /** Called on Escape, backdrop click, Cancel, or Done. */
@@ -31,6 +34,8 @@ export interface CanvasConnectDialogProps {
   /** Fired after the stored token is forgotten. */
   onDisconnected?: () => void;
   theme?: "light" | "dark";
+  /** Prefer laptop-extension pairing (default) or access-token form. */
+  initialTab?: ConnectTab;
 }
 
 export const CanvasConnectDialog: React.FC<CanvasConnectDialogProps> = ({
@@ -38,10 +43,12 @@ export const CanvasConnectDialog: React.FC<CanvasConnectDialogProps> = ({
   onConnected,
   onDisconnected,
   theme,
+  initialTab = "bridge",
 }) => {
   const { connection, isChecking, error, connect, disconnect, clearError } =
     useCanvasConnection();
 
+  const [tab, setTab] = useState<ConnectTab>(initialTab);
   const [host, setHost] = useState(connection?.host ?? "");
   const [token, setToken] = useState("");
   const [successName, setSuccessName] = useState<string | null>(null);
@@ -181,166 +188,228 @@ export const CanvasConnectDialog: React.FC<CanvasConnectDialogProps> = ({
         </div>
 
         <p className="gn-canvas-lede">
-          Pull your courses, deadlines and course files in, so you don’t retype
-          them. Everything this app does with Canvas is read-only.
+          Pull courses, deadlines and files onto this device. Prefer the laptop
+          Chrome extension on iPad — no access token required.
         </p>
 
-        {/* The warning. Up front, not a footnote. */}
-        <section
-          id={warningId}
-          className="gn-canvas-warning"
-          aria-labelledby={`${warningId}-title`}
+        <div
+          className="gn-canvas-mode-tabs"
+          role="tablist"
+          aria-label="How to connect Canvas"
         >
-          <h3 id={`${warningId}-title`} className="gn-canvas-warning__title">
-            <span aria-hidden="true" className="gn-canvas-warning__glyph">
-              !
-            </span>
-            Read this before you paste a token
-          </h3>
-          <ul className="gn-canvas-warning__list">
-            <li>
-              <strong>
-                A Canvas access token cannot be limited to read-only.
-              </strong>{" "}
-              Canvas offers no scopes for personal tokens, so the one you paste
-              carries the <strong>full access of your Canvas account</strong> —
-              anything you can do in Canvas, that token can do.
-            </li>
-            <li>
-              <strong>It is stored in this browser</strong> (localStorage on
-              this device) and sent with each request to this app’s own
-              read-only relay. It is never sent anywhere else, and never to a
-              third party.
-            </li>
-            <li>
-              <strong>This app only reads</strong> your courses, assignments and
-              course files. It never submits work, posts, or changes anything in
-              Canvas.
-            </li>
-            <li>
-              <strong>You can revoke it at any time</strong> in Canvas under{" "}
-              <strong>Account → Settings → Approved Integrations</strong>.
-              Revoking takes effect immediately and breaks nothing here except
-              this connection.
-            </li>
-          </ul>
-        </section>
+          <button
+            type="button"
+            role="tab"
+            id={`${titleId}-tab-bridge`}
+            aria-selected={tab === "bridge"}
+            className={`gn-canvas-mode-tab${
+              tab === "bridge" ? " gn-canvas-mode-tab--active" : ""
+            }`}
+            onClick={() => setTab("bridge")}
+          >
+            Laptop extension
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id={`${titleId}-tab-token`}
+            aria-selected={tab === "token"}
+            className={`gn-canvas-mode-tab${
+              tab === "token" ? " gn-canvas-mode-tab--active" : ""
+            }`}
+            onClick={() => setTab("token")}
+          >
+            Access token
+          </button>
+        </div>
 
-        <form className="gn-canvas-form" onSubmit={onSubmit}>
-          <div className="gn-canvas-field">
-            <label htmlFor={hostId}>Canvas address</label>
-            <input
-              ref={firstFieldRef}
-              id={hostId}
-              className="gn-canvas-input"
-              type="text"
-              inputMode="url"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="your-school.instructure.com"
-              value={host}
-              onChange={(event) => {
-                setHost(event.target.value);
-                clearError();
-              }}
-              aria-describedby={error ? `${hostHintId} ${errorId}` : hostHintId}
+        {tab === "bridge" ? (
+          <>
+            <BridgePairPanel
+              onPaired={() => onConnected?.("Laptop bridge")}
+              onSynced={() => onConnected?.("Laptop bridge")}
             />
-            <p id={hostHintId} className="gn-canvas-hint">
-              The host only — no https:// and no path.
-            </p>
-          </div>
-
-          <div className="gn-canvas-field">
-            <label htmlFor={tokenId}>Access token</label>
-            <input
-              id={tokenId}
-              className="gn-canvas-input"
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="Paste your Canvas access token"
-              value={token}
-              onChange={(event) => {
-                setToken(event.target.value);
-                clearError();
-              }}
-              aria-describedby={describedBy}
-            />
-            <p id={tokenHintId} className="gn-canvas-hint">
-              Create one in Canvas: <strong>Account → Settings</strong>, scroll
-              to <strong>Approved Integrations</strong>, then{" "}
-              <strong>+ New Access Token</strong>. The same page is where you
-              revoke it.
-            </p>
-          </div>
-
-          {error ? (
-            <p id={errorId} className="gn-canvas-alert" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          {successName ? (
-            <p className="gn-canvas-success" role="status">
-              Connected as <strong>{successName}</strong>.
-            </p>
-          ) : null}
-
-          <div className="gn-canvas-status" aria-live="polite" id={statusId}>
-            {isChecking ? "Checking with Canvas…" : ""}
-          </div>
-
-          <div className="gn-canvas-actions">
-            {connection ? (
+            <div className="gn-canvas-actions">
+              <span className="gn-canvas-actions__spacer" />
               <button
                 type="button"
                 className="gn-canvas-button gn-canvas-button--quiet"
-                onClick={onDisconnect}
-              >
-                Disconnect
-              </button>
-            ) : null}
-            <span className="gn-canvas-actions__spacer" />
-            <button
-              type="button"
-              className="gn-canvas-button gn-canvas-button--quiet"
-              onClick={onClose}
-            >
-              {successName ? "Close" : "Cancel"}
-            </button>
-            {successName ? (
-              <button
-                ref={doneButtonRef}
-                type="button"
-                className="gn-canvas-button gn-canvas-button--primary"
                 onClick={onClose}
               >
-                Done
+                Close
               </button>
-            ) : (
-              <button
-                type="submit"
-                className="gn-canvas-button gn-canvas-button--primary"
-                disabled={isChecking}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* The warning. Up front, not a footnote. */}
+            <section
+              id={warningId}
+              className="gn-canvas-warning"
+              aria-labelledby={`${warningId}-title`}
+            >
+              <h3
+                id={`${warningId}-title`}
+                className="gn-canvas-warning__title"
               >
-                {isChecking ? "Checking…" : "Connect"}
-              </button>
-            )}
-          </div>
-        </form>
+                <span aria-hidden="true" className="gn-canvas-warning__glyph">
+                  !
+                </span>
+                Read this before you paste a token
+              </h3>
+              <ul className="gn-canvas-warning__list">
+                <li>
+                  <strong>
+                    A Canvas access token cannot be limited to read-only.
+                  </strong>{" "}
+                  Canvas offers no scopes for personal tokens, so the one you
+                  paste carries the{" "}
+                  <strong>full access of your Canvas account</strong> — anything
+                  you can do in Canvas, that token can do.
+                </li>
+                <li>
+                  <strong>It is stored in this browser</strong> (localStorage on
+                  this device) and sent with each request to this app’s own
+                  read-only relay. It is never sent anywhere else, and never to
+                  a third party.
+                </li>
+                <li>
+                  <strong>This app only reads</strong> your courses, assignments
+                  and course files. It never submits work, posts, or changes
+                  anything in Canvas.
+                </li>
+                <li>
+                  <strong>You can revoke it at any time</strong> in Canvas under{" "}
+                  <strong>Account → Settings → Approved Integrations</strong>.
+                  Revoking takes effect immediately and breaks nothing here
+                  except this connection.
+                </li>
+              </ul>
+            </section>
 
-        {connection && !successName ? (
-          <p className="gn-canvas-foot">
-            Currently connected to <strong>{connection.host}</strong>
-            {connection.userName ? (
-              <>
-                {" "}
-                as <strong>{connection.userName}</strong>
-              </>
+            <form className="gn-canvas-form" onSubmit={onSubmit}>
+              <div className="gn-canvas-field">
+                <label htmlFor={hostId}>Canvas address</label>
+                <input
+                  ref={firstFieldRef}
+                  id={hostId}
+                  className="gn-canvas-input"
+                  type="text"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="your-school.instructure.com"
+                  value={host}
+                  onChange={(event) => {
+                    setHost(event.target.value);
+                    clearError();
+                  }}
+                  aria-describedby={
+                    error ? `${hostHintId} ${errorId}` : hostHintId
+                  }
+                />
+                <p id={hostHintId} className="gn-canvas-hint">
+                  The host only — no https:// and no path.
+                </p>
+              </div>
+
+              <div className="gn-canvas-field">
+                <label htmlFor={tokenId}>Access token</label>
+                <input
+                  id={tokenId}
+                  className="gn-canvas-input"
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="Paste your Canvas access token"
+                  value={token}
+                  onChange={(event) => {
+                    setToken(event.target.value);
+                    clearError();
+                  }}
+                  aria-describedby={describedBy}
+                />
+                <p id={tokenHintId} className="gn-canvas-hint">
+                  Create one in Canvas: <strong>Account → Settings</strong>,
+                  scroll to <strong>Approved Integrations</strong>, then{" "}
+                  <strong>+ New Access Token</strong>. The same page is where
+                  you revoke it.
+                </p>
+              </div>
+
+              {error ? (
+                <p id={errorId} className="gn-canvas-alert" role="alert">
+                  {error}
+                </p>
+              ) : null}
+
+              {successName ? (
+                <p className="gn-canvas-success" role="status">
+                  Connected as <strong>{successName}</strong>.
+                </p>
+              ) : null}
+
+              <div
+                className="gn-canvas-status"
+                aria-live="polite"
+                id={statusId}
+              >
+                {isChecking ? "Checking with Canvas…" : ""}
+              </div>
+
+              <div className="gn-canvas-actions">
+                {connection ? (
+                  <button
+                    type="button"
+                    className="gn-canvas-button gn-canvas-button--quiet"
+                    onClick={onDisconnect}
+                  >
+                    Disconnect
+                  </button>
+                ) : null}
+                <span className="gn-canvas-actions__spacer" />
+                <button
+                  type="button"
+                  className="gn-canvas-button gn-canvas-button--quiet"
+                  onClick={onClose}
+                >
+                  {successName ? "Close" : "Cancel"}
+                </button>
+                {successName ? (
+                  <button
+                    ref={doneButtonRef}
+                    type="button"
+                    className="gn-canvas-button gn-canvas-button--primary"
+                    onClick={onClose}
+                  >
+                    Done
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="gn-canvas-button gn-canvas-button--primary"
+                    disabled={isChecking}
+                  >
+                    {isChecking ? "Checking…" : "Connect"}
+                  </button>
+                )}
+              </div>
+            </form>
+
+            {connection && !successName ? (
+              <p className="gn-canvas-foot">
+                Currently connected to <strong>{connection.host}</strong>
+                {connection.userName ? (
+                  <>
+                    {" "}
+                    as <strong>{connection.userName}</strong>
+                  </>
+                ) : null}
+                . Pasting a new token replaces it.
+              </p>
             ) : null}
-            . Pasting a new token replaces it.
-          </p>
-        ) : null}
+          </>
+        )}
       </div>
     </div>,
     document.body,

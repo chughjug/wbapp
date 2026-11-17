@@ -5,18 +5,14 @@
  * shelf's due dates and course folders fill themselves in, and a course PDF
  * becomes an annotatable document in one step.
  *
- * Two things shape the design:
+ * Two auth paths:
  *
- * 1. Canvas sends no CORS headers and Instructure-hosted instances cannot be
- *    configured to, so the browser cannot call it directly. Requests go
- *    through this app's own relay at /api/canvas/proxy, which is read-only,
- *    allowlists both the destination host and the API path, and refuses
- *    private/link-local addresses.
- * 2. A Canvas personal access token cannot be scoped to read-only, so it
- *    carries the full authority of the account. It lives in localStorage and
- *    is sent per request to our own relay, never to a third party. That is a
- *    stated trade-off, not an oversight: the connect UI must say so, and the
- *    user can revoke the token from Canvas at any time.
+ * 1. **Laptop Chrome extension (preferred on iPad)** — pair with a 6-character
+ *    code; the extension uses the logged-in Canvas session and a Heroku relay
+ *    (`canvas-bridge/`) so no access token is stored on the iPad.
+ * 2. **Personal access token** — Canvas sends no CORS headers, so requests go
+ *    through `/api/canvas/proxy`. A PAT cannot be scoped to read-only; the
+ *    connect UI states that trade-off up front.
  */
 
 export {
@@ -127,3 +123,25 @@ export {
   TOKEN_SETTINGS_PATH,
 } from "./errors";
 export type { CanvasErrorContext } from "./errors";
+
+// ---------------------------------------------------------------------------
+// Laptop Chrome extension bridge (no access token)
+// ---------------------------------------------------------------------------
+
+export {
+  BridgePairPanel,
+  joinBridgeRoom,
+  runBridgeSync,
+  applyBridgePayload,
+  isBridgePaired,
+  loadBridgeSession,
+  clearBridgeSession,
+  getBridgeUrl,
+  setBridgeUrlOverride,
+} from "./bridge";
+export type {
+  BridgePairPanelProps,
+  BridgeSession,
+  BridgePayload,
+  BridgeImportResult,
+} from "./bridge";

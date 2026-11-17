@@ -98,6 +98,16 @@ Object.defineProperty(window, "EXCALIDRAW_ASSET_PATH", {
   value: `file://${__dirname}/`,
 });
 
+// After vi.mock hoists settle: stroke modeler point counts/floats vary across
+// CI vs local, so snapshot suites use the raw coalesced path. Modeler keeps its
+// own dedicated unit tests.
+beforeAll(async () => {
+  const { setUseStrokeModeler } = await import(
+    "./packages/element/src/inkFeel"
+  );
+  setUseStrokeModeler(false);
+});
+
 // mock the font fetch only, so that everything else, as font subsetting, can run inside of the (snapshot) tests
 vi.mock(
   "./packages/excalidraw/fonts/ExcalidrawFontFace",

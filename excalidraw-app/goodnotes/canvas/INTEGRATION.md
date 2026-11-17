@@ -2,7 +2,12 @@
 
 Connect a student's Canvas instance, browse one course at a time, turn an assignment into a notebook and a course PDF into annotatable pages.
 
-**Nothing to install.** `pdfjs-dist` is already installed and configured at app startup (`excalidraw-app/index.tsx` calls `configurePdfjs`), and the read-only relay (`api/canvas/proxy.ts`) is already in the repo.
+## Two ways to connect
+
+1. **Laptop Chrome extension (recommended on iPad)** — load `chrome-extension/canvas-bridge`, keep Canvas logged in, enter the pairing code in **Connect Canvas → Laptop extension**. Course data is pulled through the Heroku relay in `canvas-bridge/` (`VITE_CANVAS_BRIDGE_URL`). No access token on the iPad.
+2. **Access token** — classic PAT + `/api/canvas/proxy` path (see warning copy in the dialog).
+
+**Nothing else to install for the token path.** `pdfjs-dist` is already configured at app startup, and the read-only relay (`api/canvas/proxy.ts`) is in the repo.
 
 > **The relay only runs on Vercel.** `/api/canvas/proxy` is a serverless function; the Vite dev server does not serve it. On `yarn start` every Canvas call fails with `CanvasError { kind: "network" }`, and the UI says so in those words ("the relay only runs on the deployed app"). That is expected locally, not a bug to chase.
 

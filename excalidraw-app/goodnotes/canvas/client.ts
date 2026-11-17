@@ -7,6 +7,13 @@
  * guards on that endpoint.
  */
 
+import {
+  bridgeAssignmentsAsCanvas,
+  bridgeCoursesAsCanvas,
+  bridgeFilesAsCanvas,
+  loadCoursePayload,
+} from "./bridge/cache";
+import { loadBridgeSession } from "./bridge/session";
 import { loadCanvasConnection } from "./connection";
 
 import type { CanvasConnection } from "./connection";
@@ -156,6 +163,18 @@ const requestAll = async <T>(
   return out;
 };
 
+const requireTokenOrThrow = () => {
+  const connection = loadCanvasConnection();
+  if (!connection) {
+    throw new CanvasError(
+      "Canvas is not connected.",
+      undefined,
+      "not-connected",
+    );
+  }
+  return connection;
+};
+
 /** Verify a connection and return the account name. Used by the connect UI. */
 export const checkCanvasConnection = async (
   connection: CanvasConnection,
@@ -168,30 +187,88 @@ export const checkCanvasConnection = async (
   return data.name ?? data.short_name ?? "Canvas user";
 };
 
-export const listCourses = () =>
-  requestAll<CanvasCourse>("courses", {
-    enrollment_state: "active",
-    include: "term",
-  });
-
-export const listAssignments = (courseId: string) =>
-  requestAll<CanvasAssignment>(`courses/${courseId}/assignments`, {
-    order_by: "due_at",
-  });
-
-export const listCourseFiles = (courseId: string) =>
-  requestAll<CanvasFile>(`courses/${courseId}/files`, { sort: "updated_at" });
-
-/** A single file record, whose `url` is a short-lived direct download. */
-export const getFile = async (fileId: string): Promise<CanvasFile> => {
-  const connection = loadCanvasConnection();
-  if (!connection) {
+export const listCourses = async (): Promise<CanvasCourse[]> => {
+  if (loadCanvasConnection()) {
+    return requestAll<CanvasCourse>("courses", {
+      enrollment_state: "active",
+      include: "term",
+    });
+  }
+  if (loadBridgeSession()) {
+    const cached = bridgeCoursesAsCanvas();
+    if (cached.length > 0) {
+      return cached;
+    }
     throw new CanvasError(
-      "Canvas is not connected.",
+      "Paired with your laptop, but no courses yet. Sync the course list from Connect Canvas → Laptop extension.",
       undefined,
       "not-connected",
     );
   }
+  throw new CanvasError("Canvas is not connected.", undefined, "not-connected");
+};
+
+export const listAssignments = async (
+  courseId: string,
+): Promise<CanvasAssignment[]> => {
+  if (loadCanvasConnection()) {
+    return requestAll<CanvasAssignment>(`courses/${courseId}/assignments`, {
+      order_by: "due_at",
+    });
+  }
+  if (loadBridgeSession()) {
+    if (!loadCoursePayload(courseId)) {
+      throw new CanvasError(
+        "This course isn’t on the iPad yet. Pull it from Connect Canvas → Laptop extension.",
+        undefined,
+        "not-found",
+      );
+    }
+    return bridgeAssignmentsAsCanvas(courseId);
+  }
+  throw new CanvasError("Canvas is not connected.", undefined, "not-connected");
+};
+
+export const listCourseFiles = async (
+  courseId: string,
+): Promise<CanvasFile[]> => {
+  if (loadCanvasConnection()) {
+    return requestAll<CanvasFile>(`courses/${courseId}/files`, {
+      sort: "updated_at",
+    });
+  }
+  if (loadBridgeSession()) {
+    if (!loadCoursePayload(courseId)) {
+      throw new CanvasError(
+        "This course isn’t on the iPad yet. Pull it from Connect Canvas → Laptop extension.",
+        undefined,
+        "not-found",
+      );
+    }
+    return bridgeFilesAsCanvas(courseId);
+  }
+  throw new CanvasError("Canvas is not connected.", undefined, "not-connected");
+};
+
+/** A single file record, whose `url` is a short-lived direct download. */
+export const getFile = async (fileId: string): Promise<CanvasFile> => {
+  if (loadBridgeSession() && !loadCanvasConnection()) {
+    const courses = bridgeCoursesAsCanvas();
+    for (const course of courses) {
+      const files = bridgeFilesAsCanvas(course.id);
+      const hit = files.find((f) => f.id === fileId);
+      if (hit) {
+        return hit;
+      }
+    }
+    // course may be cached without being in the courses list
+    throw new CanvasError(
+      "That file isn’t in the last laptop sync.",
+      404,
+      "not-found",
+    );
+  }
+  const connection = requireTokenOrThrow();
   const { data } = await requestPage<CanvasFile>(
     `files/${fileId}`,
     {},
