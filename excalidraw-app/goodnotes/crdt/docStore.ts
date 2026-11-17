@@ -107,7 +107,9 @@ export const listSnapshots = (handle: CrdtDocHandle): CrdtSnapshot[] => {
     }
   });
   // newest first; `id` breaks ties when two snaps share a millisecond
-  return out.sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : -1));
+  return out.sort(
+    (a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : -1),
+  );
 };
 
 /** Strictly increasing clock so rapid appends still sort newest-first. */
