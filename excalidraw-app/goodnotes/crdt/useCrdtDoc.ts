@@ -25,7 +25,9 @@ export interface UseCrdtDocResult {
   refresh: () => void;
 }
 
-export const useCrdtDoc = (docId: string | null | undefined): UseCrdtDocResult => {
+export const useCrdtDoc = (
+  docId: string | null | undefined,
+): UseCrdtDocResult => {
   const handleRef = useRef<CrdtDocHandle | null>(null);
   const [ready, setReady] = useState(false);
   const [role, setRoleState] = useState<CrdtRole>("owner");

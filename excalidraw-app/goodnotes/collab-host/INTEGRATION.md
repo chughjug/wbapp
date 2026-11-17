@@ -5,7 +5,7 @@ Makes self-hosted [excalidraw-room](https://github.com/excalidraw/excalidraw-roo
 ```tsx
 import { CollabHostPanel, getCollabHostStatus } from "./goodnotes/collab-host";
 
-<CollabHostPanel theme={editorTheme} />
+<CollabHostPanel theme={editorTheme} />;
 ```
 
 Set `VITE_APP_WS_SERVER_URL` to your room server. Live sync still goes through existing `Collab.tsx` / socket.io — this panel is configuration UX only.

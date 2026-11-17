@@ -19,8 +19,10 @@ const crdt = useCrdtDoc(docId);
   role={crdt.role}
   snapshots={crdt.snapshots}
   onRoleChange={crdt.setDocRole}
-  onSaveSnapshot={() => { /* serialize scene → crdt.saveSnapshot */ }}
-/>
+  onSaveSnapshot={() => {
+    /* serialize scene → crdt.saveSnapshot */
+  }}
+/>;
 ```
 
 Self-host live rooms still use `VITE_APP_WS_SERVER_URL` → [excalidraw-room](https://github.com/excalidraw/excalidraw-room).

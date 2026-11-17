@@ -111,10 +111,7 @@ import {
 } from "./goodnotes/library";
 import { CollabHostPanel } from "./goodnotes/collab-host";
 import { HistoryPanel, useCrdtDoc } from "./goodnotes/crdt";
-import {
-  PresentationOverlay,
-  usePresentation,
-} from "./goodnotes/present";
+import { PresentationOverlay, usePresentation } from "./goodnotes/present";
 
 import CustomStats from "./CustomStats";
 import {
@@ -1249,9 +1246,7 @@ const ExcalidrawWrapper = ({
           onUndo={input.undo}
           onRedo={input.redo}
           onAddPage={newPage.open}
-          onShare={() =>
-            setShareDialogState({ isOpen: true, type: "share" })
-          }
+          onShare={() => setShareDialogState({ isOpen: true, type: "share" })}
           pageCount={pages.length}
           currentPage={currentPageNumber ?? undefined}
           moreItems={[

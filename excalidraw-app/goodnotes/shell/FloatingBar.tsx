@@ -103,6 +103,8 @@ import {
   ThemeIcon,
 } from "./icons";
 
+import { BarToolSubmenu } from "./BarToolSubmenu";
+
 import "./FloatingBar.scss";
 
 import type { ReactNode } from "react";
@@ -115,6 +117,7 @@ import type {
   TaskbarShapeId,
   TaskbarToolId,
 } from "../taskbar/model";
+import type { ToolMenuToolId } from "../tool-menu/editor";
 
 /**
  * Body class that hides the Excalidraw chrome this bar replaces: the top
@@ -465,10 +468,7 @@ export interface FloatingBarProps {
    * A control only appears when its host callback exists (e.g. `share` needs
    * `onShare`). Page counter / separators stay visible at every width.
    */
-  pinnedControls?:
-    | readonly FloatingBarPinnedControl[]
-    | "all"
-    | "minimal";
+  pinnedControls?: readonly FloatingBarPinnedControl[] | "all" | "minimal";
 
   /**
    * When true (default), pinned controls are omitted from "+" / "…" so the
@@ -1019,8 +1019,7 @@ export const FloatingBar = ({
     isPinned,
   ]);
 
-  const showPinnedTitle =
-    isPinned("title") && !!documentTitle?.trim();
+  const showPinnedTitle = isPinned("title") && !!documentTitle?.trim();
   const showPinnedText = isPinned("text");
   const showPinnedImage = isPinned("image");
   const showPinnedSticky = isPinned("sticky");
@@ -1207,6 +1206,15 @@ export const FloatingBar = ({
 
   const anchorPlacement = placement === "fixed" ? "fixed" : "floating";
 
+  const submenuTool: ToolMenuToolId | null =
+    activeTool === "pen" ||
+    activeTool === "highlighter" ||
+    activeTool === "eraser" ||
+    activeTool === "shape" ||
+    activeTool === "text"
+      ? activeTool
+      : null;
+
   return (
     <div
       className={`gn-bar-scope gn-bar-scope--${anchorPlacement} excalidraw${
@@ -1214,425 +1222,437 @@ export const FloatingBar = ({
       }${className ? ` ${className}` : ""}`}
       data-testid="goodnotes-navbar"
     >
-      <div
-        ref={barRef}
-        className="gn-bar"
-        data-testid="goodnotes-floating-bar"
-        role="toolbar"
-        aria-label={ariaLabel}
-        aria-orientation="horizontal"
-      >
-        {/* ---- identity ------------------------------------------------- */}
-        {onHome && (
-          <button
-            type="button"
-            ref={registerRef("home")}
-            className="gn-bar__button"
-            data-control="home"
-            tabIndex={tabIndexFor("home")}
-            aria-describedby={titleDescId}
-            title={
-              documentTitle?.trim()
-                ? `All documents — leaves “${documentTitle.trim()}”`
-                : "All documents"
-            }
-            onFocus={() => setFocusId("home")}
-            onClick={onHome}
-          >
-            <HomeIcon />
-            <span className="gn-bar__sr">All documents</span>
-          </button>
-        )}
-        {titleDescId && (
-          <span id={titleDescId} className="gn-bar__sr">
-            {`Open document: ${documentTitle!.trim()}`}
-          </span>
-        )}
-
-        {showPinnedTitle && (
-          <span className="gn-bar__title" title={documentTitle!.trim()}>
-            {documentTitle!.trim()}
-          </span>
-        )}
-
-        {onTogglePagePanel && (
-          <button
-            type="button"
-            id={pagesId}
-            ref={registerRef(pagesId)}
-            className="gn-bar__button gn-bar__button--wide"
-            data-control="pages-panel"
-            tabIndex={tabIndexFor(pagesId)}
-            aria-haspopup="dialog"
-            aria-expanded={!!pagePanelOpen}
-            title={pagesLabel}
-            onFocus={() => setFocusId(pagesId)}
-            onClick={onTogglePagePanel}
-          >
-            <PagesPanelIcon />
-            <span className="gn-bar__sr">{pagesLabel}</span>
-            {typeof pageCount === "number" && pageCount > 0 && (
-              <span className="gn-bar__count" aria-hidden="true">
-                {currentPage ?? 1}/{pageCount}
-              </span>
-            )}
-          </button>
-        )}
-
-        <span
-          className="gn-bar__separator"
-          role="separator"
-          aria-orientation="vertical"
-        />
-
-        {/* ---- the five tools -------------------------------------------- */}
-        {PRIMARY_TOOLS.map((tool) => {
-          const isLassoSlot = tool.id === "lasso" && !!onFuzzySelect;
-          const pressed = isLassoSlot
-            ? !!fuzzySelectActive
-            : activeTool === tool.id;
-          const disabled =
-            readMode || (isLassoSlot ? !!fuzzySelectDisabled : false);
-          const label = isLassoSlot
-            ? "Lasso select (smart selection)"
-            : tool.label;
-          return (
-            <button
-              key={tool.id}
-              type="button"
-              ref={registerRef(tool.id)}
-              className="gn-bar__button gn-bar__button--tool"
-              data-control={tool.id}
-              tabIndex={tabIndexFor(tool.id)}
-              // read mode keeps the toolbar focusable but inert:
-              // `aria-disabled`, never `disabled`, so no tab stop disappears
-              aria-disabled={disabled || undefined}
-              aria-pressed={pressed}
-              title={tool.shortcut ? `${label} (${tool.shortcut})` : label}
-              onFocus={() => setFocusId(tool.id)}
-              onClick={() => {
-                setFocusId(tool.id);
-                setOpenMenu(null);
-                if (disabled) {
-                  return;
-                }
-                if (isLassoSlot) {
-                  onFuzzySelect?.();
-                  return;
-                }
-                selectTool(tool.id);
-              }}
-            >
-              {tool.icon}
-              <span className="gn-bar__sr">{label}</span>
-            </button>
-          );
-        })}
-
-        <button
-          type="button"
-          ref={registerRef(HAND_TOOL.id)}
-          className="gn-bar__button gn-bar__button--tool"
-          data-control={HAND_TOOL.id}
-          tabIndex={tabIndexFor(HAND_TOOL.id)}
-          aria-disabled={readMode || undefined}
-          aria-pressed={handActive}
-          title={`${HAND_TOOL.label} (${HAND_TOOL.shortcut})`}
-          onFocus={() => setFocusId(HAND_TOOL.id)}
-          onClick={() => {
-            setFocusId(HAND_TOOL.id);
-            setOpenMenu(null);
-            toggleHand();
-          }}
+      <div className="gn-bar-stack">
+        <div
+          ref={barRef}
+          className="gn-bar"
+          data-testid="goodnotes-floating-bar"
+          role="toolbar"
+          aria-label={ariaLabel}
+          aria-orientation="horizontal"
         >
-          <HandIcon />
-          <span className="gn-bar__sr">{HAND_TOOL.label}</span>
-        </button>
-
-        <span
-          className="gn-bar__separator"
-          role="separator"
-          aria-orientation="vertical"
-        />
-
-        {/* ---- pinned inserts (always on the bar) -------------------------- */}
-        {showPinnedText && (
-          <button
-            type="button"
-            ref={registerRef("pin-text")}
-            className="gn-bar__button gn-bar__button--tool"
-            data-control="pin-text"
-            tabIndex={tabIndexFor("pin-text")}
-            aria-disabled={readMode || undefined}
-            aria-pressed={activeTool === "text"}
-            title="Text"
-            onFocus={() => setFocusId("pin-text")}
-            onClick={() => {
-              setFocusId("pin-text");
-              setOpenMenu(null);
-              if (!readMode) {
-                selectTool("text");
-              }
-            }}
-          >
-            <TextIcon />
-            <span className="gn-bar__sr">Text</span>
-          </button>
-        )}
-        {showPinnedImage && (
-          <button
-            type="button"
-            ref={registerRef("pin-image")}
-            className="gn-bar__button gn-bar__button--tool"
-            data-control="pin-image"
-            tabIndex={tabIndexFor("pin-image")}
-            aria-disabled={readMode || undefined}
-            aria-pressed={activeTool === "image"}
-            title="Image"
-            onFocus={() => setFocusId("pin-image")}
-            onClick={() => {
-              setFocusId("pin-image");
-              setOpenMenu(null);
-              if (!readMode) {
-                selectTool("image");
-              }
-            }}
-          >
-            <ImageIcon />
-            <span className="gn-bar__sr">Image</span>
-          </button>
-        )}
-        {showPinnedSticky && (
-          <button
-            type="button"
-            ref={registerRef("pin-sticky")}
-            className="gn-bar__button gn-bar__button--tool"
-            data-control="pin-sticky"
-            tabIndex={tabIndexFor("pin-sticky")}
-            aria-disabled={readMode || undefined}
-            aria-pressed={activeTool === "sticky"}
-            title="Sticky note"
-            onFocus={() => setFocusId("pin-sticky")}
-            onClick={() => {
-              setFocusId("pin-sticky");
-              setOpenMenu(null);
-              if (!readMode) {
-                selectTool("sticky");
-              }
-            }}
-          >
-            <StickyIcon />
-            <span className="gn-bar__sr">Sticky note</span>
-          </button>
-        )}
-
-        {/* ---- "+" secondary inserts -------------------------------------- */}
-        {insertSections.length > 0 && (
-          <div className="gn-bar__slot">
+          {/* ---- identity ------------------------------------------------- */}
+          {onHome && (
             <button
               type="button"
-              id={insertId}
-              ref={registerRef(insertId)}
+              ref={registerRef("home")}
               className="gn-bar__button"
-              data-control="insert"
-              tabIndex={tabIndexFor(insertId)}
-              aria-haspopup="menu"
-              aria-expanded={openMenu === "insert"}
-              aria-controls={
-                openMenu === "insert" ? `${insertId}-menu` : undefined
+              data-control="home"
+              tabIndex={tabIndexFor("home")}
+              aria-describedby={titleDescId}
+              title={
+                documentTitle?.trim()
+                  ? `All documents — leaves “${documentTitle.trim()}”`
+                  : "All documents"
               }
-              title="Insert"
-              onFocus={() => setFocusId(insertId)}
-              onClick={() => {
-                setFocusId(insertId);
-                setOpenMenu((open) => (open === "insert" ? null : "insert"));
-              }}
+              onFocus={() => setFocusId("home")}
+              onClick={onHome}
             >
-              <PlusIcon />
-              <span className="gn-bar__sr">Insert — text, shapes and more</span>
+              <HomeIcon />
+              <span className="gn-bar__sr">All documents</span>
             </button>
-            {openMenu === "insert" && (
-              <TaskbarMenu
-                id={`${insertId}-menu`}
-                labelledBy={insertId}
-                sections={insertSections}
-                onClose={(opts) => {
-                  setOpenMenu(null);
-                  if (opts?.restoreFocus !== false) {
-                    buttonRefs.current.get(insertId)?.focus();
-                  }
-                }}
-              />
-            )}
-          </div>
-        )}
+          )}
+          {titleDescId && (
+            <span id={titleDescId} className="gn-bar__sr">
+              {`Open document: ${documentTitle!.trim()}`}
+            </span>
+          )}
 
-        {showPinnedActionCluster && (
+          {showPinnedTitle && (
+            <span className="gn-bar__title" title={documentTitle!.trim()}>
+              {documentTitle!.trim()}
+            </span>
+          )}
+
+          {onTogglePagePanel && (
+            <button
+              type="button"
+              id={pagesId}
+              ref={registerRef(pagesId)}
+              className="gn-bar__button gn-bar__button--wide"
+              data-control="pages-panel"
+              tabIndex={tabIndexFor(pagesId)}
+              aria-haspopup="dialog"
+              aria-expanded={!!pagePanelOpen}
+              title={pagesLabel}
+              onFocus={() => setFocusId(pagesId)}
+              onClick={onTogglePagePanel}
+            >
+              <PagesPanelIcon />
+              <span className="gn-bar__sr">{pagesLabel}</span>
+              {typeof pageCount === "number" && pageCount > 0 && (
+                <span className="gn-bar__count" aria-hidden="true">
+                  {currentPage ?? 1}/{pageCount}
+                </span>
+              )}
+            </button>
+          )}
+
           <span
             className="gn-bar__separator"
             role="separator"
             aria-orientation="vertical"
           />
-        )}
 
-        {showPinnedUndo && (
-          <button
-            type="button"
-            ref={registerRef("pin-undo")}
-            className="gn-bar__button"
-            data-control="pin-undo"
-            tabIndex={tabIndexFor("pin-undo")}
-            disabled={undoDisabled}
-            title="Undo"
-            onFocus={() => setFocusId("pin-undo")}
-            onClick={() => {
-              setFocusId("pin-undo");
-              setOpenMenu(null);
-              onUndo?.();
-            }}
-          >
-            <UndoIcon />
-            <span className="gn-bar__sr">Undo</span>
-          </button>
-        )}
-        {showPinnedRedo && (
-          <button
-            type="button"
-            ref={registerRef("pin-redo")}
-            className="gn-bar__button"
-            data-control="pin-redo"
-            tabIndex={tabIndexFor("pin-redo")}
-            disabled={redoDisabled}
-            title="Redo"
-            onFocus={() => setFocusId("pin-redo")}
-            onClick={() => {
-              setFocusId("pin-redo");
-              setOpenMenu(null);
-              onRedo?.();
-            }}
-          >
-            <RedoIcon />
-            <span className="gn-bar__sr">Redo</span>
-          </button>
-        )}
-        {showPinnedAddPage && (
-          <button
-            type="button"
-            ref={registerRef("pin-add-page")}
-            className="gn-bar__button"
-            data-control="pin-add-page"
-            tabIndex={tabIndexFor("pin-add-page")}
-            disabled={addPageDisabled}
-            title="Add page"
-            onFocus={() => setFocusId("pin-add-page")}
-            onClick={() => {
-              setFocusId("pin-add-page");
-              setOpenMenu(null);
-              onAddPage?.();
-            }}
-          >
-            <AddPageIcon />
-            <span className="gn-bar__sr">Add page</span>
-          </button>
-        )}
-        {showPinnedShare && (
-          <button
-            type="button"
-            ref={registerRef("pin-share")}
-            className="gn-bar__button"
-            data-control="pin-share"
-            tabIndex={tabIndexFor("pin-share")}
-            disabled={shareDisabled}
-            title={shareLabel}
-            onFocus={() => setFocusId("pin-share")}
-            onClick={() => {
-              setFocusId("pin-share");
-              setOpenMenu(null);
-              onShare?.();
-            }}
-          >
-            <ShareIcon />
-            <span className="gn-bar__sr">{shareLabel}</span>
-          </button>
-        )}
-        {showPinnedExport && (
-          <button
-            type="button"
-            ref={registerRef("pin-export")}
-            className="gn-bar__button"
-            data-control="pin-export"
-            tabIndex={tabIndexFor("pin-export")}
-            disabled={exportPdfDisabled}
-            title="Export to PDF"
-            onFocus={() => setFocusId("pin-export")}
-            onClick={() => {
-              setFocusId("pin-export");
-              setOpenMenu(null);
-              onExportPdf?.();
-            }}
-          >
-            <ExportPdfIcon />
-            <span className="gn-bar__sr">Export to PDF</span>
-          </button>
-        )}
-        {showPinnedSearch && (
-          <button
-            type="button"
-            ref={registerRef("pin-search")}
-            className="gn-bar__button"
-            data-control="pin-search"
-            tabIndex={tabIndexFor("pin-search")}
-            title="Search"
-            onFocus={() => setFocusId("pin-search")}
-            onClick={() => {
-              setFocusId("pin-search");
-              setOpenMenu(null);
-              onToggleSearch?.();
-            }}
-          >
-            <SearchIcon />
-            <span className="gn-bar__sr">Search</span>
-          </button>
-        )}
+          {/* ---- the five tools -------------------------------------------- */}
+          {PRIMARY_TOOLS.map((tool) => {
+            const isLassoSlot = tool.id === "lasso" && !!onFuzzySelect;
+            const pressed = isLassoSlot
+              ? !!fuzzySelectActive
+              : activeTool === tool.id;
+            const disabled =
+              readMode || (isLassoSlot ? !!fuzzySelectDisabled : false);
+            const label = isLassoSlot
+              ? "Lasso select (smart selection)"
+              : tool.label;
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                ref={registerRef(tool.id)}
+                className="gn-bar__button gn-bar__button--tool"
+                data-control={tool.id}
+                tabIndex={tabIndexFor(tool.id)}
+                // read mode keeps the toolbar focusable but inert:
+                // `aria-disabled`, never `disabled`, so no tab stop disappears
+                aria-disabled={disabled || undefined}
+                aria-pressed={pressed}
+                title={tool.shortcut ? `${label} (${tool.shortcut})` : label}
+                onFocus={() => setFocusId(tool.id)}
+                onClick={() => {
+                  setFocusId(tool.id);
+                  setOpenMenu(null);
+                  if (disabled) {
+                    return;
+                  }
+                  if (isLassoSlot) {
+                    onFuzzySelect?.();
+                    return;
+                  }
+                  selectTool(tool.id);
+                }}
+              >
+                {tool.icon}
+                <span className="gn-bar__sr">{label}</span>
+              </button>
+            );
+          })}
 
-        {/* ---- "…" document actions ---------------------------------------- */}
-        {moreSections.length > 0 && (
-          <div className="gn-bar__slot">
+          <button
+            type="button"
+            ref={registerRef(HAND_TOOL.id)}
+            className="gn-bar__button gn-bar__button--tool"
+            data-control={HAND_TOOL.id}
+            tabIndex={tabIndexFor(HAND_TOOL.id)}
+            aria-disabled={readMode || undefined}
+            aria-pressed={handActive}
+            title={`${HAND_TOOL.label} (${HAND_TOOL.shortcut})`}
+            onFocus={() => setFocusId(HAND_TOOL.id)}
+            onClick={() => {
+              setFocusId(HAND_TOOL.id);
+              setOpenMenu(null);
+              toggleHand();
+            }}
+          >
+            <HandIcon />
+            <span className="gn-bar__sr">{HAND_TOOL.label}</span>
+          </button>
+
+          <span
+            className="gn-bar__separator"
+            role="separator"
+            aria-orientation="vertical"
+          />
+
+          {/* ---- pinned inserts (always on the bar) -------------------------- */}
+          {showPinnedText && (
             <button
               type="button"
-              id={moreId}
-              ref={registerRef(moreId)}
-              className="gn-bar__button"
-              data-control="more"
-              tabIndex={tabIndexFor(moreId)}
-              aria-haspopup="menu"
-              aria-expanded={openMenu === "more"}
-              aria-controls={openMenu === "more" ? `${moreId}-menu` : undefined}
-              title="Document actions"
-              onFocus={() => setFocusId(moreId)}
+              ref={registerRef("pin-text")}
+              className="gn-bar__button gn-bar__button--tool"
+              data-control="pin-text"
+              tabIndex={tabIndexFor("pin-text")}
+              aria-disabled={readMode || undefined}
+              aria-pressed={activeTool === "text"}
+              title="Text"
+              onFocus={() => setFocusId("pin-text")}
               onClick={() => {
-                setFocusId(moreId);
-                setOpenMenu((open) => (open === "more" ? null : "more"));
+                setFocusId("pin-text");
+                setOpenMenu(null);
+                if (!readMode) {
+                  selectTool("text");
+                }
               }}
             >
-              <MoreIcon />
-              <span className="gn-bar__sr">Document actions</span>
+              <TextIcon />
+              <span className="gn-bar__sr">Text</span>
             </button>
-            {openMenu === "more" && (
-              <TaskbarMenu
-                id={`${moreId}-menu`}
-                labelledBy={moreId}
-                align="end"
-                sections={moreSections}
-                onClose={(opts) => {
-                  setOpenMenu(null);
-                  if (opts?.restoreFocus !== false) {
-                    buttonRefs.current.get(moreId)?.focus();
-                  }
+          )}
+          {showPinnedImage && (
+            <button
+              type="button"
+              ref={registerRef("pin-image")}
+              className="gn-bar__button gn-bar__button--tool"
+              data-control="pin-image"
+              tabIndex={tabIndexFor("pin-image")}
+              aria-disabled={readMode || undefined}
+              aria-pressed={activeTool === "image"}
+              title="Image"
+              onFocus={() => setFocusId("pin-image")}
+              onClick={() => {
+                setFocusId("pin-image");
+                setOpenMenu(null);
+                if (!readMode) {
+                  selectTool("image");
+                }
+              }}
+            >
+              <ImageIcon />
+              <span className="gn-bar__sr">Image</span>
+            </button>
+          )}
+          {showPinnedSticky && (
+            <button
+              type="button"
+              ref={registerRef("pin-sticky")}
+              className="gn-bar__button gn-bar__button--tool"
+              data-control="pin-sticky"
+              tabIndex={tabIndexFor("pin-sticky")}
+              aria-disabled={readMode || undefined}
+              aria-pressed={activeTool === "sticky"}
+              title="Sticky note"
+              onFocus={() => setFocusId("pin-sticky")}
+              onClick={() => {
+                setFocusId("pin-sticky");
+                setOpenMenu(null);
+                if (!readMode) {
+                  selectTool("sticky");
+                }
+              }}
+            >
+              <StickyIcon />
+              <span className="gn-bar__sr">Sticky note</span>
+            </button>
+          )}
+
+          {/* ---- "+" secondary inserts -------------------------------------- */}
+          {insertSections.length > 0 && (
+            <div className="gn-bar__slot">
+              <button
+                type="button"
+                id={insertId}
+                ref={registerRef(insertId)}
+                className="gn-bar__button"
+                data-control="insert"
+                tabIndex={tabIndexFor(insertId)}
+                aria-haspopup="menu"
+                aria-expanded={openMenu === "insert"}
+                aria-controls={
+                  openMenu === "insert" ? `${insertId}-menu` : undefined
+                }
+                title="Insert"
+                onFocus={() => setFocusId(insertId)}
+                onClick={() => {
+                  setFocusId(insertId);
+                  setOpenMenu((open) => (open === "insert" ? null : "insert"));
                 }}
-              />
-            )}
-          </div>
+              >
+                <PlusIcon />
+                <span className="gn-bar__sr">
+                  Insert — text, shapes and more
+                </span>
+              </button>
+              {openMenu === "insert" && (
+                <TaskbarMenu
+                  id={`${insertId}-menu`}
+                  labelledBy={insertId}
+                  sections={insertSections}
+                  onClose={(opts) => {
+                    setOpenMenu(null);
+                    if (opts?.restoreFocus !== false) {
+                      buttonRefs.current.get(insertId)?.focus();
+                    }
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {showPinnedActionCluster && (
+            <span
+              className="gn-bar__separator"
+              role="separator"
+              aria-orientation="vertical"
+            />
+          )}
+
+          {showPinnedUndo && (
+            <button
+              type="button"
+              ref={registerRef("pin-undo")}
+              className="gn-bar__button"
+              data-control="pin-undo"
+              tabIndex={tabIndexFor("pin-undo")}
+              disabled={undoDisabled}
+              title="Undo"
+              onFocus={() => setFocusId("pin-undo")}
+              onClick={() => {
+                setFocusId("pin-undo");
+                setOpenMenu(null);
+                onUndo?.();
+              }}
+            >
+              <UndoIcon />
+              <span className="gn-bar__sr">Undo</span>
+            </button>
+          )}
+          {showPinnedRedo && (
+            <button
+              type="button"
+              ref={registerRef("pin-redo")}
+              className="gn-bar__button"
+              data-control="pin-redo"
+              tabIndex={tabIndexFor("pin-redo")}
+              disabled={redoDisabled}
+              title="Redo"
+              onFocus={() => setFocusId("pin-redo")}
+              onClick={() => {
+                setFocusId("pin-redo");
+                setOpenMenu(null);
+                onRedo?.();
+              }}
+            >
+              <RedoIcon />
+              <span className="gn-bar__sr">Redo</span>
+            </button>
+          )}
+          {showPinnedAddPage && (
+            <button
+              type="button"
+              ref={registerRef("pin-add-page")}
+              className="gn-bar__button"
+              data-control="pin-add-page"
+              tabIndex={tabIndexFor("pin-add-page")}
+              disabled={addPageDisabled}
+              title="Add page"
+              onFocus={() => setFocusId("pin-add-page")}
+              onClick={() => {
+                setFocusId("pin-add-page");
+                setOpenMenu(null);
+                onAddPage?.();
+              }}
+            >
+              <AddPageIcon />
+              <span className="gn-bar__sr">Add page</span>
+            </button>
+          )}
+          {showPinnedShare && (
+            <button
+              type="button"
+              ref={registerRef("pin-share")}
+              className="gn-bar__button"
+              data-control="pin-share"
+              tabIndex={tabIndexFor("pin-share")}
+              disabled={shareDisabled}
+              title={shareLabel}
+              onFocus={() => setFocusId("pin-share")}
+              onClick={() => {
+                setFocusId("pin-share");
+                setOpenMenu(null);
+                onShare?.();
+              }}
+            >
+              <ShareIcon />
+              <span className="gn-bar__sr">{shareLabel}</span>
+            </button>
+          )}
+          {showPinnedExport && (
+            <button
+              type="button"
+              ref={registerRef("pin-export")}
+              className="gn-bar__button"
+              data-control="pin-export"
+              tabIndex={tabIndexFor("pin-export")}
+              disabled={exportPdfDisabled}
+              title="Export to PDF"
+              onFocus={() => setFocusId("pin-export")}
+              onClick={() => {
+                setFocusId("pin-export");
+                setOpenMenu(null);
+                onExportPdf?.();
+              }}
+            >
+              <ExportPdfIcon />
+              <span className="gn-bar__sr">Export to PDF</span>
+            </button>
+          )}
+          {showPinnedSearch && (
+            <button
+              type="button"
+              ref={registerRef("pin-search")}
+              className="gn-bar__button"
+              data-control="pin-search"
+              tabIndex={tabIndexFor("pin-search")}
+              title="Search"
+              onFocus={() => setFocusId("pin-search")}
+              onClick={() => {
+                setFocusId("pin-search");
+                setOpenMenu(null);
+                onToggleSearch?.();
+              }}
+            >
+              <SearchIcon />
+              <span className="gn-bar__sr">Search</span>
+            </button>
+          )}
+
+          {/* ---- "…" document actions ---------------------------------------- */}
+          {moreSections.length > 0 && (
+            <div className="gn-bar__slot">
+              <button
+                type="button"
+                id={moreId}
+                ref={registerRef(moreId)}
+                className="gn-bar__button"
+                data-control="more"
+                tabIndex={tabIndexFor(moreId)}
+                aria-haspopup="menu"
+                aria-expanded={openMenu === "more"}
+                aria-controls={
+                  openMenu === "more" ? `${moreId}-menu` : undefined
+                }
+                title="Document actions"
+                onFocus={() => setFocusId(moreId)}
+                onClick={() => {
+                  setFocusId(moreId);
+                  setOpenMenu((open) => (open === "more" ? null : "more"));
+                }}
+              >
+                <MoreIcon />
+                <span className="gn-bar__sr">Document actions</span>
+              </button>
+              {openMenu === "more" && (
+                <TaskbarMenu
+                  id={`${moreId}-menu`}
+                  labelledBy={moreId}
+                  align="end"
+                  sections={moreSections}
+                  onClose={(opts) => {
+                    setOpenMenu(null);
+                    if (opts?.restoreFocus !== false) {
+                      buttonRefs.current.get(moreId)?.focus();
+                    }
+                  }}
+                />
+              )}
+            </div>
+          )}
+        </div>
+        {!readMode && (
+          <BarToolSubmenu
+            excalidrawAPI={excalidrawAPI}
+            activeTool={submenuTool}
+          />
         )}
       </div>
     </div>

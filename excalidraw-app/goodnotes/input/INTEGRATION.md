@@ -223,21 +223,22 @@ The hand tool used to be a **dead control** in this app, and was correctly left 
   hand-tool drag          378.07 /  21.07        378.07 /  21.07     0.00 px
 ```
 
-Nothing was broken: at the fit zoom the page box is *smaller* than the viewport, so the page lock has nowhere to move the viewport to, and that is the clamp doing its job. The tool simply had nothing to pan.
+Nothing was broken: at the fit zoom the page box is _smaller_ than the viewport, so the page lock has nowhere to move the viewport to, and that is the clamp doing its job. The tool simply had nothing to pan.
 
 Two changes make it real, and they are deliberately in different modules:
 
 1. **Inside the page** — `goodnotes/paged` now installs the lock with `overscroll: PAGED_VIEW_OVERSCROLL_PX` (28 CSS px) instead of `false`. Nothing in this module is involved: the editor's own rubberband and `AppViewport.releaseOverscroll()` do all of it.
-2. **Between pages** — `handPan.ts`, wired into `attachInputGestures`. A hand drag whose travel the viewport demonstrably could *not* consume is an attempt to go somewhere the current page does not reach; past `HAND_PAGE_TURN_PX` (72 CSS px) of such travel, releasing turns the page through `getActivePagedView()`.
+2. **Between pages** — `handPan.ts`, wired into `attachInputGestures`. A hand drag whose travel the viewport demonstrably could _not_ consume is an attempt to go somewhere the current page does not reach; past `HAND_PAGE_TURN_PX` (72 CSS px) of such travel, releasing turns the page through `getActivePagedView()`.
 
 ### It cannot fight the editor
 
-`handPan.ts` **writes nothing to the viewport while the pointer is down.** Its listeners are the same passive, capture-phase `document` listeners the rest of this module uses, and the gesture is resolved on *release* — the same contract as the flick and the taps. The editor's own hand pan stays the only thing moving the viewport during the drag.
+`handPan.ts` **writes nothing to the viewport while the pointer is down.** Its listeners are the same passive, capture-phase `document` listeners the rest of this module uses, and the gesture is resolved on _release_ — the same contract as the flick and the taps. The editor's own hand pan stays the only thing moving the viewport during the drag.
 
 "Unconsumed" is measured, not assumed:
 
 ```ts
-unconsumedTravel(pointerDelta, scrollDelta, zoom) === pointerDelta - scrollDelta * zoom;
+unconsumedTravel(pointerDelta, scrollDelta, zoom) ===
+  pointerDelta - scrollDelta * zoom;
 ```
 
 So while there is anywhere left to pan — zoomed in, mid-page — the figure stays at zero and no page turn can fire however far the user drags.
@@ -250,7 +251,7 @@ So while there is anywhere left to pan — zoomed in, mid-page — the figure st
 | hand drag −300 px, page fitted | page 0 | page 1 | **−838.45 px** |
 | hand drag +300 px | page 1 | page 0 | **+838.45 px** |
 | hand drag (−120, −140) at zoom 2.2698 | — | — | **−120.00 / −140.00 px**, page unchanged |
-| one-finger *touch* hand drag, pencil-only on | — | — | −28.00 px held, then page 0 → 1 |
+| one-finger _touch_ hand drag, pencil-only on | — | — | −28.00 px held, then page 0 → 1 |
 | hand drag (−250, −180), continuous (no constraints) | — | — | **−250.00 / −180.00 px**, no spring-back |
 
 ### Settings

@@ -5,9 +5,10 @@
  * new frame type — notebook pages *are* frames already.
  */
 
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+
 import { scrollToPage } from "../pages/scrollToPage";
 
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import type { Page } from "../types";
 
 export interface PresentationState {

@@ -113,6 +113,10 @@ export type {
   ShellPlacement,
 } from "./FloatingBar";
 
+/** Always-visible tool options strip under the floating bar. */
+export { BarToolSubmenu } from "./BarToolSubmenu";
+export type { BarToolSubmenuProps } from "./BarToolSubmenu";
+
 /**
  * @deprecated The three-zone band is gone. `NavBar` is an alias for
  * {@link FloatingBar} so existing importers keep compiling; `NavBarProps` is

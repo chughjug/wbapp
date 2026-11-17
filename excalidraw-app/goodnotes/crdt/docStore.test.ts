@@ -26,8 +26,8 @@ describe("crdt docStore", () => {
     setRole(handle, "editor");
     expect(readRole(handle)).toBe("editor");
 
-    appendSnapshot(handle, { label: "first", payload: "{\"a\":1}" });
-    appendSnapshot(handle, { label: "second", payload: "{\"a\":2}" });
+    appendSnapshot(handle, { label: "first", payload: '{"a":1}' });
+    appendSnapshot(handle, { label: "second", payload: '{"a":2}' });
 
     const snaps = listSnapshots(handle);
     expect(snaps).toHaveLength(2);

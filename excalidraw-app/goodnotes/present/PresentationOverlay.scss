@@ -1,5 +1,6 @@
 body.gn-presenting {
-  .gn-bar-scope,
+  /* Keep the floating bar + under-bar tool submenu reachable in present
+     mode; only hide the secondary chrome that crowds the stage. */
   .gn-tool-menu,
   .gn-tab-bar,
   .gn-page-panel {

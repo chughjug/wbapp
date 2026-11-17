@@ -35,6 +35,8 @@ import type { ElementsMap, ExcalidrawElement } from "@excalidraw/element/types";
 
 import { AnimatedTrail } from "../animatedTrail";
 
+import { getEraserRadius } from "./size";
+
 import type App from "../components/App";
 
 export class EraserTrail extends AnimatedTrail {
@@ -57,8 +59,10 @@ export class EraserTrail extends AnimatedTrail {
           (DECAY_LENGTH -
             Math.min(DECAY_LENGTH, c.totalLength - c.currentIndex)) /
           DECAY_LENGTH;
+        // scale the trail blob with the chosen brush so Large/XL read larger
+        const brushScale = Math.max(0.6, getEraserRadius() / 15);
 
-        return Math.min(easeOut(l), easeOut(t));
+        return Math.min(easeOut(l), easeOut(t)) * brushScale;
       },
       fill: () =>
         app.state.theme === THEME.LIGHT
@@ -200,9 +204,12 @@ const eraserTest = (
   zoom: number,
 ): boolean => {
   const lastPoint = pathSegment[1];
+  const brushRadius = getEraserRadius();
 
   // PERF: Do a quick bounds intersection test first because it's cheap
-  const threshold = isFreeDrawElement(element) ? 15 : element.strokeWidth / 2;
+  const threshold = isFreeDrawElement(element)
+    ? brushRadius
+    : Math.max(element.strokeWidth / 2, brushRadius * 0.35);
   const segmentBounds = [
     Math.min(pathSegment[0][0], pathSegment[1][0]) - threshold,
     Math.min(pathSegment[0][1], pathSegment[1][1]) - threshold,
@@ -241,7 +248,7 @@ const eraserTest = (
       outlinePoints,
       elementsMap,
     );
-    const tolerance = Math.max(2.25, 5 / zoom); // NOTE: Visually fine-tuned approximation
+    const tolerance = Math.max(brushRadius * 0.15, brushRadius / zoom);
 
     for (const seg of strokeSegments) {
       if (lineSegmentsDistance(seg, pathSegment) <= tolerance) {
@@ -271,6 +278,7 @@ const eraserTest = (
     const tolerance = Math.max(
       element.strokeWidth,
       (element.strokeWidth * 2) / zoom,
+      brushRadius * 0.5,
     );
 
     // If the eraser movement is so fast that a large distance is covered

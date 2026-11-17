@@ -1,6 +1,7 @@
 import { CURSOR_TYPE, KEYS, MIME_TYPES, THEME } from "@excalidraw/common";
 
 import { isHandToolActive, isEraserActive } from "../appState";
+import { getEraserSize } from "../eraser/size";
 
 import { bucketFillIconSvgPaths } from "./icons";
 
@@ -49,10 +50,14 @@ export class AppCursor {
     type: AppState["activeTool"]["type"];
     bucketFillColor?: string;
     theme?: AppState["theme"];
+    eraserSizeId?: string;
   } | null = null;
 
   private eraserCanvasCache:
-    | (HTMLCanvasElement & { theme?: AppState["theme"] })
+    | (HTMLCanvasElement & {
+        theme?: AppState["theme"];
+        sizeId?: string;
+      })
     | null = null;
   private eraserPreviewDataURL: DataURL | null = null;
 
@@ -114,12 +119,15 @@ export class AppCursor {
             theme,
           )
         : undefined;
+    const eraserSizeId =
+      activeTool.type === "eraser" ? getEraserSize().id : undefined;
     const memo = this.toolCursorMemo;
     if (
       memo?.canvas === canvas &&
       memo.type === activeTool.type &&
       memo.bucketFillColor === bucketFillColor &&
-      memo.theme === theme
+      memo.theme === theme &&
+      memo.eraserSizeId === eraserSizeId
     ) {
       return;
     }
@@ -157,6 +165,7 @@ export class AppCursor {
       type: activeTool.type,
       bucketFillColor,
       theme,
+      eraserSizeId,
     };
   };
 
@@ -206,13 +215,19 @@ export class AppCursor {
   };
 
   private applyEraser = () => {
-    const cursorImageSizePx = 20;
+    const brush = getEraserSize();
+    const cursorImageSizePx = brush.cursorPx;
     const theme = this.app.state.theme;
 
-    if (!this.eraserCanvasCache || this.eraserCanvasCache.theme !== theme) {
+    if (
+      !this.eraserCanvasCache ||
+      this.eraserCanvasCache.theme !== theme ||
+      this.eraserCanvasCache.sizeId !== brush.id
+    ) {
       const isDarkTheme = theme === THEME.DARK;
       this.eraserCanvasCache = this.app.ownerDocument.createElement("canvas");
       this.eraserCanvasCache.theme = theme;
+      this.eraserCanvasCache.sizeId = brush.id;
       this.eraserCanvasCache.height = cursorImageSizePx;
       this.eraserCanvasCache.width = cursorImageSizePx;
       const context = this.eraserCanvasCache.getContext("2d")!;
@@ -221,7 +236,7 @@ export class AppCursor {
       context.arc(
         this.eraserCanvasCache.width / 2,
         this.eraserCanvasCache.height / 2,
-        5,
+        Math.max(3, cursorImageSizePx / 2 - 2),
         0,
         2 * Math.PI,
       );

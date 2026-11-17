@@ -63,8 +63,8 @@ The `anon` key is designed to be public and ships in the client bundle. What pro
 1. Deploy [excalidraw/excalidraw-room](https://github.com/excalidraw/excalidraw-room) (or a compatible socket.io room server).
 2. In Vercel / `.env.local` set:
 
-   | Name | Value |
-   | --- | --- |
+   | Name                     | Value                              |
+   | ------------------------ | ---------------------------------- |
    | `VITE_APP_WS_SERVER_URL` | `https://your-room-server.example` |
 
 3. Open **Settings → Collaboration** in the app: you should see the server URL and can mint classroom room codes.

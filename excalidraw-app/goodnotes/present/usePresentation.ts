@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
-import {
-  goToPresentationPage,
-  setPresentationChrome,
-} from "./presentation";
-
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+
+import { goToPresentationPage, setPresentationChrome } from "./presentation";
+
 import type { Page } from "../types";
 
 export interface UsePresentationResult {

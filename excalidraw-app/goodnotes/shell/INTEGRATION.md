@@ -6,7 +6,7 @@
 
 ## 0. What changed
 
-Measured on an iPad Pro 11" viewport (1194x834) with a document open, the editor's *permanent* chrome was **28.5%** of the screen across six surfaces. `goodnotes/shell` owned two of the worst — the 189x656 page rail (123,954 px²) and the 1194x52 nav bar — plus, with `goodnotes/tabs`, the 1152x29 tab strip.
+Measured on an iPad Pro 11" viewport (1194x834) with a document open, the editor's _permanent_ chrome was **28.5%** of the screen across six surfaces. `goodnotes/shell` owned two of the worst — the 189x656 page rail (123,954 px²) and the 1194x52 nav bar — plus, with `goodnotes/tabs`, the 1152x29 tab strip.
 
 | before (shell + tabs) | after |
 | --- | --- |
@@ -53,7 +53,7 @@ Three classes ship with the module (`FloatingBar.scss`):
 | `gn-shell-stage` | `position:relative; display:flex; flex:1; min-height:0` — **the positioning context the bar and the overlay anchor to** |
 | `gn-shell-canvas` | `position:relative; flex:1; min-width:0` — the `<Excalidraw>` wrapper |
 
-**`gn-shell-body` is kept as an exact alias of `gn-shell-stage`.** It is now `position: relative`, so if you only move `<FloatingBar>` *inside* your existing `.gn-shell-body` you are already correct and need not rename anything.
+**`gn-shell-body` is kept as an exact alias of `gn-shell-stage`.** It is now `position: relative`, so if you only move `<FloatingBar>` _inside_ your existing `.gn-shell-body` you are already correct and need not rename anything.
 
 ### The one thing you must change
 
@@ -85,111 +85,111 @@ Three classes ship with the module (`FloatingBar.scss`):
 Delete the `<TabBar>` / `<NavBar>` / `<ToolMenu>` / `.gn-shell-body` markup you have today and use this. The three things that moved are marked:
 
 ```tsx
-      {/* the tab strip renders only when more than one document is open */}
-      <TabBar
-        tabs={openDocs.tabs}
-        activeId={openDocs.activeId}
-        theme={editorTheme}
-        onActivate={onActivateTab}
-        onClose={onCloseTab}
-        onReorder={openDocs.actions.reorder}
-        onCloseOthers={openDocs.actions.closeOthers}
-        onNewTab={onNewDocument}
-      />
-      {/* ONE stage: canvas, then the bar and the overlay floating over it */}
-      <div className="gn-shell-stage">
-        <div className="gn-shell-canvas">
-          <PaperBackgroundLayer
-            /* …unchanged… */
-          />
-          <Excalidraw /* …unchanged… */>
-            {/* …unchanged children… */}
-          </Excalidraw>
-        </div>
+{
+  /* the tab strip renders only when more than one document is open */
+}
+<TabBar
+  tabs={openDocs.tabs}
+  activeId={openDocs.activeId}
+  theme={editorTheme}
+  onActivate={onActivateTab}
+  onClose={onCloseTab}
+  onReorder={openDocs.actions.reorder}
+  onCloseOthers={openDocs.actions.closeOthers}
+  onNewTab={onNewDocument}
+/>;
+{
+  /* ONE stage: canvas, then the bar and the overlay floating over it */
+}
+<div className="gn-shell-stage">
+  <div className="gn-shell-canvas">
+    <PaperBackgroundLayer
+    /* …unchanged… */
+    />
+    <Excalidraw /* …unchanged… */>{/* …unchanged children… */}</Excalidraw>
+  </div>
 
-        {/* MOVED: the bar is now a child of the stage, not a band */}
-        <FloatingBar
-          excalidrawAPI={excalidrawAPI}
-          suppressDefaultChrome
-          theme={editorTheme}
-          // ---- identity ----------------------------------------------
-          onHome={onCloseDocument}
-          // NEW: with one document there is no tab strip to carry the title,
-          // so it heads the "…" menu and describes the Home control
-          documentTitle={openDocs.tabs.find((t) => t.id === docId)?.meta?.title}
-          pagePanelOpen={isPagePanelOpen}
-          onTogglePagePanel={() => setIsPagePanelOpen((v) => !v)}
-          pageCount={pages.length}
-          currentPage={currentPageNumber ?? undefined}
-          // ---- tools ---------------------------------------------------
-          onActiveToolMenu={(tool, anchor) => {
-            if (
-              tool === "pen" ||
-              tool === "highlighter" ||
-              tool === "eraser" ||
-              tool === "shape" ||
-              tool === "text"
-            ) {
-              toolMenu.onToolSelect(tool, anchor);
-            }
-          }}
-          onFuzzySelect={() => {
-            backdrops.close();
-            toggleFuzzySelect();
-          }}
-          fuzzySelectActive={isFuzzySelectActive}
-          // ---- "+" (secondary inserts) ---------------------------------
-          onImportPdf={() => {
-            deactivateFuzzySelect();
-            setIsPdfImportOpen(true);
-          }}
-          // MOVED: graph belongs under "+", not in the "…" overflow
-          onInsertGraph={() => graph.open()}
-          // ---- "…" (document actions) ----------------------------------
-          onNewDocument={onNewDocument}
-          onUndo={input.undo}
-          onRedo={input.redo}
-          onAddPage={newPage.open}
-          onExportPdf={() => {
-            deactivateFuzzySelect();
-            setIsPdfExportOpen(true);
-          }}
-          onOpenBackdrops={() => {
-            // the lasso overlay is modal and covers the window
-            deactivateFuzzySelect();
-            backdrops.open();
-          }}
-          backdropsActive={backdrops.isOpen}
-          backdropsDisabled={!backdrops.hasImageSelection}
-          // NEW: this app controls the editor theme itself (goodnotes/dark
-          // feeds <Excalidraw theme={editorTheme}>), so the bar's own
-          // fallback cannot win — wire it explicitly. See §5.
-          onToggleTheme={() =>
-            setAppTheme(editorTheme === "dark" ? "light" : "dark")
-          }
-          moreItems={[
-            {
-              id: "settings",
-              label: "Settings…",
-              onSelect: () => settings.open(),
-            },
-          ]}
-        />
+  {/* MOVED: the bar is now a child of the stage, not a band */}
+  <FloatingBar
+    excalidrawAPI={excalidrawAPI}
+    suppressDefaultChrome
+    theme={editorTheme}
+    // ---- identity ----------------------------------------------
+    onHome={onCloseDocument}
+    // NEW: with one document there is no tab strip to carry the title,
+    // so it heads the "…" menu and describes the Home control
+    documentTitle={openDocs.tabs.find((t) => t.id === docId)?.meta?.title}
+    pagePanelOpen={isPagePanelOpen}
+    onTogglePagePanel={() => setIsPagePanelOpen((v) => !v)}
+    pageCount={pages.length}
+    currentPage={currentPageNumber ?? undefined}
+    // ---- tools ---------------------------------------------------
+    onActiveToolMenu={(tool, anchor) => {
+      if (
+        tool === "pen" ||
+        tool === "highlighter" ||
+        tool === "eraser" ||
+        tool === "shape" ||
+        tool === "text"
+      ) {
+        toolMenu.onToolSelect(tool, anchor);
+      }
+    }}
+    onFuzzySelect={() => {
+      backdrops.close();
+      toggleFuzzySelect();
+    }}
+    fuzzySelectActive={isFuzzySelectActive}
+    // ---- "+" (secondary inserts) ---------------------------------
+    onImportPdf={() => {
+      deactivateFuzzySelect();
+      setIsPdfImportOpen(true);
+    }}
+    // MOVED: graph belongs under "+", not in the "…" overflow
+    onInsertGraph={() => graph.open()}
+    // ---- "…" (document actions) ----------------------------------
+    onNewDocument={onNewDocument}
+    onUndo={input.undo}
+    onRedo={input.redo}
+    onAddPage={newPage.open}
+    onExportPdf={() => {
+      deactivateFuzzySelect();
+      setIsPdfExportOpen(true);
+    }}
+    onOpenBackdrops={() => {
+      // the lasso overlay is modal and covers the window
+      deactivateFuzzySelect();
+      backdrops.open();
+    }}
+    backdropsActive={backdrops.isOpen}
+    backdropsDisabled={!backdrops.hasImageSelection}
+    // NEW: this app controls the editor theme itself (goodnotes/dark
+    // feeds <Excalidraw theme={editorTheme}>), so the bar's own
+    // fallback cannot win — wire it explicitly. See §5.
+    onToggleTheme={() => setAppTheme(editorTheme === "dark" ? "light" : "dark")}
+    moreItems={[
+      {
+        id: "settings",
+        label: "Settings…",
+        onSelect: () => settings.open(),
+      },
+    ]}
+  />
 
-        {/* MOVED: the overlay is a child of the stage and renders nothing
+  {/* MOVED: the overlay is a child of the stage and renders nothing
             at all while closed */}
-        <PagePanel
-          excalidrawAPI={excalidrawAPI}
-          open={isPagePanelOpen}
-          onClose={() => setIsPagePanelOpen(false)}
-          theme={editorTheme}
-          onAddPage={newPage.open}
-          docId={docId ?? undefined}
-        />
+  <PagePanel
+    excalidrawAPI={excalidrawAPI}
+    open={isPagePanelOpen}
+    onClose={() => setIsPagePanelOpen(false)}
+    theme={editorTheme}
+    onAddPage={newPage.open}
+    docId={docId ?? undefined}
+  />
 
-        {/* the active tool's settings — owned by goodnotes/tool-menu */}
-        <ToolMenu {...toolMenu.menuProps} />
-      </div>
+  {/* the active tool's settings — owned by goodnotes/tool-menu */}
+  <ToolMenu {...toolMenu.menuProps} />
+</div>;
 ```
 
 `setAppTheme` already comes out of the `useDarkMode()` call at the top of the component — no new import.
@@ -198,7 +198,7 @@ Everything else in the file (the `PaperBackgroundLayer` props, the `<Excalidraw>
 
 ### 2d. Props that no longer exist
 
-The three-zone band had an inline search field, an inline Write/Read segmented control and an inline `Share` button. Those *capabilities* survive as `onToggleSearch`, `mode`/`onModeChange` and `onShare`/`shareLabel`, now rendered as items in the "…" menu. The band-only props `searchQuery`, `onSearchChange`, `onSearchSubmit` and `searchPlaceholder` are gone. `App.tsx` passes none of them, so nothing to do.
+The three-zone band had an inline search field, an inline Write/Read segmented control and an inline `Share` button. Those _capabilities_ survive as `onToggleSearch`, `mode`/`onModeChange` and `onShare`/`shareLabel`, now rendered as items in the "…" menu. The band-only props `searchQuery`, `onSearchChange`, `onSearchSubmit` and `searchPlaceholder` are gone. `App.tsx` passes none of them, so nothing to do.
 
 ---
 
@@ -229,7 +229,7 @@ Everything the old nav bar exposed, and where it is now. **Nothing became imposs
 | **export PDF** | "…" | "…" → Export to PDF… | 2 → 2 |
 | **backdrops** | "…" | "…" → Image backdrop… (ticked while open) | 2 → 2 |
 | **settings** | "…" (host `moreItems`) | "…" → Settings… (host `moreItems`, unchanged) | 2 → 2 |
-| **theme** | *nowhere* — Excalidraw's hamburger island, which `suppressDefaultChrome` hides | "…" → Dark/Light theme | ∞ → 2 |
+| **theme** | _nowhere_ — Excalidraw's hamburger island, which `suppressDefaultChrome` hides | "…" → Dark/Light theme | ∞ → 2 |
 | share | right zone primary button | "…" → Share (`onShare`; this app passes none, so no item) | 1 → 2 |
 | search | left zone field/button | "…" → Search… (`onToggleSearch`; this app passes none) | 1 → 2 |
 | Write / Read | left zone segmented control | "…" → Read mode (`onModeChange`; this app passes none) | 1 → 2 |
@@ -238,7 +238,7 @@ Everything the old nav bar exposed, and where it is now. **Nothing became imposs
 
 ### Deliberately dropped
 
-1. **The inline search *field*.** Search itself is still reachable (`onToggleSearch` → "…" → Search…), but a 16rem text input cannot live in a 46px pill without the pill becoming a band again. The host's own search UI is the right place for a field.
+1. **The inline search _field_.** Search itself is still reachable (`onToggleSearch` → "…" → Search…), but a 16rem text input cannot live in a 46px pill without the pill becoming a band again. The host's own search UI is the right place for a field.
 2. **The centre cluster's measured overflow solver** (`planOverflow`). With a fixed set of 9 controls there is nothing to solve; the bar is ~380px wide and fits every viewport down to ~400px. `planOverflow` is still exported from `goodnotes/taskbar` for anyone who wants it.
 3. **The `Share` button's "primary" styling.** Share is a menu item now, not a filled button. The capability is intact; the emphasis is not. If Share matters more than this to you, say so and it gets a slot.
 4. **The separate "more tools" overflow menu.** There is one "+" and one "…" instead of three menus.
@@ -252,7 +252,7 @@ Nothing else was dropped.
 Implemented and checked in a browser:
 
 - **The bar is one `role="toolbar"`** with `aria-orientation="horizontal"`: a single tab stop, roving tabindex, Arrow Left/Right to move, Home/End to the ends.
-  - Those keys are bound on the *document* in the capture phase, not as a React handler on the bar. `goodnotes/paged` claims Arrow/Home/End at document capture to turn the page, and its guard is "the target is inside `.excalidraw`" — which the bar's root is, because that is the scope Excalidraw's colour tokens live in. Capturing and calling `preventDefault()` gets the keys back (that controller bails on `defaultPrevented`) without either module reaching into the other.
+  - Those keys are bound on the _document_ in the capture phase, not as a React handler on the bar. `goodnotes/paged` claims Arrow/Home/End at document capture to turn the page, and its guard is "the target is inside `.excalidraw`" — which the bar's root is, because that is the scope Excalidraw's colour tokens live in. Capturing and calling `preventDefault()` gets the keys back (that controller bails on `defaultPrevented`) without either module reaching into the other.
 - **`aria-pressed` on all five tool toggles**, mirrored from `excalidrawAPI.onChange`, so it stays true when a keyboard shortcut or the Active Tool Menu changes the tool. Read mode uses `aria-disabled`, never `disabled`, so the toolbar never loses its tab stop.
 - **Every icon control has a visually-hidden text name** (`.gn-bar__sr`), plus a `title`.
 - **"+" and "…" are real menus**: `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`; `role="menu"` / `role="menuitem"`; focus moves to the first item on open; Escape, Tab, an outside pointerdown and selecting an item all close and return focus to the trigger.
@@ -260,13 +260,13 @@ Implemented and checked in a browser:
 - **`:focus-visible` rings** (`--focus-highlight-color`, 2px, 1px offset) are visible against both themes and against the translucent bar.
 - **`@media (prefers-reduced-motion: reduce)`** removes every transition and both overlay animations.
 - **`@media (forced-colors: active)`** gives the bar a `CanvasText` border, an opaque `Canvas` background and drops the blur.
-- **Colour comes only from Excalidraw's custom properties**, funnelled through local `--gn-bar-*` properties that are redeclared under `.theme--dark`, so even the `var()` fallbacks are theme-correct. `--color-muted` (a *background* grey) and `--keybinding-color` (~1.9:1 on white) are not used. De-emphasised text — the "2/12" counter — uses `--input-label-color` (#495057 light / #e9ecef dark).
+- **Colour comes only from Excalidraw's custom properties**, funnelled through local `--gn-bar-*` properties that are redeclared under `.theme--dark`, so even the `var()` fallbacks are theme-correct. `--color-muted` (a _background_ grey) and `--keybinding-color` (~1.9:1 on white) are not used. De-emphasised text — the "2/12" counter — uses `--input-label-color` (#495057 light / #e9ecef dark).
 
 ### Pointer
 
 A bar floating over the canvas must not swallow drawing. The bar's full-width positioning wrapper (`.gn-bar-scope`) is `pointer-events: none` throughout; only the pill takes pointer events. Verified in a browser: 6px below, 6px above and 10px to the right of the pill all hit-test to `canvas.excalidraw__canvas`, the pill's own centre hit-tests to its button, and a stroke started 10px under the pill draws ink on the page beneath.
 
-While the overlay is open its scrim (z-index 130) is above the bar (125), as a modal's scrim should be. That means the Pages control cannot be *clicked* to close the overlay — Escape, the overlay's close button, and a scrim click (including a click where the Pages control is) all do it.
+While the overlay is open its scrim (z-index 130) is above the bar (125), as a modal's scrim should be. That means the Pages control cannot be _clicked_ to close the overlay — Escape, the overlay's close button, and a scrim click (including a click where the Pages control is) all do it.
 
 ---
 
@@ -326,28 +326,28 @@ Two optional lines, if you want them:
                            ^^ new, last in the tool run
 ```
 
-The bar was cut to ten controls on purpose, so an extra one needs an argument. The test applied to the other five tools was applied here: **can the user afford to reach it through a menu?** No — panning is a *mode* you enter and leave continuously while writing (zoom into a corner, write, shove the paper, write), and a two-tap mode switch through "…" turns that rhythm into a chore. It is also the only control that makes a zoomed-in page navigable with a mouse, a trackpad or a single finger without a modifier key.
+The bar was cut to ten controls on purpose, so an extra one needs an argument. The test applied to the other five tools was applied here: **can the user afford to reach it through a menu?** No — panning is a _mode_ you enter and leave continuously while writing (zoom into a corner, write, shove the paper, write), and a two-tap mode switch through "…" turns that rhythm into a chore. It is also the only control that makes a zoomed-in page navigable with a mouse, a trackpad or a single finger without a modifier key.
 
 It sits **last in the tool run, next to Select**, because Select and Hand are the two non-marking tools: everything to their left leaves ink.
 
 ### What was considered and rejected
 
 - **Putting it in "…"** — rejected above: wrong for a mode.
-- **Moving `lasso` into "…" to keep the count at ten** — rejected. The lasso slot is a *host hook* (`onFuzzySelect` backs it with `goodnotes/fuzzy-select`); demoting it would quietly change a capability this module does not own, to buy 36 px.
+- **Moving `lasso` into "…" to keep the count at ten** — rejected. The lasso slot is a _host hook_ (`onFuzzySelect` backs it with `goodnotes/fuzzy-select`); demoting it would quietly change a capability this module does not own, to buy 36 px.
 - **A long-press on Select** — rejected: an undiscoverable gesture is not a control.
 
 ### Measured cost (Chromium, 1194 × 834, one document open, first-run hint dismissed)
 
 Union of the surfaces that actually paint — `.gn-bar` and Excalidraw's own `zoom-actions` pill — rasterised to a 1 px grid so nothing is double-counted:
 
-| | bar | zoom pill | union | % of 995,796 px² |
+|  | bar | zoom pill | union | % of 995,796 px² |
 | --- | --- | --- | --- | --- |
 | without the Hand control | 380 × 46 | 96 × 36 | 20,936 px² | **2.10%** |
 | with the Hand control | 416 × 46 | 96 × 36 | 22,592 px² | **2.27%** |
 
 **+1,656 px², +0.17 percentage points.** The pill grows 380 → 416 px (the 34 px button plus the 2 px flex gap); it stays centred and still clears a quarter of the viewport width on each side.
 
-> The brief quoted 2.50% as the resting figure and `INTEGRATION.md` § 0 quotes 2.40%; neither method is recorded, so the two numbers above are both taken with the *same* method on the *same* page, which is what makes the delta trustworthy. The absolute figure moves with which surfaces you count (an undo/redo island, a minimap dot, the first-run hint) — the +0.17 pp does not.
+> The brief quoted 2.50% as the resting figure and `INTEGRATION.md` § 0 quotes 2.40%; neither method is recorded, so the two numbers above are both taken with the _same_ method on the _same_ page, which is what makes the delta trustworthy. The absolute figure moves with which surfaces you count (an undo/redo island, a minimap dot, the first-run hint) — the +0.17 pp does not.
 
 ### Keyboard shortcuts — two pre-existing lies in the bar, fixed
 
@@ -355,7 +355,7 @@ Adding a Hand control put a **second `H`** in the bar and exposed something that
 
 | the bar used to say | what the key actually did | now |
 | --- | --- | --- |
-| Pen **(P)** | `p` → `freedraw` ✓ — but it does **not** clear the highlighter marker, so after using the highlighter, `p` left you highlighting | **(P)**, now bound by the bar so it means the Pen *slot*, ink and all |
+| Pen **(P)** | `p` → `freedraw` ✓ — but it does **not** clear the highlighter marker, so after using the highlighter, `p` left you highlighting | **(P)**, now bound by the bar so it means the Pen _slot_, ink and all |
 | Highlighter **(H)** | `h` → **`hand`**. The editor owns `H` (`TOOLS.hand: { letterKey: KEYS.H, toggle: true }`); nothing in this app ever bound it to the highlighter. **This was wrong before the Hand control existed** — the Hand control did not take the key, it made the collision visible | **(⇧P)** — "the other pen", bound by the bar |
 | Eraser **(E)** | `e` → `eraser` ✓ | unchanged |
 | Lasso select **(Q)** | `q` → toggles the **tool lock** (`activeTool.locked`, measured `false → true → false`). `TOOLS.lasso` has no `letterKey`, and a scan of all 26 letters reached the lasso with none of them | **no shortcut advertised** |

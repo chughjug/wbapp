@@ -1135,10 +1135,9 @@ export const ToolMenu = ({
     }
     note = (
       <p className="gn-tool-menu__note">
-        Excalidraw&rsquo;s eraser removes a whole stroke on contact. It has no
-        brush size and no per-kind filter, so there is nothing here to size or
-        to limit to highlighter strokes &mdash; shipping either control would be
-        a dial wired to nothing.
+        Brush size lives on the strip under the floating bar (Small through
+        Extra large). The eraser still removes a whole stroke on contact; there
+        is no per-kind filter to limit it to highlighter marks only.
       </p>
     );
   } else if (tool === "shape") {

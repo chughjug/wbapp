@@ -27,9 +27,10 @@
  * be tappable.
  */
 
-$gn-chrome-surfaces: "[data-gn-chrome-surface]", ".gn-bar-scope",
-  ".gn-nav-scope", ".gn-tabbar", ".gn-tool-menu-scope--docked",
-  ".excalidraw .layer-ui__wrapper__footer-left";
+/* `.gn-bar-scope` is intentionally absent: the floating bar and its tool
+   submenu stay visible while writing ("never hide the toolbar"). */
+$gn-chrome-surfaces: "[data-gn-chrome-surface]", ".gn-nav-scope", ".gn-tabbar",
+  ".gn-tool-menu-scope--docked", ".excalidraw .layer-ui__wrapper__footer-left";
 
 @each $surface in $gn-chrome-surfaces {
   :root[data-gn-chrome] #{$surface} {

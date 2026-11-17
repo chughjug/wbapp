@@ -46,9 +46,7 @@ export const makeClassroomRoomCode = (bytes = 5): string => {
     }
   } else {
     for (let i = 0; i < bytes; i++) {
-      out.push(
-        ROOM_ALPHABET[Math.floor(Math.random() * ROOM_ALPHABET.length)],
-      );
+      out.push(ROOM_ALPHABET[Math.floor(Math.random() * ROOM_ALPHABET.length)]);
     }
   }
   return out.join("");
