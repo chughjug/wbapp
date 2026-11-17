@@ -108,6 +108,7 @@
 export { FloatingBar } from "./FloatingBar";
 export type {
   FloatingBarProps,
+  FloatingBarPinnedControl,
   ShellMode,
   ShellPlacement,
 } from "./FloatingBar";

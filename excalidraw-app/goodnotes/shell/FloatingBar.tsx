@@ -150,6 +150,59 @@ export type ShellMode = "write" | "read";
  */
 export type ShellPlacement = "floating" | "fixed" | "flow";
 
+/**
+ * Controls that can be pinned to the main bar (always visible) instead of
+ * living only inside "+" / "…". Pass a custom list for flexibility, `"all"`
+ * for the richest bar, or `"minimal"` for the original lean set.
+ */
+export type FloatingBarPinnedControl =
+  | "title"
+  | "undo"
+  | "redo"
+  | "text"
+  | "image"
+  | "sticky"
+  | "addPage"
+  | "share"
+  | "exportPdf"
+  | "search";
+
+const ALL_PINNED_CONTROLS: readonly FloatingBarPinnedControl[] = [
+  "title",
+  "undo",
+  "redo",
+  "text",
+  "image",
+  "sticky",
+  "addPage",
+  "share",
+  "exportPdf",
+  "search",
+];
+
+/** Default: more on the bar, always shown — menus keep the long-tail. */
+const DEFAULT_PINNED_CONTROLS: readonly FloatingBarPinnedControl[] = [
+  "title",
+  "undo",
+  "redo",
+  "text",
+  "image",
+  "addPage",
+  "share",
+];
+
+const resolvePinnedControls = (
+  value: FloatingBarProps["pinnedControls"],
+): ReadonlySet<FloatingBarPinnedControl> => {
+  if (value === "minimal") {
+    return new Set();
+  }
+  if (value === "all") {
+    return new Set(ALL_PINNED_CONTROLS);
+  }
+  return new Set(value ?? DEFAULT_PINNED_CONTROLS);
+};
+
 const SHAPE_ITEMS: { id: TaskbarShapeId; label: string; icon: ReactNode }[] = [
   { id: "rectangle", label: "Rectangle", icon: <RectangleIcon /> },
   { id: "ellipse", label: "Ellipse", icon: <EllipseIcon /> },
@@ -403,6 +456,26 @@ export interface FloatingBarProps {
   /** Extra entries appended to the "…" menu (settings, host commands, …). */
   moreItems?: TaskbarMenuItem[];
 
+  /**
+   * Always-visible extras on the main bar. Defaults to title, undo/redo,
+   * text, image, add page, and share. Use `"minimal"` for the lean original
+   * bar, `"all"` to pin every supported control, or pass a custom list.
+   *
+   * A control only appears when its host callback exists (e.g. `share` needs
+   * `onShare`). Page counter / separators stay visible at every width.
+   */
+  pinnedControls?:
+    | readonly FloatingBarPinnedControl[]
+    | "all"
+    | "minimal";
+
+  /**
+   * When true (default), pinned controls are omitted from "+" / "…" so the
+   * bar is the single place to reach them. Set false to keep duplicates in
+   * menus for discoverability.
+   */
+  hidePinnedFromMenus?: boolean;
+
   // ---- presentation -------------------------------------------------------
 
   /**
@@ -468,12 +541,22 @@ export const FloatingBar = ({
   onModeChange,
   onToggleTheme,
   moreItems,
+  pinnedControls,
+  hidePinnedFromMenus = true,
   suppressDefaultChrome = false,
   suppressDefaultToolbar = false,
   placement = "floating",
   ariaLabel = "Editor toolbar",
   className,
 }: FloatingBarProps) => {
+  const pinned = useMemo(
+    () => resolvePinnedControls(pinnedControls),
+    [pinnedControls],
+  );
+  const isPinned = useCallback(
+    (id: FloatingBarPinnedControl) => pinned.has(id),
+    [pinned],
+  );
   const reactId = useId().replace(/:/g, "");
   const barRef = useRef<HTMLDivElement | null>(null);
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -701,33 +784,40 @@ export const FloatingBar = ({
 
   const insertSections = useMemo<TaskbarMenuSection[]>(() => {
     const sections: TaskbarMenuSection[] = [];
-    const place: TaskbarMenuItem[] = [
-      {
+    const place: TaskbarMenuItem[] = [];
+    if (!(hidePinnedFromMenus && isPinned("text"))) {
+      place.push({
         id: "text",
         label: "Text",
         icon: <TextIcon />,
         checked: activeTool === "text",
         disabled: readMode,
         onSelect: () => selectTool("text"),
-      },
-      {
+      });
+    }
+    if (!(hidePinnedFromMenus && isPinned("image"))) {
+      place.push({
         id: "image",
         label: "Image",
         icon: <ImageIcon />,
         checked: activeTool === "image",
         disabled: readMode,
         onSelect: () => selectTool("image"),
-      },
-      {
+      });
+    }
+    if (!(hidePinnedFromMenus && isPinned("sticky"))) {
+      place.push({
         id: "sticky",
         label: "Sticky note",
         icon: <StickyIcon />,
         checked: activeTool === "sticky",
         disabled: readMode,
         onSelect: () => selectTool("sticky"),
-      },
-    ];
-    sections.push({ id: "place", label: "Insert", items: place });
+      });
+    }
+    if (place.length) {
+      sections.push({ id: "place", label: "Insert", items: place });
+    }
 
     sections.push({
       id: "shapes",
@@ -778,6 +868,8 @@ export const FloatingBar = ({
     onInsertGraph,
     insertGraphDisabled,
     insertItems,
+    hidePinnedFromMenus,
+    isPinned,
   ]);
 
   const moreSections = useMemo<TaskbarMenuSection[]>(() => {
@@ -792,7 +884,7 @@ export const FloatingBar = ({
         onSelect: onNewDocument,
       });
     }
-    if (onAddPage) {
+    if (onAddPage && !(hidePinnedFromMenus && isPinned("addPage"))) {
       doc.push({
         id: "add-page",
         label: "Add page",
@@ -801,7 +893,7 @@ export const FloatingBar = ({
         onSelect: onAddPage,
       });
     }
-    if (onUndo) {
+    if (onUndo && !(hidePinnedFromMenus && isPinned("undo"))) {
       doc.push({
         id: "undo",
         label: "Undo",
@@ -810,7 +902,7 @@ export const FloatingBar = ({
         onSelect: onUndo,
       });
     }
-    if (onRedo) {
+    if (onRedo && !(hidePinnedFromMenus && isPinned("redo"))) {
       doc.push({
         id: "redo",
         label: "Redo",
@@ -830,7 +922,7 @@ export const FloatingBar = ({
     }
 
     const out: TaskbarMenuItem[] = [];
-    if (onShare) {
+    if (onShare && !(hidePinnedFromMenus && isPinned("share"))) {
       out.push({
         id: "share",
         label: shareLabel,
@@ -839,7 +931,7 @@ export const FloatingBar = ({
         onSelect: onShare,
       });
     }
-    if (onExportPdf) {
+    if (onExportPdf && !(hidePinnedFromMenus && isPinned("exportPdf"))) {
       out.push({
         id: "export-pdf",
         label: "Export to PDF…",
@@ -863,7 +955,7 @@ export const FloatingBar = ({
     }
 
     const view: TaskbarMenuItem[] = [];
-    if (onToggleSearch) {
+    if (onToggleSearch && !(hidePinnedFromMenus && isPinned("search"))) {
       view.push({
         id: "search",
         label: "Search…",
@@ -922,7 +1014,28 @@ export const FloatingBar = ({
     resolvedTheme,
     toggleTheme,
     moreItems,
+    hidePinnedFromMenus,
+    isPinned,
   ]);
+
+  const showPinnedTitle =
+    isPinned("title") && !!documentTitle?.trim();
+  const showPinnedText = isPinned("text");
+  const showPinnedImage = isPinned("image");
+  const showPinnedSticky = isPinned("sticky");
+  const showPinnedUndo = isPinned("undo") && !!onUndo;
+  const showPinnedRedo = isPinned("redo") && !!onRedo;
+  const showPinnedAddPage = isPinned("addPage") && !!onAddPage;
+  const showPinnedShare = isPinned("share") && !!onShare;
+  const showPinnedExport = isPinned("exportPdf") && !!onExportPdf;
+  const showPinnedSearch = isPinned("search") && !!onToggleSearch;
+  const showPinnedActionCluster =
+    showPinnedUndo ||
+    showPinnedRedo ||
+    showPinnedAddPage ||
+    showPinnedShare ||
+    showPinnedExport ||
+    showPinnedSearch;
 
   // ---- roving tabindex over the whole bar ---------------------------------
 
@@ -938,8 +1051,35 @@ export const FloatingBar = ({
       ids.push(tool.id);
     }
     ids.push(HAND_TOOL.id);
+    if (showPinnedText) {
+      ids.push("pin-text");
+    }
+    if (showPinnedImage) {
+      ids.push("pin-image");
+    }
+    if (showPinnedSticky) {
+      ids.push("pin-sticky");
+    }
     if (insertSections.length) {
       ids.push(insertId);
+    }
+    if (showPinnedUndo) {
+      ids.push("pin-undo");
+    }
+    if (showPinnedRedo) {
+      ids.push("pin-redo");
+    }
+    if (showPinnedAddPage) {
+      ids.push("pin-add-page");
+    }
+    if (showPinnedShare) {
+      ids.push("pin-share");
+    }
+    if (showPinnedExport) {
+      ids.push("pin-export");
+    }
+    if (showPinnedSearch) {
+      ids.push("pin-search");
     }
     if (moreSections.length) {
       ids.push(moreId);
@@ -953,6 +1093,15 @@ export const FloatingBar = ({
     insertId,
     moreSections.length,
     moreId,
+    showPinnedText,
+    showPinnedImage,
+    showPinnedSticky,
+    showPinnedUndo,
+    showPinnedRedo,
+    showPinnedAddPage,
+    showPinnedShare,
+    showPinnedExport,
+    showPinnedSearch,
   ]);
 
   const activeFocusId =
@@ -1099,6 +1248,12 @@ export const FloatingBar = ({
           </span>
         )}
 
+        {showPinnedTitle && (
+          <span className="gn-bar__title" title={documentTitle!.trim()}>
+            {documentTitle!.trim()}
+          </span>
+        )}
+
         {onTogglePagePanel && (
           <button
             type="button"
@@ -1199,6 +1354,77 @@ export const FloatingBar = ({
           aria-orientation="vertical"
         />
 
+        {/* ---- pinned inserts (always on the bar) -------------------------- */}
+        {showPinnedText && (
+          <button
+            type="button"
+            ref={registerRef("pin-text")}
+            className="gn-bar__button gn-bar__button--tool"
+            data-control="pin-text"
+            tabIndex={tabIndexFor("pin-text")}
+            aria-disabled={readMode || undefined}
+            aria-pressed={activeTool === "text"}
+            title="Text"
+            onFocus={() => setFocusId("pin-text")}
+            onClick={() => {
+              setFocusId("pin-text");
+              setOpenMenu(null);
+              if (!readMode) {
+                selectTool("text");
+              }
+            }}
+          >
+            <TextIcon />
+            <span className="gn-bar__sr">Text</span>
+          </button>
+        )}
+        {showPinnedImage && (
+          <button
+            type="button"
+            ref={registerRef("pin-image")}
+            className="gn-bar__button gn-bar__button--tool"
+            data-control="pin-image"
+            tabIndex={tabIndexFor("pin-image")}
+            aria-disabled={readMode || undefined}
+            aria-pressed={activeTool === "image"}
+            title="Image"
+            onFocus={() => setFocusId("pin-image")}
+            onClick={() => {
+              setFocusId("pin-image");
+              setOpenMenu(null);
+              if (!readMode) {
+                selectTool("image");
+              }
+            }}
+          >
+            <ImageIcon />
+            <span className="gn-bar__sr">Image</span>
+          </button>
+        )}
+        {showPinnedSticky && (
+          <button
+            type="button"
+            ref={registerRef("pin-sticky")}
+            className="gn-bar__button gn-bar__button--tool"
+            data-control="pin-sticky"
+            tabIndex={tabIndexFor("pin-sticky")}
+            aria-disabled={readMode || undefined}
+            aria-pressed={activeTool === "sticky"}
+            title="Sticky note"
+            onFocus={() => setFocusId("pin-sticky")}
+            onClick={() => {
+              setFocusId("pin-sticky");
+              setOpenMenu(null);
+              if (!readMode) {
+                selectTool("sticky");
+              }
+            }}
+          >
+            <StickyIcon />
+            <span className="gn-bar__sr">Sticky note</span>
+          </button>
+        )}
+
         {/* ---- "+" secondary inserts -------------------------------------- */}
         {insertSections.length > 0 && (
           <div className="gn-bar__slot">
@@ -1238,6 +1464,134 @@ export const FloatingBar = ({
               />
             )}
           </div>
+        )}
+
+        {showPinnedActionCluster && (
+          <span
+            className="gn-bar__separator"
+            role="separator"
+            aria-orientation="vertical"
+          />
+        )}
+
+        {showPinnedUndo && (
+          <button
+            type="button"
+            ref={registerRef("pin-undo")}
+            className="gn-bar__button"
+            data-control="pin-undo"
+            tabIndex={tabIndexFor("pin-undo")}
+            disabled={undoDisabled}
+            title="Undo"
+            onFocus={() => setFocusId("pin-undo")}
+            onClick={() => {
+              setFocusId("pin-undo");
+              setOpenMenu(null);
+              onUndo?.();
+            }}
+          >
+            <UndoIcon />
+            <span className="gn-bar__sr">Undo</span>
+          </button>
+        )}
+        {showPinnedRedo && (
+          <button
+            type="button"
+            ref={registerRef("pin-redo")}
+            className="gn-bar__button"
+            data-control="pin-redo"
+            tabIndex={tabIndexFor("pin-redo")}
+            disabled={redoDisabled}
+            title="Redo"
+            onFocus={() => setFocusId("pin-redo")}
+            onClick={() => {
+              setFocusId("pin-redo");
+              setOpenMenu(null);
+              onRedo?.();
+            }}
+          >
+            <RedoIcon />
+            <span className="gn-bar__sr">Redo</span>
+          </button>
+        )}
+        {showPinnedAddPage && (
+          <button
+            type="button"
+            ref={registerRef("pin-add-page")}
+            className="gn-bar__button"
+            data-control="pin-add-page"
+            tabIndex={tabIndexFor("pin-add-page")}
+            disabled={addPageDisabled}
+            title="Add page"
+            onFocus={() => setFocusId("pin-add-page")}
+            onClick={() => {
+              setFocusId("pin-add-page");
+              setOpenMenu(null);
+              onAddPage?.();
+            }}
+          >
+            <AddPageIcon />
+            <span className="gn-bar__sr">Add page</span>
+          </button>
+        )}
+        {showPinnedShare && (
+          <button
+            type="button"
+            ref={registerRef("pin-share")}
+            className="gn-bar__button"
+            data-control="pin-share"
+            tabIndex={tabIndexFor("pin-share")}
+            disabled={shareDisabled}
+            title={shareLabel}
+            onFocus={() => setFocusId("pin-share")}
+            onClick={() => {
+              setFocusId("pin-share");
+              setOpenMenu(null);
+              onShare?.();
+            }}
+          >
+            <ShareIcon />
+            <span className="gn-bar__sr">{shareLabel}</span>
+          </button>
+        )}
+        {showPinnedExport && (
+          <button
+            type="button"
+            ref={registerRef("pin-export")}
+            className="gn-bar__button"
+            data-control="pin-export"
+            tabIndex={tabIndexFor("pin-export")}
+            disabled={exportPdfDisabled}
+            title="Export to PDF"
+            onFocus={() => setFocusId("pin-export")}
+            onClick={() => {
+              setFocusId("pin-export");
+              setOpenMenu(null);
+              onExportPdf?.();
+            }}
+          >
+            <ExportPdfIcon />
+            <span className="gn-bar__sr">Export to PDF</span>
+          </button>
+        )}
+        {showPinnedSearch && (
+          <button
+            type="button"
+            ref={registerRef("pin-search")}
+            className="gn-bar__button"
+            data-control="pin-search"
+            tabIndex={tabIndexFor("pin-search")}
+            title="Search"
+            onFocus={() => setFocusId("pin-search")}
+            onClick={() => {
+              setFocusId("pin-search");
+              setOpenMenu(null);
+              onToggleSearch?.();
+            }}
+          >
+            <SearchIcon />
+            <span className="gn-bar__sr">Search</span>
+          </button>
         )}
 
         {/* ---- "…" document actions ---------------------------------------- */}
