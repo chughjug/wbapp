@@ -1,6 +1,6 @@
 import path from "path";
 
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
@@ -88,6 +88,12 @@ export default defineConfig({
     setupFiles: ["./setupTests.ts"],
     globals: true,
     environment: "jsdom",
+    // Standalone Heroku relay + Chrome extension use node:test / browser chrome APIs
+    exclude: [
+      ...configDefaults.exclude,
+      "canvas-bridge/**",
+      "chrome-extension/**",
+    ],
     // don't list skipped tests in the failure tree — keeps output readable
     hideSkippedTests: true,
     deps: {
