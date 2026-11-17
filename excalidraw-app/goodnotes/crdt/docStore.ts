@@ -106,7 +106,20 @@ export const listSnapshots = (handle: CrdtDocHandle): CrdtSnapshot[] => {
       });
     }
   });
-  return out.sort((a, b) => b.createdAt - a.createdAt);
+  // newest first; `id` breaks ties when two snaps share a millisecond
+  return out.sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : -1));
+};
+
+/** Strictly increasing clock so rapid appends still sort newest-first. */
+const nextCreatedAt = (handle: CrdtDocHandle): number => {
+  let latest = 0;
+  handle.snapshots.forEach((entry) => {
+    const createdAt = entry.get("createdAt");
+    if (typeof createdAt === "number" && createdAt > latest) {
+      latest = createdAt;
+    }
+  });
+  return Math.max(Date.now(), latest + 1);
 };
 
 export const appendSnapshot = (
@@ -121,7 +134,7 @@ export const appendSnapshot = (
 ): CrdtSnapshot => {
   const snap: CrdtSnapshot = {
     id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-    createdAt: Date.now(),
+    createdAt: nextCreatedAt(handle),
     label: input.label,
     payload: input.payload,
     author: input.author,
