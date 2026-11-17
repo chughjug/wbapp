@@ -80,10 +80,7 @@ export const mergeCourseIntoCoursesList = (payload: BridgeCoursePayload) => {
 export const saveCoursePayload = (payload: BridgeCoursePayload) => {
   const slim = withoutInlineBytes(payload);
   try {
-    localStorage.setItem(
-      courseKey(payload.courseId),
-      JSON.stringify(slim),
-    );
+    localStorage.setItem(courseKey(payload.courseId), JSON.stringify(slim));
   } catch {
     // Still notify so UI can refresh from any prior metadata.
   }

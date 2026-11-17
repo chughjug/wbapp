@@ -239,21 +239,18 @@ export const runBridgeCoursePull = async (
     result = {
       ...result,
       filesImported: result.filesImported + chunkResult.filesImported,
-      filesPlaceholder:
-        result.filesPlaceholder + chunkResult.filesPlaceholder,
-      notebooksCreated:
-        result.notebooksCreated + chunkResult.notebooksCreated,
-      notebooksUpdated:
-        result.notebooksUpdated + chunkResult.notebooksUpdated,
+      filesPlaceholder: result.filesPlaceholder + chunkResult.filesPlaceholder,
+      notebooksCreated: result.notebooksCreated + chunkResult.notebooksCreated,
+      notebooksUpdated: result.notebooksUpdated + chunkResult.notebooksUpdated,
       courseLabel: result.courseLabel || chunkResult.courseLabel,
       pendingFileIds: pending,
     };
   }
 
   options.onStatus?.(
-    `Done — ${result.filesImported} PDFs and ${result.filesPlaceholder} other files in “${
-      result.courseLabel || "course"
-    }”.`,
+    `Done — ${result.filesImported} PDFs and ${
+      result.filesPlaceholder
+    } other files in “${result.courseLabel || "course"}”.`,
   );
   return result;
 };

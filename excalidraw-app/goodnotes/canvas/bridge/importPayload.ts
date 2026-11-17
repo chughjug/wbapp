@@ -6,7 +6,11 @@ import { createDoc, getDoc, listDocs, updateDocMeta } from "../../library";
 import { importPdfAsNewDocument } from "../../share-target";
 import { canvasAssignmentTag, canvasFileTag } from "../sync";
 
-import { loadCoursePayload, saveCoursePayload, saveCoursesPayload } from "./cache";
+import {
+  loadCoursePayload,
+  saveCoursePayload,
+  saveCoursesPayload,
+} from "./cache";
 
 import type { DocMeta } from "../../types";
 import type {
@@ -291,16 +295,16 @@ export const applyBridgePayload = async (
     filesPlaceholder = result.filesPlaceholder;
   }
 
-  const pendingFileIds =
-    payload.pendingFileIds?.length
-      ? payload.pendingFileIds
-      : payload.files.filter((f) => f.downloadUrl && !f.dataBase64).map((f) => f.id);
+  const pendingFileIds = payload.pendingFileIds?.length
+    ? payload.pendingFileIds
+    : payload.files
+        .filter((f) => f.downloadUrl && !f.dataBase64)
+        .map((f) => f.id);
 
   options.onProgress?.(
-    `Folder “${courseLabel}”: ${payload.files.length} files listed` +
-      (pendingFileIds.length
-        ? `, downloading ${pendingFileIds.length}…`
-        : "."),
+    `Folder “${courseLabel}”: ${payload.files.length} files listed${
+      pendingFileIds.length ? `, downloading ${pendingFileIds.length}…` : "."
+    }`,
   );
 
   return {
