@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { isBridgePaired, subscribeBridgeSession } from "./bridge";
 import { checkCanvasConnection } from "./client";
 import {
   clearCanvasConnection,
@@ -23,6 +24,8 @@ import type { CanvasConnection } from "./connection";
 export interface UseCanvasConnection {
   connection: CanvasConnection | null;
   isConnected: boolean;
+  /** True when paired via the laptop Chrome extension (no PAT). */
+  isBridgePaired: boolean;
   /** Display name Canvas reported for the token's account, if known. */
   userName: string | null;
   /** True while {@link connect} is verifying. */
@@ -44,17 +47,23 @@ export const useCanvasConnection = (): UseCanvasConnection => {
   const [connection, setConnection] = useState<CanvasConnection | null>(() =>
     loadCanvasConnection(),
   );
+  const [bridgePaired, setBridgePaired] = useState(() => isBridgePaired());
   const [isChecking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // re-read on mount as well: the store may have changed before subscribing
     setConnection(loadCanvasConnection());
+    setBridgePaired(isBridgePaired());
     const unsubscribe = subscribeCanvasConnection(() =>
       setConnection(loadCanvasConnection()),
     );
+    const unsubBridge = subscribeBridgeSession(() =>
+      setBridgePaired(isBridgePaired()),
+    );
     return () => {
       unsubscribe();
+      unsubBridge();
     };
   }, []);
 
@@ -101,7 +110,8 @@ export const useCanvasConnection = (): UseCanvasConnection => {
 
   return {
     connection,
-    isConnected: connection !== null,
+    isConnected: connection !== null || bridgePaired,
+    isBridgePaired: bridgePaired,
     userName: connection?.userName ?? null,
     isChecking,
     error,

@@ -13,6 +13,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { listDocs } from "../library";
 
+import {
+  isBridgePaired,
+  subscribeBridgeCache,
+  subscribeBridgeSession,
+} from "./bridge";
 import { listAssignments, listCourseFiles, listCourses } from "./client";
 import { subscribeCanvasConnection, loadCanvasConnection } from "./connection";
 import { describeCanvasError } from "./errors";
@@ -97,18 +102,22 @@ const useCanvasResource = <T>(
   };
 };
 
-/** Whether a connection exists, recomputed on every store change. */
+/** Whether a PAT or laptop-bridge pairing exists. */
 const useConnected = () => {
   const [connected, setConnected] = useState(
-    () => loadCanvasConnection() !== null,
+    () => loadCanvasConnection() !== null || isBridgePaired(),
   );
   useEffect(() => {
-    setConnected(loadCanvasConnection() !== null);
-    const unsubscribe = subscribeCanvasConnection(() =>
-      setConnected(loadCanvasConnection() !== null),
-    );
+    const refresh = () =>
+      setConnected(loadCanvasConnection() !== null || isBridgePaired());
+    refresh();
+    const unsubs = [
+      subscribeCanvasConnection(refresh),
+      subscribeBridgeSession(refresh),
+      subscribeBridgeCache(refresh),
+    ];
     return () => {
-      unsubscribe();
+      unsubs.forEach((u) => u());
     };
   }, []);
   return connected;

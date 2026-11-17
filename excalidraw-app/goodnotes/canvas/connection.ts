@@ -70,4 +70,23 @@ export const clearCanvasConnection = () => {
   notify();
 };
 
-export const isCanvasConnected = () => loadCanvasConnection() !== null;
+/**
+ * True when either a PAT is stored, or the iPad is paired with the laptop
+ * Chrome extension bridge (session may exist before the first course sync).
+ */
+export const isCanvasConnected = (): boolean => {
+  if (loadCanvasConnection()) {
+    return true;
+  }
+  try {
+    // lazy require to avoid a hard cycle at module init
+    const raw = localStorage.getItem("goodnotes:canvas-bridge-session");
+    if (!raw) {
+      return false;
+    }
+    const parsed = JSON.parse(raw) as { roomId?: string; pairCode?: string };
+    return Boolean(parsed?.roomId && parsed?.pairCode);
+  } catch {
+    return false;
+  }
+};
