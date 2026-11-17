@@ -568,7 +568,12 @@ export const setPageImage = (
  */
 export const ensureFirstPage = (
   elements: Elements,
-  opts?: { size?: PageSizeName; template?: PaperTemplateId },
+  opts?: {
+    size?: PageSizeName;
+    template?: PaperTemplateId;
+    landscape?: boolean;
+    image?: PageImageBackground | null;
+  },
 ): ExcalidrawElement[] => {
   if (getPageCount(elements) > 0) {
     return elements as ExcalidrawElement[];
@@ -576,6 +581,8 @@ export const ensureFirstPage = (
   return addPage(elements, {
     size: opts?.size ?? "A4",
     template: opts?.template ?? "blank",
+    landscape: opts?.landscape ?? false,
+    image: opts?.image ?? null,
   }).elements;
 };
 

@@ -84,6 +84,16 @@ export interface NewPageDialogProps {
   title?: string;
   /** Confirm button label. Default `"Add page"`. */
   submitLabel?: string;
+  /**
+   * Intro copy under the title. Default explains remembering the choice for
+   * the current notebook (the add-page case).
+   */
+  intro?: string;
+  /**
+   * When `false`, the Image format is hidden — useful for flows that cannot
+   * attach a file yet. Default `true`.
+   */
+  allowImage?: boolean;
   className?: string;
 }
 
@@ -236,6 +246,9 @@ const ImageFormatPreview = ({
   </span>
 );
 
+const DEFAULT_INTRO =
+  "Pick a format for the new page. Your choice is remembered for this notebook.";
+
 export const NewPageDialog: React.FC<NewPageDialogProps> = ({
   initial,
   onSubmit,
@@ -243,6 +256,8 @@ export const NewPageDialog: React.FC<NewPageDialogProps> = ({
   theme = "light",
   title = "New page",
   submitLabel = "Add page",
+  intro = DEFAULT_INTRO,
+  allowImage = true,
   className,
 }) => {
   const uid = useId().replace(/:/g, "");
@@ -339,24 +354,27 @@ export const NewPageDialog: React.FC<NewPageDialogProps> = ({
     setImageFile(file);
   }, []);
 
-  const formatOptions = useMemo<PaperPickerOption<NewPageFormatId>[]>(
-    () => [
-      ...PAPER_TEMPLATE_LIST.map((template) => ({
-        id: template.id as NewPageFormatId,
-        label: template.label,
-        preview: (
-          <PaperPreview template={template.id} theme={theme} />
-        ) as React.ReactNode,
-      })),
+  const formatOptions = useMemo<PaperPickerOption<NewPageFormatId>[]>(() => {
+    const paper = PAPER_TEMPLATE_LIST.map((template) => ({
+      id: template.id as NewPageFormatId,
+      label: template.label,
+      preview: (
+        <PaperPreview template={template.id} theme={theme} />
+      ) as React.ReactNode,
+    }));
+    if (!allowImage) {
+      return paper;
+    }
+    return [
+      ...paper,
       {
         id: IMAGE_FORMAT_ID,
         label: "Image",
         ariaLabel: "Image — use a picture as the page background",
         preview: <ImageFormatPreview url={previewUrl} theme={theme} />,
       },
-    ],
-    [previewUrl, theme],
-  );
+    ];
+  }, [allowImage, previewUrl, theme]);
 
   const submit = useCallback(async () => {
     if (busy) {
@@ -449,8 +467,7 @@ export const NewPageDialog: React.FC<NewPageDialogProps> = ({
         </div>
 
         <p className="gn-new-page__desc" id={descId}>
-          Pick a format for the new page. Your choice is remembered for this
-          notebook.
+          {intro}
         </p>
 
         <PaperPicker<NewPageFormatId>

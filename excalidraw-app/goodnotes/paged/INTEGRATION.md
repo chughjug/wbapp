@@ -215,7 +215,7 @@ import {
 
 ## 8. The lock is no longer rigid: `overscroll` (added for the hand tool)
 
-`applyLock` used to install `lock: { scroll: true, zoom: true, overscroll: false }`. That made every *navigation* gesture a dead control while the page is fitted — at the fit zoom the page box is smaller than the viewport, so the clamp has nowhere to move the viewport to. Measured in the running app (iPad Pro 11" viewport, Letter page):
+`applyLock` used to install `lock: { scroll: true, zoom: true, overscroll: false }`. That made every _navigation_ gesture a dead control while the page is fitted — at the fit zoom the page box is smaller than the viewport, so the clamp has nowhere to move the viewport to. Measured in the running app (iPad Pro 11" viewport, Letter page):
 
 ```
                        scrollX / scrollY before   after    content moved
@@ -226,9 +226,9 @@ import {
 
 The lock now installs `overscroll: PAGED_VIEW_OVERSCROLL_PX` (28 CSS px), exported from `./pagedView` and from the module index.
 
-**This is not slack in the clamp.** `ScrollConstraints.overscroll` is the editor's own rubberband (`constrainScrollAxis` in `packages/excalidraw/viewport.ts`), and `AppViewport.snapBack()` / `releaseOverscroll()` return the viewport to exactly the clamp when the gesture ends. The *resting* viewport is bit-identical to before:
+**This is not slack in the clamp.** `ScrollConstraints.overscroll` is the editor's own rubberband (`constrainScrollAxis` in `packages/excalidraw/viewport.ts`), and `AppViewport.snapBack()` / `releaseOverscroll()` return the viewport to exactly the clamp when the gesture ends. The _resting_ viewport is bit-identical to before:
 
-| | before | after |
+|  | before | after |
 | --- | --- | --- |
 | resting `scrollX / scrollY`, page fitted | `378.07 / 21.07` | `378.07 / 21.07` |
 | peak during a hand drag | `378.07 / 21.07` (0.00 px) | `378.07 / −15.80` (**−28.00 px**) |
@@ -256,4 +256,4 @@ This needs no guard in `handPan.ts`: it calls `controller.next()` / `prev()`, wh
 
 ### One known side effect, in `packages/` (not fixed — app-level only)
 
-With `overscroll > 0`, `AppViewport.translate` calls `this.snapBackDebounced()` from *inside* a `setState` updater (`packages/excalidraw/components/App.viewport.ts`, `translate`, the `if (overscroll > 0)` branch). React logs *"An update … was scheduled from inside an update function"* in development. **It is pre-existing**: the same warning is emitted with `overscroll: false` by another path, verified by temporarily reverting this change. No behavioural effect was observed. The fix is to hoist that call out of the updater, which is a `packages/` change.
+With `overscroll > 0`, `AppViewport.translate` calls `this.snapBackDebounced()` from _inside_ a `setState` updater (`packages/excalidraw/components/App.viewport.ts`, `translate`, the `if (overscroll > 0)` branch). React logs _"An update … was scheduled from inside an update function"_ in development. **It is pre-existing**: the same warning is emitted with `overscroll: false` by another path, verified by temporarily reverting this change. No behavioural effect was observed. The fix is to hoist that call out of the updater, which is a `packages/` change.
