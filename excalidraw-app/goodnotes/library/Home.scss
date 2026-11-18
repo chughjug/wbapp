@@ -18,6 +18,16 @@
  */
 
 .excalidraw.gn-shelf {
+  // Safe-area insets. `index.html` asks for `viewport-fit=cover`, so in a
+  // Home Screen app the shelf extends under the status bar and the home
+  // indicator. Exposed as variables so a test can substitute real values on
+  // a machine whose `env()` is all zero; `env(..., 0px)` makes every rule
+  // below a no-op anywhere without insets.
+  --gn-safe-top: env(safe-area-inset-top, 0px);
+  --gn-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --gn-safe-left: env(safe-area-inset-left, 0px);
+  --gn-safe-right: env(safe-area-inset-right, 0px);
+
   // the sidebar is no longer a column of the shell; the shell is one column
   display: block;
 
@@ -35,7 +45,11 @@
     align-items: center;
     gap: 0.5rem;
     min-height: 3.25rem;
-    padding: 0.4375rem 1rem;
+    // grows INTO the top inset rather than being pushed below it, so the
+    // bar's own background fills the status-bar strip; `top: 0` keeps it
+    // pinned there while the shelf scrolls underneath
+    padding: calc(0.4375rem + var(--gn-safe-top)) calc(1rem + var(--gn-safe-right))
+      0.4375rem calc(1rem + var(--gn-safe-left));
     background-color: var(--island-bg-color);
     border-bottom: 1px solid var(--default-border-color);
   }
@@ -162,7 +176,8 @@
 
   // -------------------------------------------------------------- content
   .gn-shelf__content {
-    padding: 1rem 1rem 3rem;
+    padding: 1rem calc(1rem + var(--gn-safe-right)) calc(3rem + var(--gn-safe-bottom))
+      calc(1rem + var(--gn-safe-left));
   }
 
   .gn-grid {
@@ -232,11 +247,13 @@
   // ------------------------------------------------------------- narrower
   @media (max-width: 600px) {
     .gn-home__bar {
-      padding-inline: 0.75rem;
+      padding-inline: calc(0.75rem + var(--gn-safe-left))
+        calc(0.75rem + var(--gn-safe-right));
     }
 
     .gn-shelf__content {
-      padding: 0.75rem 0.75rem 4rem;
+      padding: 0.75rem calc(0.75rem + var(--gn-safe-right))
+        calc(4rem + var(--gn-safe-bottom)) calc(0.75rem + var(--gn-safe-left));
     }
 
     .gn-grid {

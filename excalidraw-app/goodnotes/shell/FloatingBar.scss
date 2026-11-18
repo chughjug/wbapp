@@ -43,11 +43,47 @@
    --------------------------------------------------------------------------- */
 
 .gn-shell-layout {
+  /* Safe-area insets, exposed as variables so a test can substitute real
+     values on a machine whose `env()` is all zero. */
+  --gn-safe-top: env(safe-area-inset-top, 0px);
+  --gn-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --gn-safe-left: env(safe-area-inset-left, 0px);
+  --gn-safe-right: env(safe-area-inset-right, 0px);
+
+  /* border-box, or `height: 100%` plus the safe-area padding below makes the
+     layout TALLER than the viewport: the canvas keeps its full height, spills
+     past the bottom edge, and the bar and ink orb are pushed down into the
+     home indicator instead of away from it. */
+  box-sizing: border-box;
+
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
   overflow: hidden;
+
+  /* `index.html` asks for `viewport-fit=cover`, so on a device with a notch,
+     rounded corners or a home indicator the page extends UNDER them — and in
+     an iPad/iPhone Home Screen app (the install this app's storage story
+     depends on) that includes the status bar. Upstream pads for this, but
+     only on `.FixedSideContainer`, which holds the top islands this shell
+     hides: the protection covers exactly the chrome that was removed and
+     none of its replacement, so the tab strip and the floating bar would sit
+     under the clock.
+     Insetting here does it once, for the strip and the bar together — an
+     inset on each would double-count, since the strip already pushes the
+     bar's container down. The canvas loses those pixels, which is what we
+     want: ink under the status bar cannot be touched.
+     Every value is `env(..., 0px)`, so this is a no-op on any display
+     without insets — every desktop browser and the whole test suite. */
+  padding-top: var(--gn-safe-top);
+  padding-left: var(--gn-safe-left);
+  padding-right: var(--gn-safe-right);
+  padding-bottom: var(--gn-safe-bottom);
+
+  /* the strip the padding exposes is transparent otherwise, which reads as a
+     seam above the canvas; this is the editor's own backdrop in both themes */
+  background-color: var(--default-bg-color, #fff);
 }
 
 .gn-shell-stage,
