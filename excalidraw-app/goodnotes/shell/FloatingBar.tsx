@@ -390,6 +390,16 @@ export interface FloatingBarProps {
     anchor: HTMLButtonElement | null,
   ) => void;
 
+  /**
+   * `true` while the full Active Tool Menu is open. The compact submenu under
+   * the bar carries the same five colours and five widths, and the menu opens
+   * directly over it — leaving two orphaned swatches poking out at its edge
+   * and three live copies of one control on screen. The submenu is the
+   * quick row; while the full panel is up it has nothing to add, so it
+   * stands down.
+   */
+  activeToolMenuOpen?: boolean;
+
   // ---- "+" (secondary inserts) --------------------------------------------
 
   /** Open the PDF import flow. Item hidden when absent. */
@@ -511,6 +521,7 @@ export const FloatingBar = ({
   penPreset,
   highlighterPreset,
   onActiveToolMenu,
+  activeToolMenuOpen = false,
   onImportPdf,
   importPdfDisabled,
   onInsertGraph,
@@ -1633,7 +1644,7 @@ export const FloatingBar = ({
             </button>
           )}
         </div>
-        {!readMode && (
+        {!readMode && !activeToolMenuOpen && (
           <BarToolSubmenu
             excalidrawAPI={excalidrawAPI}
             activeTool={submenuTool}

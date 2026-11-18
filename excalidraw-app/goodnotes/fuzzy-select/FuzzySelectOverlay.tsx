@@ -508,6 +508,19 @@ export const FuzzySelectOverlay = ({
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
+      // A modal surface on top owns the keyboard. Without this the lasso
+      // overlay swallowed the first Escape aimed at the Pages panel (it runs
+      // in the capture phase on `window`, so it wins over everything), and
+      // the user had to press Escape twice to dismiss a dialog opened while
+      // the lasso tool happened to be selected.
+      const active = document.activeElement;
+      if (
+        active instanceof Element &&
+        active.closest('[role="dialog"], [role="menu"]')
+      ) {
+        return;
+      }
+
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();

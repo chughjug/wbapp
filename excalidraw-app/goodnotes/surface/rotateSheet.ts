@@ -79,6 +79,13 @@ export interface RotateSheetResult {
   landscape: boolean;
 }
 
+/**
+ * How much of the sheet to keep clear when ink has to be shrunk to fit a
+ * rotated page, as a fraction of each side. Purely cosmetic: without it the
+ * content box is fitted flush to the paper edge.
+ */
+const SHEET_FIT_MARGIN_RATIO = 0.03;
+
 const unchanged = (elements: Elements): RotateSheetResult => ({
   elements: elements.slice(),
   rotated: false,
@@ -205,30 +212,43 @@ export const rotateSheetsElements = (
     const boxWidth = Math.max(maxX - minX, 0);
     const boxHeight = Math.max(maxY - minY, 0);
 
-    // shrink only as much as it takes to make the box fit at all
+    // Shrink only as much as it takes to make the box fit — inside a margin,
+    // not flush to the paper edge. Fitting to the bare sheet put the topmost
+    // stroke at y=0.00 and the lowest at exactly y=height, which reads as ink
+    // sliced off by the page edge even though nothing is clipped. The margin
+    // costs a few percent of scale and keeps the result looking like a page.
+    const marginX = newWidth * SHEET_FIT_MARGIN_RATIO;
+    const marginY = newHeight * SHEET_FIT_MARGIN_RATIO;
+    const fitWidth = Math.max(newWidth - 2 * marginX, 1);
+    const fitHeight = Math.max(newHeight - 2 * marginY, 1);
+
     const s = Math.min(
       1,
-      boxWidth > newWidth ? newWidth / boxWidth : 1,
-      boxHeight > newHeight ? newHeight / boxHeight : 1,
+      boxWidth > fitWidth ? fitWidth / boxWidth : 1,
+      boxHeight > fitHeight ? fitHeight / boxHeight : 1,
     );
 
-    // …then nudge the (possibly scaled) box back inside the sheet
+    // …then nudge the (possibly scaled) box back inside the sheet. The margin
+    // only constrains ink we actually had to shrink: a page whose ink already
+    // fits must not be shuffled around just because it sits near an edge.
     const scaledX = relX * s;
     const scaledY = relY * s;
     const scaledWidth = boxWidth * s;
     const scaledHeight = boxHeight * s;
+    const insetX = s < 1 ? marginX : 0;
+    const insetY = s < 1 ? marginY : 0;
 
     let dx = 0;
-    if (scaledX < 0) {
-      dx = -scaledX;
-    } else if (scaledX + scaledWidth > newWidth) {
-      dx = newWidth - (scaledX + scaledWidth);
+    if (scaledX < insetX) {
+      dx = insetX - scaledX;
+    } else if (scaledX + scaledWidth > newWidth - insetX) {
+      dx = newWidth - insetX - (scaledX + scaledWidth);
     }
     let dy = 0;
-    if (scaledY < 0) {
-      dy = -scaledY;
-    } else if (scaledY + scaledHeight > newHeight) {
-      dy = newHeight - (scaledY + scaledHeight);
+    if (scaledY < insetY) {
+      dy = insetY - scaledY;
+    } else if (scaledY + scaledHeight > newHeight - insetY) {
+      dy = newHeight - insetY - (scaledY + scaledHeight);
     }
 
     minScale = Math.min(minScale, s);

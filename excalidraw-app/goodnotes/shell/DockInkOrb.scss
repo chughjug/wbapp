@@ -12,7 +12,13 @@
   pointer-events: none;
   position: absolute;
   right: 0.85rem;
-  bottom: 0.85rem;
+
+  /* 0.85rem would put the orb exactly on top of the editor's footer Help
+     button (measured at 1194x834: orb 44x44 at 1136,776 fully enclosing Help
+     36x36 at 1142,782 — `elementFromPoint` on Help returned the orb's fill,
+     so Help could not be clicked at all). The footer button sits 16px off
+     the bottom and is 36px tall, so the orb clears it from 3.6rem up. */
+  bottom: 3.6rem;
   z-index: 126;
   display: flex;
   flex-direction: column;

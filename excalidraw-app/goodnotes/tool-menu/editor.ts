@@ -452,14 +452,15 @@ export const EXTRA_TOOL_LABELS: Record<ExtraToolId, string> = {
  * - `lasso` — the GoodNotes nav bar already carries a lasso button ("Lasso
  *   select (smart selection)"). A second one behind **More** is duplicate
  *   chrome.
- * - `hand` — measured in the running app: the paged surface pins the
- *   viewport, so `appState.scrollX/scrollY` do not move for a wheel, a
- *   space-drag or a hand-tool drag (378.07 / 21.07 before and after all
- *   three). A Pan button here would be a dead control.
+ * - `hand` — the nav bar now carries a Hand button of its own (bound to `H`),
+ *   so listing it here too would be the same duplicate chrome as `lasso`.
+ *   It is no longer a dead control: the scroll constraints the paged surface
+ *   used to pin (measured 378.07 / 21.07 before and after a wheel, a
+ *   space-drag and a hand drag alike) are lifted in whiteboard mode and
+ *   relaxed on paper, and a hand drag now moves the viewport 28.00px.
  *
  * Both stay in {@link EXTRA_TOOLS}: {@link activateExtraTool} is the public
- * way for any surface to reach them, and `hand` becomes real again the moment
- * a free-scrolling (whiteboard) mode ships.
+ * way for any surface to reach them.
  */
 export const POPOVER_EXTRA_TOOLS: readonly ExtraToolId[] = ["laser"];
 

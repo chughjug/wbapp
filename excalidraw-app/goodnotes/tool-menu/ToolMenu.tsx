@@ -46,7 +46,9 @@ import {
   shapeFromAppState,
 } from "./editor";
 import {
+  DEFAULT_TOOL_MENU_PLACEMENT,
   EDGE_MARGIN,
+  TOOL_MENU_PLACEMENTS,
   anchoredPlacement,
   describePosition,
   loadToolMenuPlacement,
@@ -603,15 +605,22 @@ export const ToolMenu = ({
   );
 
   const togglePlacement = useCallback(() => {
-    // anchored → docked → floating → anchored. One button, because the
-    // choice is rare and a three-way control in the panel header would cost
-    // more pixels than the thing it configures.
+    // Cycle through TOOL_MENU_PLACEMENTS rather than a hardcoded triple. The
+    // list is the single source of truth for what a user may choose, and it
+    // deliberately excludes "docked" — see the comment on it in
+    // `position.ts`. Hardcoding the old anchored → docked → floating cycle
+    // here put the known-bad docked band one tap from the default state: the
+    // canvas resized on every tool change (834 -> 758 pen, -> 782 eraser) and
+    // the choice did not even survive a reload, because
+    // `loadToolMenuPlacement` migrates a stored "docked" away.
+    //
+    // A placement not in the list (a host passing `placement="docked"`
+    // explicitly, which the type still allows) cycles back to the default.
+    const index = TOOL_MENU_PLACEMENTS.indexOf(menuPlacement);
     choosePlacement(
-      menuPlacement === "anchored"
-        ? "docked"
-        : menuPlacement === "docked"
-        ? "floating"
-        : "anchored",
+      index === -1
+        ? DEFAULT_TOOL_MENU_PLACEMENT
+        : TOOL_MENU_PLACEMENTS[(index + 1) % TOOL_MENU_PLACEMENTS.length],
     );
   }, [choosePlacement, menuPlacement]);
 
@@ -1388,14 +1397,14 @@ export const ToolMenu = ({
       data-testid="gn-tool-menu-placement"
       aria-label={
         isAnchored
-          ? `Dock ${toolTitle.toLowerCase()} settings as a band under the nav bar`
+          ? `Unpin ${toolTitle.toLowerCase()} settings into a movable panel`
           : isDocked
-          ? `Undock ${toolTitle.toLowerCase()} settings into a floating panel`
+          ? `Undock ${toolTitle.toLowerCase()} settings back to the tool button`
           : `Pin ${toolTitle.toLowerCase()} settings to the tool button`
       }
       onClick={togglePlacement}
     >
-      {isAnchored ? "Dock" : isDocked ? "Undock" : "Pin"}
+      {isAnchored ? "Unpin" : isDocked ? "Undock" : "Pin"}
     </button>
   );
 

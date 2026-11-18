@@ -38,6 +38,29 @@
     right: 0;
   }
 
+  /* Portalled out of the trigger's scroll container: the inline style owns
+     every edge, and `max-height` comes from the measured free space rather
+     than a guess, so the clamp above must not fight it. See `Menu.tsx`. */
+  &.gn-menu--fixed {
+    position: fixed;
+    top: auto;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    max-height: none;
+    z-index: 100;
+
+    /* The bar's scope is a `pointer-events: none` overlay so the canvas stays
+       drawable around the bar; `.gn-bar` restores `auto` for itself. A
+       portalled menu is a sibling of the bar, not a child, so it has to
+       restore it too — without this every item hit-tests to the canvas. */
+    pointer-events: auto;
+
+    /* `max-height` is measured free space, which must include the padding and
+       border or the popover overruns the viewport edge by exactly those 10px. */
+    box-sizing: border-box;
+  }
+
   &__group + &__group {
     margin-top: 0.125rem;
     padding-top: 0.25rem;

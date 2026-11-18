@@ -1260,6 +1260,7 @@ const ExcalidrawWrapper = ({
               ? undefined
               : () => setIsPagePanelOpen((v) => !v)
           }
+          activeToolMenuOpen={toolMenu.isOpen}
           // the bar knows more tools than the menu has panels for
           onActiveToolMenu={(tool, anchor) => {
             if (
