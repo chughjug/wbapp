@@ -468,13 +468,36 @@ export const ToolMenu = ({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  useLayoutEffect(() => {
-    const node = panelRef.current;
+  /**
+   * Measure the panel through a CALLBACK ref rather than an effect keyed on
+   * `[open, tool]`.
+   *
+   * Anchored and floating are two different JSX subtrees, so changing
+   * placement swaps the DOM node while `open` and `tool` both stay the same.
+   * An effect with those deps therefore never re-ran: the `ResizeObserver`
+   * went on watching the detached anchored node, which reports 0x0, and
+   * `placementToPixels` turned that into a panel positioned off the bottom
+   * of the screen — at 1194x834, `top = 16 + 0.68 * (834 - 32 - 0) = 561`
+   * for a 490px-tall panel, so 217px of it hung below the fold, including
+   * the "Pin" button that would undo it. A callback ref fires on every node
+   * swap, which is exactly the event that was being missed, and does not
+   * depend on where in the component body it is declared.
+   */
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const measurePanel = useCallback((node: HTMLDivElement | null) => {
+    panelRef.current = node;
+    observerRef.current?.disconnect();
+    observerRef.current = null;
     if (!node) {
       return;
     }
     const measure = () => {
       const rect = node.getBoundingClientRect();
+      // A collapsed measurement is never real for a panel that is on
+      // screen; taking it would place the panel from a bogus size.
+      if (rect.width < 1 || rect.height < 1) {
+        return;
+      }
       setPanelSize((current) =>
         Math.abs(current.width - rect.width) < 1 &&
         Math.abs(current.height - rect.height) < 1
@@ -485,8 +508,16 @@ export const ToolMenu = ({
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
-    return () => observer.disconnect();
-  }, [open, tool]);
+    observerRef.current = observer;
+  }, []);
+
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+    },
+    [],
+  );
 
   const placement = useMemo(
     () => drag ?? placementToPixels(position, panelSize, viewport),
@@ -1437,7 +1468,7 @@ export const ToolMenu = ({
         data-placement="anchored"
       >
         <div
-          ref={panelRef}
+          ref={measurePanel}
           className={`gn-tool-menu gn-tool-menu--anchored ${
             className ?? ""
           }`.trim()}
@@ -1521,7 +1552,7 @@ export const ToolMenu = ({
         data-placement="docked"
       >
         <div
-          ref={panelRef}
+          ref={measurePanel}
           className={`gn-tool-menu gn-tool-menu--docked ${
             className ?? ""
           }`.trim()}
@@ -1584,7 +1615,7 @@ export const ToolMenu = ({
       data-placement="floating"
     >
       <div
-        ref={panelRef}
+        ref={measurePanel}
         className={`gn-tool-menu ${className ?? ""}`.trim()}
         data-testid="gn-tool-menu"
         data-placement="floating"

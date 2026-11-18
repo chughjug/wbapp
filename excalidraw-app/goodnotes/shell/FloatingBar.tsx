@@ -372,7 +372,13 @@ export interface FloatingBarProps {
    */
   activeTool?: TaskbarToolId | null;
   /** Fired after the editor has been switched, for hosts that mirror state. */
-  onToolChange?: (tool: TaskbarToolId, shape?: TaskbarShapeId) => void;
+  /**
+   * Fired whenever the bar changes the active tool, including to "hand",
+   * which is an engine tool rather than one of the bar's own slots — the
+   * host needs to hear about that one too, to dismiss surfaces (the lasso
+   * overlay) that would otherwise sit on top of it.
+   */
+  onToolChange?: (tool: TaskbarToolId | "hand", shape?: TaskbarShapeId) => void;
 
   /** Ink for the pen slot. Defaults to a medium black freedraw. */
   penPreset?: PenPreset;
@@ -672,6 +678,13 @@ export const FloatingBar = ({
     }
     activateExtraTool(excalidrawAPI, "hand");
     setHandActive(true);
+    // Announce the way IN as well as the way out. Every other control on
+    // this bar reports its tool change, and the host uses that to drop the
+    // lasso overlay; hand reported only on the way back to Select, so
+    // picking Hand while the lasso was on left the overlay live on top of
+    // it — two buttons showing as pressed and the canvas swallowing the
+    // drag.
+    onToolChangeRef.current?.("hand");
   }, [readMode, excalidrawAPI, onToolChangeRef]);
 
   /**
