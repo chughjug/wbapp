@@ -64,6 +64,59 @@ export const loadSurfaceMode = (docId?: string | null): SurfaceMode => {
   }
 };
 
+/**
+ * Mirror the mode onto the document's own metadata, so it travels with the
+ * document rather than living only in this browser. Fire-and-forget and
+ * best-effort: `localStorage` stays the synchronous source of truth that the
+ * first paint reads, and a document that has not been created yet (or a
+ * storage failure) must not break the toggle.
+ */
+const writeThroughToDoc = (
+  docId: string | null | undefined,
+  mode: SurfaceMode,
+) => {
+  if (!docId) {
+    return;
+  }
+  void import("../library/store")
+    .then(({ getDoc, updateDocMeta }) =>
+      getDoc(docId).then((doc) =>
+        doc && doc.surface !== mode
+          ? updateDocMeta(docId, { surface: mode })
+          : undefined,
+      ),
+    )
+    .catch(() => {
+      // the localStorage tier already took the change
+    });
+};
+
+/**
+ * Pull the mode off the document's metadata into the synchronous tier, for a
+ * document whose mode was set on another device (or before an export). Does
+ * nothing when the two already agree, so it cannot fight a local toggle.
+ * Returns the mode now in force.
+ */
+export const hydrateSurfaceModeFromDoc = async (
+  docId: string | null | undefined,
+): Promise<SurfaceMode> => {
+  const local = loadSurfaceMode(docId);
+  if (!docId) {
+    return local;
+  }
+  try {
+    const { getDoc } = await import("../library/store");
+    const doc = await getDoc(docId);
+    const stored = doc?.surface;
+    if (stored && stored !== local) {
+      return saveSurfaceMode(docId, stored);
+    }
+  } catch {
+    // no library, no problem: the local tier stands
+  }
+  return local;
+};
+
 /** Persists the mode for one document and notifies every subscriber. */
 export const saveSurfaceMode = (
   docId: string | null | undefined,
@@ -75,6 +128,7 @@ export const saveSurfaceMode = (
   } catch {
     // private mode / quota: the session still honours the change
   }
+  writeThroughToDoc(docId, next);
   listeners.forEach((listener) => listener(next, docId ?? null));
   return next;
 };

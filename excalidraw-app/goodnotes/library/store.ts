@@ -176,6 +176,8 @@ const normalizeMeta = (raw: Partial<DocMeta> & { id: string }): DocMeta => {
     ...(raw.defaultImageFit === undefined
       ? {}
       : { defaultImageFit: raw.defaultImageFit }),
+    ...(raw.surface === undefined ? {} : { surface: raw.surface }),
+    ...(raw.thumbnailAt === undefined ? {} : { thumbnailAt: raw.thumbnailAt }),
   };
 };
 

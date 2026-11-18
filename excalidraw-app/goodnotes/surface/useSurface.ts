@@ -20,6 +20,7 @@ import {
 } from "./rotateSheet";
 import {
   DEFAULT_SURFACE_MODE,
+  hydrateSurfaceModeFromDoc,
   getCurrentDocId,
   loadSurfaceMode,
   saveSurfaceMode,
@@ -101,6 +102,20 @@ export const useSurface = (
   // the document may change under us (tabs); re-read its stored mode
   useEffect(() => {
     setModeState(loadSurfaceMode(docId));
+    // and then catch up with the document's own record, for a mode that was
+    // set on another device or came in with an import. `saveSurfaceMode`
+    // inside the hydrate notifies every subscriber, including this hook, so
+    // there is nothing to apply here; a document that already agrees writes
+    // nothing at all.
+    let cancelled = false;
+    void hydrateSurfaceModeFromDoc(docId).then((mode) => {
+      if (!cancelled) {
+        setModeState(mode);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [docId]);
 
   // other writers (another tab, a host menu calling saveSurfaceMode)

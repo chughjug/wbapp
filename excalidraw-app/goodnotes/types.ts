@@ -91,6 +91,19 @@ export interface DocMeta {
   defaultPageSize: PageSizeName;
   defaultLandscape?: boolean;
   defaultImageFit?: PageImageFit;
+  /**
+   * Is this document made of paper, or is it an endless whiteboard?
+   * Absent means "paper". Lives here rather than only in `localStorage` so
+   * the mode travels with the document — to another device once sync is on,
+   * and through an export/reimport.
+   */
+  surface?: "paper" | "whiteboard";
+  /**
+   * When the cover thumbnail was taken, as the `updatedAt` it was taken at.
+   * Lets the library tell a stale cover from a current one without keeping a
+   * parallel stamp table of its own.
+   */
+  thumbnailAt?: number;
 }
 
 /** Full persisted scene for one document. */

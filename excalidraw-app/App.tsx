@@ -107,6 +107,11 @@ import {
 } from "./goodnotes/pages";
 import { PaperBackgroundLayer, syncPageImageCache } from "./goodnotes/paper";
 import { PagedViewControls, usePagedView } from "./goodnotes/paged";
+import {
+  SurfaceControls,
+  getWhiteboardExportScene,
+  useSurface,
+} from "./goodnotes/surface";
 import { Dashboard } from "./goodnotes/dashboard";
 import { CourseBrowser, useCanvasConnect } from "./goodnotes/canvas";
 import {
@@ -444,6 +449,8 @@ const ExcalidrawWrapper = ({
   const graph = useGraphDialog(excalidrawAPI);
   // one page at a time, fitted to the workspace; swipe/arrows move between
   const paged = usePagedView(excalidrawAPI);
+  // paper vs whiteboard (per document) + rotate sheet
+  const surface = useSurface(excalidrawAPI, { docId: docId ?? undefined });
   const [isPagePanelOpen, setIsPagePanelOpen] = useState(false);
   const openDocs = useOpenDocs(docId ?? undefined);
   const presentation = usePresentation(excalidrawAPI, pages);
@@ -1243,8 +1250,15 @@ const ExcalidrawWrapper = ({
           onInsertGraph={() => graph.open()}
           documentTitle={excalidrawAPI?.getName()}
           onNewDocument={onNewDocument}
-          pagePanelOpen={isPagePanelOpen}
-          onTogglePagePanel={() => setIsPagePanelOpen((v) => !v)}
+          pagePanelOpen={isPagePanelOpen && !surface.isWhiteboard}
+          // omitted on a whiteboard, which hides the control entirely:
+          // there are no pages to show, so the panel opens empty and the
+          // button is a dead one
+          onTogglePagePanel={
+            surface.isWhiteboard
+              ? undefined
+              : () => setIsPagePanelOpen((v) => !v)
+          }
           // the bar knows more tools than the menu has panels for
           onActiveToolMenu={(tool, anchor) => {
             if (
@@ -1279,19 +1293,48 @@ const ExcalidrawWrapper = ({
           backdropsDisabled={!backdrops.hasImageSelection}
           onUndo={input.undo}
           onRedo={input.redo}
-          onAddPage={newPage.open}
+          // A whiteboard has no pages, so these are not merely unavailable,
+          // they are meaningless. FloatingBar treats them as optional and
+          // renders neither the counter nor "Add page" when they are absent —
+          // better than a "+" that can never do anything in this document.
+          onAddPage={surface.isWhiteboard ? undefined : newPage.open}
           onShare={() => setShareDialogState({ isOpen: true, type: "share" })}
-          pageCount={pages.length}
-          currentPage={currentPageNumber ?? undefined}
+          pageCount={surface.isWhiteboard ? undefined : pages.length}
+          currentPage={
+            surface.isWhiteboard ? undefined : currentPageNumber ?? undefined
+          }
           moreItems={[
+            ...(surface.isWhiteboard
+              ? []
+              : [
+                  {
+                    id: "present",
+                    label: "Present pages",
+                    onSelect: () => {
+                      const startAt = Math.max(0, (currentPageNumber ?? 1) - 1);
+                      presentation.start(startAt);
+                    },
+                  },
+                ]),
             {
-              id: "present",
-              label: "Present pages",
-              onSelect: () => {
-                const startAt = Math.max(0, (currentPageNumber ?? 1) - 1);
-                presentation.start(startAt);
-              },
+              id: "surface-mode",
+              label: surface.isWhiteboard ? "Back to paper" : "Whiteboard",
+              onSelect: () => surface.toggle(),
             },
+            ...(surface.hasSheets
+              ? [
+                  {
+                    id: "rotate-sheet",
+                    label: "Rotate this sheet",
+                    onSelect: () => surface.rotate(),
+                  },
+                  {
+                    id: "rotate-all-sheets",
+                    label: "Rotate every sheet",
+                    onSelect: () => surface.rotateAll(),
+                  },
+                ]
+              : []),
             {
               id: "settings",
               label: "Settings…",
@@ -1308,7 +1351,8 @@ const ExcalidrawWrapper = ({
           onExit={presentation.stop}
         />
         <PagePanel
-          open={isPagePanelOpen}
+          // equally pointless on a whiteboard
+          open={isPagePanelOpen && !surface.isWhiteboard}
           onClose={() => setIsPagePanelOpen(false)}
           theme={editorTheme}
           excalidrawAPI={excalidrawAPI}
@@ -1317,6 +1361,9 @@ const ExcalidrawWrapper = ({
         />
         <div className="gn-shell-canvas">
           <PaperBackgroundLayer
+            // `undefined` on paper, so the layer keeps deriving pages from
+            // `elements`; a stable `[]` on a whiteboard, which paints nothing.
+            pages={surface.paperPages}
             elements={paperView.elements}
             scrollX={paperView.scrollX}
             scrollY={paperView.scrollY}
@@ -1573,6 +1620,9 @@ const ExcalidrawWrapper = ({
       {settings.screen}
       {settings.firstRunHint}
       <PagedViewControls {...paged.controlsProps} />
+      {/* live region only: the rotate/whiteboard actions are in the bar's
+          overflow menu, but this is what announces them to a screen reader */}
+      <SurfaceControls {...surface.controlsProps} controls={false} />
       {newPage.dialog}
       <GlobalPdfDropOverlay mode="document" />
       <ObjectMenu
@@ -1590,10 +1640,17 @@ const ExcalidrawWrapper = ({
       )}
       {isPdfExportOpen && excalidrawAPI && (
         <ExportDialog
-          elements={excalidrawAPI.getSceneElements()}
+          // A whiteboard has no sheets to iterate, so it exports as one page
+          // over the used bounding box.
+          elements={
+            surface.isWhiteboard
+              ? getWhiteboardExportScene(excalidrawAPI.getSceneElements())
+                  .elements
+              : excalidrawAPI.getSceneElements()
+          }
           files={excalidrawAPI.getFiles()}
           appState={excalidrawAPI.getAppState()}
-          currentPageNumber={currentPageNumber}
+          currentPageNumber={surface.isWhiteboard ? 1 : currentPageNumber}
           theme={editorTheme}
           onClose={() => setIsPdfExportOpen(false)}
         />

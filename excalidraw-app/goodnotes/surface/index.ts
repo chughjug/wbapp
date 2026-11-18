@@ -42,6 +42,7 @@ export {
   SURFACE_MODE_STORAGE_PREFIX,
   TRANSIENT_DOC_KEY,
   getCurrentDocId,
+  hydrateSurfaceModeFromDoc,
   loadSurfaceMode,
   saveSurfaceMode,
   subscribeSurfaceMode,
