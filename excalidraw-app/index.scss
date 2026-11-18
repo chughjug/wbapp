@@ -1,5 +1,44 @@
 @import "../packages/excalidraw/css/variables.module.scss";
 
+/* ---------------------------------------------------------------------------
+   Touch behaviour for this app's own chrome.
+
+   Upstream gets this from the `buttonNoHighlight` mixin, which only its own
+   buttons include — none of the GoodNotes shell does. On iOS and iPadOS that
+   left every control in the bar, the menus, the tool panel, the tabs, the ink
+   orb and the shelf with the browser defaults: a grey tap-highlight box
+   flashing on each tap, and a long press selecting the label or raising the
+   Copy / Look Up callout. On a device driven by a finger and a Pencil — where
+   a resting palm or a slow tap is routine, not an edge case — that fires
+   constantly.
+
+   Text that is genuinely meant to be selectable opts back in: the shelf and
+   the dashboard already set `user-select: text`, and this does not touch
+   inputs or the canvas.
+   --------------------------------------------------------------------------- */
+.gn-bar-scope,
+.gn-menu,
+.gn-tool-menu,
+.gn-ink-orb,
+.gn-page-panel,
+.gn-shelf,
+[role="tablist"] {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+.gn-bar-scope button,
+.gn-menu button,
+.gn-tool-menu button,
+.gn-ink-orb button,
+.gn-page-panel button,
+.gn-shelf button,
+[role="tablist"] button {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
 .excalidraw {
   --color-primary-contrast-offset: #625ee0; // to offset Chubb illusion
 

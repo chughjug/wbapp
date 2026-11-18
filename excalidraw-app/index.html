@@ -9,6 +9,16 @@
     />
     <meta name="referrer" content="origin" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <!-- iOS < 16.4 does not read `display` from the web manifest; without
+         this, "Add to Home Screen" opens in a browser window rather than
+         standalone, and a non-standalone install is not exempt from Safari's
+         7-day cap on script-writable storage. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- Pins the Home Screen label. iOS otherwise uses `document.title`,
+         which now carries the open document's name ("Organic Chemistry —
+         Notebook"), so installing from inside a notebook would name the app
+         after whatever happened to be open. -->
+    <meta name="apple-mobile-web-app-title" content="Notebook" />
     <meta name="theme-color" content="#121212" />
 
     <!-- Primary Meta Tags -->
