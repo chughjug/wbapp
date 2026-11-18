@@ -114,6 +114,7 @@ import {
 } from "./goodnotes/surface";
 import { Dashboard } from "./goodnotes/dashboard";
 import { CourseBrowser, useCanvasConnect } from "./goodnotes/canvas";
+import { SyncPanel, useSync } from "./goodnotes/sync";
 import {
   getScene,
   saveSceneDebounced,
@@ -1692,6 +1693,12 @@ const GoodNotesRoot = () => {
   const { editorTheme } = useDarkMode();
   const canvasConnect = useCanvasConnect({ theme: editorTheme });
 
+  // Sync sits above both the shelf and the editor, so a pass is not cancelled
+  // by navigating between them. `activeDocId` is load-bearing: the engine
+  // will not overwrite the document the editor currently holds in memory.
+  // It is inert with no Supabase env vars set, which is the default.
+  const sync = useSync({ activeDocId: docId });
+
   const openDocument = useCallback((doc: DocMeta) => {
     window.history.pushState({}, "", `/d/${encodeURIComponent(doc.id)}`);
     setDocId(doc.id);
@@ -1775,7 +1782,12 @@ const GoodNotesRoot = () => {
           theme={editorTheme}
           onOpenDocument={openDocument}
           onCreateDocument={(init) => newDocument.open(init)}
-          headerExtra={<PdfDropZone variant="inline" />}
+          headerExtra={
+            <>
+              <PdfDropZone variant="inline" />
+              <SyncPanel sync={sync} theme={editorTheme} />
+            </>
+          }
           onConnectCanvas={canvasConnect.open}
         />
         <GlobalPdfDropOverlay mode="library" />
