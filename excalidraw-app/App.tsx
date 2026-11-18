@@ -120,6 +120,8 @@ import {
   saveSceneDebounced,
   flushSceneSaves,
   subscribeSaveError,
+  updateDocMeta,
+  PromptDialog,
 } from "./goodnotes/library";
 import { CollabHostPanel } from "./goodnotes/collab-host";
 import { HistoryPanel, useCrdtDoc } from "./goodnotes/crdt";
@@ -464,6 +466,8 @@ const ExcalidrawWrapper = ({
    * the "+" menu — and a row of browser tabs all reading "Notebook" is no
    * use for picking between them.
    */
+  const [isRenamingDoc, setIsRenamingDoc] = useState(false);
+
   const activeDocTitle =
     openDocs.tabs.find((tab) => tab.id === openDocs.activeId)?.meta?.title ??
     null;
@@ -1297,7 +1301,14 @@ const ExcalidrawWrapper = ({
             setAppTheme(editorTheme === "dark" ? "light" : "dark")
           }
           onInsertGraph={() => graph.open()}
-          documentTitle={excalidrawAPI?.getName()}
+          // The LIBRARY's title, not `excalidrawAPI.getName()`. The latter
+          // is Excalidraw's own scene name, which for a notebook created in
+          // this app is a machine-generated stamp — the bar's document
+          // heading read "Untitled-2026-11-18-2346" while the shelf, the tab
+          // strip and the window title all said "Untitled notebook", and it
+          // did not follow a rename. `getName()` is still the fallback, for
+          // a shared link that has no library entry to name it.
+          documentTitle={activeDocTitle ?? excalidrawAPI?.getName()}
           onNewDocument={onNewDocument}
           pagePanelOpen={isPagePanelOpen && !surface.isWhiteboard}
           // omitted on a whiteboard, which hides the control entirely:
@@ -1309,6 +1320,9 @@ const ExcalidrawWrapper = ({
               : () => setIsPagePanelOpen((v) => !v)
           }
           activeToolMenuOpen={toolMenu.isOpen}
+          // only for a document that is actually in the library: a shared
+          // link has no entry to rename
+          onRenameDocument={docId ? () => setIsRenamingDoc(true) : undefined}
           // the bar knows more tools than the menu has panels for
           onActiveToolMenu={(tool, anchor) => {
             if (
@@ -1412,6 +1426,26 @@ const ExcalidrawWrapper = ({
           onAddPage={newPage.open}
           docId={docId ?? undefined}
         />
+        {isRenamingDoc && docId && (
+          <PromptDialog
+            title="Rename notebook"
+            label="Name"
+            initialValue={activeDocTitle ?? ""}
+            placeholder="Untitled notebook"
+            confirmLabel="Rename"
+            onCancel={() => setIsRenamingDoc(false)}
+            onConfirm={(value) => {
+              setIsRenamingDoc(false);
+              const title = value.trim();
+              if (!title || title === activeDocTitle) {
+                return;
+              }
+              // the shelf, the tab strip and the window title all read this
+              // back through the library's change listeners
+              void updateDocMeta(docId, { title });
+            }}
+          />
+        )}
         <div className="gn-shell-canvas">
           <PaperBackgroundLayer
             // `undefined` on paper, so the layer keeps deriving pages from
@@ -1704,6 +1738,10 @@ const ExcalidrawWrapper = ({
           files={excalidrawAPI.getFiles()}
           appState={excalidrawAPI.getAppState()}
           currentPageNumber={surface.isWhiteboard ? 1 : currentPageNumber}
+          // Without this every export is literally "document.pdf", so a term
+          // of handed-in work collides in one folder. The field stays
+          // editable in the dialog.
+          defaultFileName={activeDocTitle ?? undefined}
           theme={editorTheme}
           onClose={() => setIsPdfExportOpen(false)}
         />

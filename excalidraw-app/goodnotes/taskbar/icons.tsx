@@ -258,6 +258,14 @@ export const HomeIcon = () => (
   </svg>
 );
 
+/** Rename the open document. A pencil over a line. */
+export const RenameIcon = () => (
+  <svg viewBox="0 0 24 24" className="gn-icon" aria-hidden="true">
+    <path d="M4 20h16" />
+    <path d="M15.5 4.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4z" />
+  </svg>
+);
+
 /** Create a new document. */
 export const NewDocumentIcon = () => (
   <svg viewBox="0 0 24 24" className="gn-icon" aria-hidden="true">

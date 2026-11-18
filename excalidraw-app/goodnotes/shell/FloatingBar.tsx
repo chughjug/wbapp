@@ -77,6 +77,7 @@ import {
   LassoIcon,
   LineIcon,
   NewDocumentIcon,
+  RenameIcon,
   PagesPanelIcon,
   PenIcon,
   ReadIcon,
@@ -408,6 +409,17 @@ export interface FloatingBarProps {
 
   // ---- "+" (secondary inserts) --------------------------------------------
 
+  /**
+   * Rename the open document. Item hidden when absent (a shared link with
+   * no library entry has nothing to rename).
+   *
+   * The title otherwise appears only as this menu's section heading, and
+   * the tab strip that used to carry it is hidden while one document is
+   * open — so without this there is no way to name a notebook from inside
+   * it, and every notebook starts out called "Untitled notebook".
+   */
+  onRenameDocument?: () => void;
+
   /** Open the PDF import flow. Item hidden when absent. */
   onImportPdf?: () => void;
   importPdfDisabled?: boolean;
@@ -528,6 +540,7 @@ export const FloatingBar = ({
   highlighterPreset,
   onActiveToolMenu,
   activeToolMenuOpen = false,
+  onRenameDocument,
   onImportPdf,
   importPdfDisabled,
   onInsertGraph,
@@ -894,6 +907,14 @@ export const FloatingBar = ({
     const sections: TaskbarMenuSection[] = [];
 
     const doc: TaskbarMenuItem[] = [];
+    if (onRenameDocument) {
+      doc.push({
+        id: "rename-document",
+        label: "Rename…",
+        icon: <RenameIcon />,
+        onSelect: onRenameDocument,
+      });
+    }
     if (onNewDocument) {
       doc.push({
         id: "new-document",
@@ -1012,6 +1033,7 @@ export const FloatingBar = ({
   }, [
     documentTitle,
     onNewDocument,
+    onRenameDocument,
     onAddPage,
     addPageDisabled,
     onUndo,
