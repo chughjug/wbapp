@@ -689,6 +689,18 @@ export const attachPagedView = (
     if (!insideEditor) {
       return;
     }
+    // …but a popup or dialog on top owns the keyboard, even though it is
+    // inside the editor by DOM. The "+" popover is portalled onto
+    // `.excalidraw` (so it inherits the editor's theme tokens), which
+    // satisfies the check above; without this, page navigation ate Home and
+    // End there and the menu's own jump-to-first/last did nothing. Same
+    // rule the lasso overlay follows.
+    if (
+      target instanceof Element &&
+      target.closest('[role="menu"], [role="dialog"]')
+    ) {
+      return;
+    }
     const appState = api.getAppState();
     if (appState.editingTextElement || appState.openDialog) {
       return;
