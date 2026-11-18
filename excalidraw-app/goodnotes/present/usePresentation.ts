@@ -49,6 +49,16 @@ export const usePresentation = (
       return;
     }
     const onKey = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT")
+      ) {
+        return; // someone is typing
+      }
       if (event.key === "Escape") {
         event.preventDefault();
         stop();
@@ -60,8 +70,19 @@ export const usePresentation = (
         prev();
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // CAPTURE, on `window`.
+    //
+    // The floating bar deliberately stays visible and focusable while
+    // presenting (see `PresentationOverlay.scss`), and closing the "+" menu
+    // returns focus to its trigger — a bar button. The bar's roving-focus
+    // handler claims Left/Right in the capture phase on `document` and calls
+    // `stopPropagation`, so in a bubble listener here the arrow keys never
+    // arrived: they moved focus along the hidden bar instead of changing
+    // slide, and a presentation could not be advanced or stepped back from
+    // the keyboard at all. `window` capture runs before `document` capture,
+    // so presenting — which is a modal mode — now wins.
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [active, next, prev, stop]);
 
   useEffect(() => () => setPresentationChrome(false), []);
