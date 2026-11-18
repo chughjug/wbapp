@@ -362,6 +362,23 @@ body.gn-shell-suppress-default-ui {
     display: none;
   }
 
+  /* the editor's own undo/redo, bottom-left. The bar carries the pair the
+     user actually reaches for — beside the tools, where a thumb already is —
+     so leaving these would put Undo and Redo on screen twice. Measured at
+     1194x834: bar pair at x=770/806, these at x=122/158. The zoom readout
+     and the minimap beside them stay; they are not duplicated anywhere. */
+  .excalidraw .undo-button-container,
+  .excalidraw .redo-button-container {
+    display: none;
+  }
+
+  /* "Exit zen mode", bottom-centre. Zen mode is this app's permanent state —
+     the shell IS the zen UI — so the button offers to leave somewhere the
+     user never chose to be, and leaves upstream's toolbars behind if used. */
+  .excalidraw .disable-zen-mode {
+    display: none;
+  }
+
   /* mobile form factor: the same tools, rendered as a bottom bar by
      `MobileMenu`. Hidden too, otherwise every tool appears twice. */
   .excalidraw--mobile .App-toolbar-content,
