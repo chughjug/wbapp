@@ -8,7 +8,7 @@
  * this device's point of view.
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ExcalidrawElement } from "@excalidraw/element/types";
 
@@ -329,6 +329,57 @@ describe("sync engine", () => {
     expect(row.course).toBe("CHEM 210");
     expect(row.tags).toEqual(["exam"]);
     expect(row.version).toBe(2);
+  });
+
+  it("still sees an edit that lands in the same millisecond as the sync", async () => {
+    // `Date.now()` is millisecond-resolution and the fast path compares
+    // `updatedAt` for equality, so a stroke saved in the same millisecond the
+    // engine took its watermark used to be invisible — skipped on this pass
+    // and every later one, until some unrelated edit happened to bump the
+    // clock. `library/store.ts` keeps `updatedAt` strictly increasing to stop
+    // that. Saving in a tight loop is what makes the collision likely.
+    // Freeze the clock so the collision is certain rather than a race: every
+    // `Date.now()` below returns the same millisecond. Only `Date` is faked —
+    // faking timers wholesale would stall the idb promises these helpers use.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+
+      const doc = await createDoc({ title: "Same ms" });
+      await saveScene(doc.id, sceneOf(["a"]));
+      await run(server);
+      expect(await countPending()).toBe(0);
+
+      const syncedAt = (await listDocs()).find(
+        (d) => d.id === doc.id,
+      )!.updatedAt;
+      await saveScene(doc.id, sceneOf(["a", "b"]));
+      const editedAt = (await listDocs()).find(
+        (d) => d.id === doc.id,
+      )!.updatedAt;
+
+      expect(editedAt).toBeGreaterThan(syncedAt);
+      expect(await countPending()).toBe(1);
+
+      // and it must actually reach the server, not just be counted
+      const report = await run(server);
+      expect(report.pushed).toEqual([doc.id]);
+      expect(await countPending()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps updatedAt strictly increasing across a burst of saves", async () => {
+    const doc = await createDoc({ title: "Burst" });
+    const stamps: number[] = [];
+    for (let i = 0; i < 25; i++) {
+      await saveScene(doc.id, sceneOf([`el-${i}`]));
+      stamps.push((await listDocs()).find((d) => d.id === doc.id)!.updatedAt);
+    }
+    for (let i = 1; i < stamps.length; i++) {
+      expect(stamps[i]).toBeGreaterThan(stamps[i - 1]);
+    }
   });
 
   it("counts pending documents without reading scenes", async () => {

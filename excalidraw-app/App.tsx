@@ -455,6 +455,25 @@ const ExcalidrawWrapper = ({
   const [isPagePanelOpen, setIsPagePanelOpen] = useState(false);
   const openDocs = useOpenDocs(docId ?? undefined);
   const presentation = usePresentation(excalidrawAPI, pages);
+
+  /**
+   * Keep the browser/PWA window title on the document you are looking at.
+   * The tab strip hides itself when only one document is open, so without
+   * this the name of the thing you are writing in appears nowhere outside
+   * the "+" menu — and a row of browser tabs all reading "Notebook" is no
+   * use for picking between them.
+   */
+  const activeDocTitle =
+    openDocs.tabs.find((tab) => tab.id === openDocs.activeId)?.meta?.title ??
+    null;
+  useEffect(() => {
+    const base = "Notebook";
+    const name = activeDocTitle?.trim();
+    document.title = name ? `${name} — ${base}` : base;
+    return () => {
+      document.title = base;
+    };
+  }, [activeDocTitle]);
   const crdt = useCrdtDoc(docId);
 
   const onActivateTab = useCallback(
@@ -1234,7 +1253,13 @@ const ExcalidrawWrapper = ({
         onReorder={openDocs.actions.reorder}
         onCloseOthers={openDocs.actions.closeOthers}
         onNewTab={onNewDocument}
-        showWhenSingle
+        // No `showWhenSingle`. `TabBar`'s own contract is that a full-width
+        // strip naming the document you are already looking at is pure
+        // chrome, and measurement agrees: it was 3.32% of a 1194x834 viewport
+        // and 3.04% of a phone's — a third of all resting chrome — to show
+        // one tab. The strip returns the moment a second document is open.
+        // Nothing is lost with one: "New document" is in the "+" menu and on
+        // Ctrl+N, and the document's title is in the same menu.
       />
       {/* band 3 — page panel + canvas */}
       {/* the active tool's settings, docked as a band under the bar */}

@@ -109,6 +109,26 @@ export const runBatched = async <T>(fn: () => Promise<T>): Promise<T> => {
 const now = () => Date.now();
 
 /**
+ * The next `updatedAt` for a document, guaranteed to be strictly greater than
+ * the one it already has.
+ *
+ * WHY: `Date.now()` has millisecond resolution, and two writes to the same
+ * document can land inside one millisecond — a stroke saved right after the
+ * sync engine took its watermark, say. The sync fast path compares
+ * `updatedAt` for *equality* against that watermark and checks the metadata
+ * hash alongside it (`sync/engine.ts`), so an edit that changes only the
+ * scene and keeps the same millisecond looks identical to a synced document
+ * and is skipped — not until the next sync, but until some later edit
+ * happens to bump the clock. Making the stamp strictly monotonic removes the
+ * collision at the source and keeps that fast path cheap (no scene reads).
+ *
+ * The stamp stays an ordinary epoch-millisecond value; under a burst of
+ * sub-millisecond writes it simply runs a few ms ahead of the wall clock.
+ */
+const bumpUpdatedAt = (previous: number): number =>
+  Math.max(now(), previous + 1);
+
+/**
  * Not every value that lives on `AppState` survives a structured clone (and a
  * few are pure runtime noise). Keep the write cheap and total.
  */
@@ -257,7 +277,7 @@ export const updateDocMeta = async (
     ...rest,
     id: existing.id,
     createdAt: existing.createdAt,
-    updatedAt: patch.updatedAt ?? now(),
+    updatedAt: patch.updatedAt ?? bumpUpdatedAt(existing.updatedAt),
   });
   await set(id, next, metaStore);
   emitChange();
@@ -286,7 +306,7 @@ export const saveScene = async (id: string, scene: DocScene): Promise<void> => {
       id,
       normalizeMeta({
         ...meta,
-        updatedAt: now(),
+        updatedAt: bumpUpdatedAt(meta.updatedAt),
         pageCount: pageCount > 0 ? pageCount : meta.pageCount,
       }),
       metaStore,
