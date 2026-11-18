@@ -306,7 +306,18 @@ export default defineConfig(({ mode }) => {
         eslint:
           envVars.VITE_APP_ENABLE_ESLINT === "false"
             ? undefined
-            : { lintCommand: 'eslint "./**/*.{js,ts,tsx}"' },
+            : {
+                // The glob is relative to this package, and eslint looks for
+                // `.eslintignore` relative to the cwd it runs in — which is
+                // here, not the repo root, so the root file's `build/` entry
+                // never applies. Without these the dev server lints its own
+                // production output, and `yarn build` kills a running
+                // `yarn dev`: the checker expands the glob, the build rewrites
+                // `build/assets/<hash>.js`, and the next read dies with ENOENT
+                // on a filename that no longer exists.
+                lintCommand:
+                  'eslint "./**/*.{js,ts,tsx}" --ignore-pattern build --ignore-pattern dist --ignore-pattern dev-dist',
+              },
         overlay: {
           initialIsOpen: envVars.VITE_APP_COLLAPSE_OVERLAY === "false",
           badgeStyle: "margin-bottom: 4rem; margin-left: 1rem",
