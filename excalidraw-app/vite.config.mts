@@ -488,36 +488,32 @@ export default defineConfig(({ mode }) => {
           // editor that reads upstream's `web-share-target` cache), so it
           // advertised a capability the app did not have.
           share_target: SHARE_TARGET_MANIFEST,
+          // Real captures of this app. The six that were here before
+          // ("virtual-whiteboard", "wireframe", "illustration", "shapes",
+          // "collaboration", "export") were upstream Excalidraw's marketing
+          // shots, so the install prompt previewed a different product.
+          // `form_factor` is what lets a store/prompt pick the right one.
           screenshots: [
             {
-              src: "/screenshots/virtual-whiteboard.png",
+              src: "/screenshots/library-wide.png",
               type: "image/png",
-              sizes: "462x945",
+              sizes: "1194x834",
+              form_factor: "wide",
+              label: "Your notebooks on the shelf",
             },
             {
-              src: "/screenshots/wireframe.png",
+              src: "/screenshots/notebook-page.png",
               type: "image/png",
               sizes: "462x945",
+              form_factor: "narrow",
+              label: "Handwriting on a ruled page",
             },
             {
-              src: "/screenshots/illustration.png",
+              src: "/screenshots/library.png",
               type: "image/png",
               sizes: "462x945",
-            },
-            {
-              src: "/screenshots/shapes.png",
-              type: "image/png",
-              sizes: "462x945",
-            },
-            {
-              src: "/screenshots/collaboration.png",
-              type: "image/png",
-              sizes: "462x945",
-            },
-            {
-              src: "/screenshots/export.png",
-              type: "image/png",
-              sizes: "462x945",
+              form_factor: "narrow",
+              label: "Your notebooks on the shelf",
             },
           ],
         },
