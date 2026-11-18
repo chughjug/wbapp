@@ -119,6 +119,7 @@ import {
   getScene,
   saveSceneDebounced,
   flushSceneSaves,
+  subscribeSaveError,
 } from "./goodnotes/library";
 import { CollabHostPanel } from "./goodnotes/collab-host";
 import { HistoryPanel, useCrdtDoc } from "./goodnotes/crdt";
@@ -571,6 +572,28 @@ const ExcalidrawWrapper = ({
       flush();
     };
   }, []);
+
+  /**
+   * Say so when a scene write fails. These writes happen on a timer and on
+   * `pagehide`, so there is no caller left to show an error — and the two
+   * ways they realistically fail (the storage quota exhausted, or Safari
+   * evicting the database) are exactly the ones where carrying on writing
+   * loses the most work. A toast is the minimum: it is the difference
+   * between losing the last few strokes and losing the afternoon.
+   */
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    return subscribeSaveError(() => {
+      excalidrawAPI.setToast({
+        message:
+          "This notebook could not be saved — your device may be out of storage. Export a backup from Settings before closing the tab.",
+        closable: true,
+        duration: Infinity,
+      });
+    });
+  }, [excalidrawAPI]);
 
   const { editorTheme, appTheme, setAppTheme } = useDarkMode();
   const settingsExtraSections = useMemo(

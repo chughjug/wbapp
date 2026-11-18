@@ -182,6 +182,8 @@ export {
   saveSceneDebounced,
   /** Force-write anything saveSceneDebounced is still holding. */
   flushSceneSaves,
+  /** Scene writes that failed with nobody left waiting on them. */
+  subscribeSaveError,
   /** Store a page-1 PNG data URL preview. */
   setThumbnail,
   /** Stamp lastOpenedAt. */

@@ -315,6 +315,45 @@ export const saveScene = async (id: string, scene: DocScene): Promise<void> => {
   emitChange();
 };
 
+/**
+ * Scene writes that fail after the caller has stopped waiting.
+ *
+ * `saveSceneDebounced` fires from a timer and `flushSceneSaves` is called
+ * for its side effect, so neither has a caller left to return an error to.
+ * Both used to drop the rejection on the floor (`void saveScene(...)`),
+ * which meant a write that failed — the quota exhausted by a term of
+ * PDF-backed notebooks, or Safari evicting the database — lost the strokes
+ * in silence while the app went on looking like it was saving. Losing work
+ * is bad; losing it without saying so is worse, because the user keeps
+ * writing. Failures are announced here instead, and the host turns them
+ * into something the user can see.
+ */
+type SaveErrorListener = (docId: string, error: unknown) => void;
+
+const saveErrorListeners = new Set<SaveErrorListener>();
+
+/** Subscribe to scene writes that failed with nobody waiting on them. */
+export const subscribeSaveError = (
+  listener: SaveErrorListener,
+): (() => void) => {
+  saveErrorListeners.add(listener);
+  return () => {
+    saveErrorListeners.delete(listener);
+  };
+};
+
+const reportSaveError = (docId: string, error: unknown): void => {
+  // eslint-disable-next-line no-console
+  console.error(`goodnotes/library: could not save "${docId}"`, error);
+  saveErrorListeners.forEach((listener) => {
+    try {
+      listener(docId, error);
+    } catch {
+      // a broken listener must not swallow the next one
+    }
+  });
+};
+
 const pendingSaves = new Map<
   string,
   { timer: ReturnType<typeof setTimeout>; scene: DocScene }
@@ -337,7 +376,9 @@ export const saveSceneDebounced = (
     const entry = pendingSaves.get(id);
     pendingSaves.delete(id);
     if (entry) {
-      void saveScene(id, entry.scene);
+      void saveScene(id, entry.scene).catch((error) =>
+        reportSaveError(id, error),
+      );
     }
   }, wait);
   pendingSaves.set(id, { timer, scene });
@@ -350,7 +391,14 @@ export const flushSceneSaves = async (): Promise<void> => {
   await Promise.all(
     queued.map(([id, entry]) => {
       clearTimeout(entry.timer);
-      return saveScene(id, entry.scene);
+      // Resolve even when one document fails: every call site either ignores
+      // the result (`void flushSceneSaves()`, including the `pagehide`
+      // handler) or is mid-navigation, so a rejection here would be an
+      // unhandled one and would also abandon the OTHER documents in the
+      // batch. The failure is announced instead.
+      return saveScene(id, entry.scene).catch((error) =>
+        reportSaveError(id, error),
+      );
     }),
   );
 };
