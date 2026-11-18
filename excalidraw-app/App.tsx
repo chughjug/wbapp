@@ -1321,6 +1321,9 @@ const ExcalidrawWrapper = ({
               toolMenu.onToolSelect(tool, anchor);
             }
           }}
+          // picking any other tool must drop the lasso overlay, which is
+          // modal and otherwise swallows every stroke the new tool makes
+          onToolChange={() => deactivateFuzzySelect()}
           onFuzzySelect={() => {
             backdrops.close();
             toggleFuzzySelect();

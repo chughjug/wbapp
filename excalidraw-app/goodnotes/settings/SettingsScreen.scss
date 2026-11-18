@@ -539,7 +539,14 @@
   position: fixed;
   z-index: 55;
   right: 1rem;
-  bottom: 1rem;
+
+  /* Clear of the editor's bottom-right footer, and of the ink orb above it.
+     At `1rem` this toast covered the Help button outright (measured: toast
+     762,715 416x103; Help 1142,782 — `elementFromPoint` on Help returned the
+     toast), so a first-run user could not open Help for as long as the
+     first-run hint was up. `env(..., 0px)` also keeps it off the home
+     indicator on a Home Screen install. */
+  bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 0.75rem;
