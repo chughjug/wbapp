@@ -121,3 +121,6 @@ export type { DeadlineUrgency } from "./urgency";
  * already renders; it fails soft when the row is not present.
  */
 export { selectCourseInShelf, findCourseButton } from "./shelfBridge";
+
+export { PinnedStrip, orderPinned, MAX_PINNED_SHOWN } from "./PinnedStrip";
+export type { PinnedStripProps } from "./PinnedStrip";

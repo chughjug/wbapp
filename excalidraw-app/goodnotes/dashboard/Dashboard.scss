@@ -646,3 +646,111 @@
   border-radius: 50%;
   background-color: var(--gn-course-color, currentColor);
 }
+
+/* ---- Pinned row -------------------------------------------------------
+ *
+ * Shares the Up-next row's shape so the two read as one system when both
+ * are on screen. Colours are Excalidraw theme tokens, never literals —
+ * literal fallbacks were what made the Up-next cards white in dark mode.
+ */
+
+.gn-pinned {
+  &__heading {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--input-label-color, #495057);
+  }
+
+  &__list {
+    display: flex;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0 0 0.25rem;
+    list-style: none;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    // let a row of pinned notebooks scroll past the safe area on a phone
+    // rather than being clipped by it
+    scroll-padding-inline: 0.5rem;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 11rem;
+    max-width: 16rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--default-border-color, #c5c5d0);
+    border-radius: 0.625rem;
+    background: var(--island-bg-color, #fff);
+    color: var(--text-primary-color, #1b1b1f);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 120ms ease, transform 120ms ease;
+
+    &:hover {
+      border-color: var(--color-primary, #6965db);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4dabf7);
+      outline-offset: 1px;
+    }
+
+    &:active {
+      transform: scale(0.99);
+    }
+  }
+
+  &__star {
+    flex: 0 0 auto;
+    font-size: 0.875rem;
+    color: hsl(var(--gn-hue, 250) 70% 55%);
+  }
+
+  &__text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+
+  &__title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__course {
+    display: flex;
+    align-items: center;
+    gap: 0.3125rem;
+    font-size: 0.75rem;
+    color: var(--input-label-color, #495057);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__dot {
+    flex: 0 0 auto;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--color-primary, #6965db);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-pinned__item {
+    transition: none;
+  }
+}

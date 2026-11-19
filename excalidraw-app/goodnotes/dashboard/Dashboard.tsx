@@ -27,13 +27,14 @@
 
 import React, { useCallback, useId, useMemo, useRef, useState } from "react";
 
-import { Shelf, useCourseStyles, useDocuments } from "../library";
+import { isFavourite, Shelf, useCourseStyles, useDocuments } from "../library";
 
 import { ConnectInvite } from "./ConnectInvite";
 import { CourseCards } from "./CourseCards";
 import { DueSoonStrip } from "./DueSoonStrip";
 import { UpNextStrip } from "./UpNextStrip";
 import { buildLocalDeadlines } from "./localDeadlines";
+import { orderPinned, PinnedStrip } from "./PinnedStrip";
 import { dismissConnectInvite, isConnectInviteDismissed } from "./dismissal";
 import { buildCourseSummaries } from "./model";
 import { selectCourseInShelf } from "./shelfBridge";
@@ -88,6 +89,7 @@ export const Dashboard = ({
   const dueHeadingId = `${useId()}-due`;
   const upNextHeadingId = `${useId()}-up-next`;
   const coursesHeadingId = `${useId()}-courses`;
+  const pinnedHeadingId = `${useId()}-pinned`;
 
   // One clock read per data change keeps every badge mutually consistent.
   // `documents` is in here as well as the Canvas state because the local
@@ -135,6 +137,18 @@ export const Dashboard = ({
     [connected, liveDocuments, now],
   );
 
+  /**
+   * Starred notebooks, most recently opened first.
+   *
+   * Shown whether or not Canvas is connected: "what is due" and "what am I
+   * working in" are different questions, and the pinned row answers the
+   * second one in a single tap rather than a filter click.
+   */
+  const pinned = useMemo(
+    () => orderPinned(liveDocuments.filter(isFavourite)),
+    [liveDocuments],
+  );
+
   return (
     <div
       ref={rootRef}
@@ -157,6 +171,17 @@ export const Dashboard = ({
             onSelectCourse={handleSelectCourse}
             loading={work.status === "loading" && work.rows.length === 0}
             headingId={coursesHeadingId}
+          />
+        </div>
+      )}
+
+      {pinned.length > 0 && (
+        <div className="gn-dash__top">
+          <PinnedStrip
+            items={pinned}
+            styleOf={courseStyles.styleOf}
+            onOpenDocument={onOpenDocument}
+            headingId={pinnedHeadingId}
           />
         </div>
       )}
