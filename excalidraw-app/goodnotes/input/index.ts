@@ -131,3 +131,13 @@ export {
   HOVER_PREVIEW_MIN_SIZE_PX,
   HOVER_PREVIEW_MAX_SIZE_PX,
 } from "./constants";
+
+export {
+  /** Has a stylus ever been used on this device? Persisted, sticky. */
+  hasSeenStylus,
+  rememberStylusSeen,
+  forgetStylusSeen,
+  /** The tool a document should open with, given that answer. */
+  defaultToolForDevice,
+  STYLUS_SEEN_KEY,
+} from "./stylusMemory";

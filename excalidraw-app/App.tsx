@@ -86,7 +86,11 @@ import {
   starterSeedsContent,
 } from "./goodnotes/starters";
 import { useMathDialog } from "./goodnotes/math";
-import { useInputGestures } from "./goodnotes/input";
+import {
+  defaultToolForDevice,
+  hasSeenStylus,
+  useInputGestures,
+} from "./goodnotes/input";
 import { useSettingsScreen } from "./goodnotes/settings";
 import {
   GlobalPdfDropOverlay,
@@ -696,6 +700,20 @@ const ExcalidrawWrapper = ({
        * so the student's first Ctrl+Z undoes their own first stroke and
        * not the template they asked for.
        */
+      /**
+       * Open ready to write, but only on a device that has a stylus.
+       *
+       * On a phone a one-finger drag IS a drawing stroke and palm
+       * rejection only suppresses fingers while a stylus is in use, so
+       * Pen-by-default there would draw a line every time someone tried to
+       * scroll. Keyed on whether a `pointerType: "pen"` event has ever
+       * actually arrived on this device, not on screen size or user agent,
+       * both of which lie. See goodnotes/input/stylusMemory.ts.
+       */
+      if (defaultToolForDevice(hasSeenStylus()) === "freedraw") {
+        excalidrawAPI.setActiveTool({ type: "freedraw" });
+      }
+
       const starter = pending?.starterId ? getStarter(pending.starterId) : null;
       if (starter && starterSeedsContent(starter)) {
         const elements = excalidrawAPI.getSceneElementsIncludingDeleted();

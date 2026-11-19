@@ -17,6 +17,7 @@ import {
   saveInputSettings,
   subscribeInputSettings,
 } from "./settings";
+import { rememberStylusSeen } from "./stylusMemory";
 
 import type { ChromeVisibilityState } from "./chromeVisibility";
 import type { InputCapabilities, InputGestureEvent } from "./gestures";
@@ -104,7 +105,16 @@ export const useInputGestures = (
     const handle = attachInputGestures(excalidrawAPI, {
       getSettings: () => settingsRef.current,
       onGesture: (event) => onGestureRef.current?.(event),
-      onCapabilities: setCapabilities,
+      onCapabilities: (next) => {
+        setCapabilities(next);
+        // Persist the one capability that has to outlive the session.
+        // `penSeen` is false at mount, which is exactly when the default
+        // tool is chosen, so without remembering it a stylus could never
+        // influence that decision. See ./stylusMemory.ts.
+        if (next.penSeen) {
+          rememberStylusSeen();
+        }
+      },
     });
     handleRef.current = handle;
     return () => {
