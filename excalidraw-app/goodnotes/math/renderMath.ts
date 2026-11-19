@@ -210,10 +210,20 @@ const loadTypesetter = async (): Promise<MathTypesetter> => {
   if (!typesetterPromise) {
     typesetterPromise = (injectedLoader ?? loadRealTypesetter)().catch(
       (error) => {
-        // a failed load must not poison every later attempt
+        // Clear the cached promise so a later attempt can try again. This
+        // helps a caller-supplied loader and anything that failed before
+        // the network, but it CANNOT rescue the real `import()`: when a
+        // module script fails to load, the browser records that failure in
+        // the document's module map, and every later import of the same
+        // specifier gets the recorded failure without a new request.
+        //
+        // Measured, not assumed — offline, then online in the same tab,
+        // then online after a reload: fail, fail, work. So the message
+        // asks for the reload rather than for another try, which is what
+        // it used to ask for and would never have worked.
         typesetterPromise = null;
         throw new MathRenderError(
-          "Could not load the maths typesetter. Check your connection and try again.",
+          "Could not load the maths typesetter — you may be offline. Reconnect, then reload the page.",
           null,
           error,
         );

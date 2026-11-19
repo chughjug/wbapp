@@ -181,6 +181,20 @@ describe("rendering", () => {
     );
   });
 
+  /**
+   * The browser records a failed module load in the document's module map,
+   * so after going offline the real `import()` keeps failing in that tab
+   * however many times it is retried — measured as fail, fail, work across
+   * offline / online / online-after-reload. The message has to ask for the
+   * reload; "try again" would be advice that cannot work.
+   */
+  it("tells the user to reload rather than just retry", async () => {
+    configureMathjax({ load: () => Promise.reject(new Error("offline")) });
+    await expect(renderMathToSvg(createMathSpec("x"))).rejects.toThrow(
+      /reload the page/i,
+    );
+  });
+
   it("retries after a failed load instead of staying broken", async () => {
     let attempt = 0;
     configureMathjax({
