@@ -402,6 +402,20 @@ export const Shelf = ({
   const controlsId = useId();
   const gridRef = useRef<HTMLUListElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  /**
+   * The button that opened search, so closing can hand focus back to it.
+   *
+   * Without this, dismissing search left `document.activeElement` on
+   * `<body>` and the next Tab restarted from the top of the page — the
+   * one dismissal in the app that did not restore focus; every popover
+   * and dialog here already does.
+   */
+  const searchTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeSearch = useCallback(() => {
+    setQuery("");
+    setSearchOpen(false);
+    window.requestAnimationFrame(() => searchTriggerRef.current?.focus());
+  }, []);
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
   // id of a card that should take DOM focus once it renders
   const pendingFocusRef = useRef<string | null>(null);
@@ -1329,18 +1343,14 @@ export const Shelf = ({
                   onKeyDown={(event) => {
                     if (event.key === "Escape") {
                       event.preventDefault();
-                      setQuery("");
-                      setSearchOpen(false);
+                      closeSearch();
                     }
                   }}
                 />
                 <button
                   type="button"
                   className="gn-button gn-button--small gn-search__done"
-                  onClick={() => {
-                    setQuery("");
-                    setSearchOpen(false);
-                  }}
+                  onClick={closeSearch}
                 >
                   {query ? "Clear" : "Done"}
                 </button>
@@ -1351,6 +1361,7 @@ export const Shelf = ({
                 <div className="gn-home__bar-end">
                   <button
                     type="button"
+                    ref={searchTriggerRef}
                     className="gn-icon-button gn-home__iconbtn"
                     aria-label="Search documents"
                     onClick={() => setSearchOpen(true)}

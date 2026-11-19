@@ -42,8 +42,19 @@
   --gn-on-fill: #fff;
   --gn-star: #f0a52a;
 
+  // Text that sits on the *accent* fill, which is a different problem
+  // from `--gn-on-fill`. A black scrim is black in both themes, so white
+  // is always right on it. `--color-primary` is NOT: it lightens to
+  // #a8a5ff in dark, where white measures 2.21:1 — and it is used on the
+  // three most prominent controls on the home screen (the New button, the
+  // active filter chip, the CONTINUE badge), so the most important
+  // affordances were the least legible ones at night. Dark ink on the
+  // light accent gives ~9:1.
+  --gn-on-accent: #fff;
+
   &.theme--dark {
     --gn-text-muted: var(--color-gray-40);
+    --gn-on-accent: #1b1b1f;
   }
 
   *,
@@ -384,7 +395,7 @@
     }
 
     &--primary {
-      color: var(--gn-on-fill);
+      color: var(--gn-on-accent);
       background-color: var(--color-primary);
       border-color: var(--color-primary);
 
@@ -1019,7 +1030,7 @@
 
   .gn-icon-button--on {
     background-color: var(--color-primary);
-    color: var(--gn-on-fill);
+    color: var(--gn-on-accent);
 
     &:hover:not(:disabled) {
       background-color: var(--color-primary-darker);
@@ -1045,10 +1056,23 @@
     position: absolute;
     inset-block-start: 0.4rem;
     inset-inline-start: 0.5rem;
+    // The star is the only sign a notebook is a favourite, so as a
+    // graphical object conveying state it owes 3:1 (WCAG 1.4.11). Against
+    // a pale placeholder cover — which is every card until a thumbnail
+    // exists — the bare glyph measured 1.77:1, and a text-shadow is not a
+    // contrast fix. Same dark scrim `.gn-card__pages` already uses, which
+    // passes comfortably.
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.125rem;
+    min-height: 1.125rem;
+    padding: 0.0625rem;
+    border-radius: 999px;
     font-size: 0.875rem;
     line-height: 1;
     color: var(--gn-star);
-    text-shadow: 0 0 2px rgb(0 0 0 / 55%);
+    background-color: rgb(0 0 0 / 55%);
   }
 
   // ------------------------------------------------------------- list view
@@ -1706,7 +1730,12 @@
     }
 
     &--upcoming {
-      color: var(--color-success-text);
+      // Not Excalidraw's own `--color-success-text`: that pairing measures
+      // 4.36:1 against `--color-success`, just under the 4.5:1 AA needs at
+      // this 12px size, and it is the one piece of text encoding a
+      // deadline. Overridden here rather than upstream, where the token is
+      // used on other backgrounds. #1b5e20 gives ~6.3:1 on the same fill.
+      color: #1b5e20;
       background-color: var(--color-success);
     }
 

@@ -319,11 +319,19 @@
       background-color: var(--gn-bar-hover);
     }
 
-    /* a ring that survives both themes, the translucency and the pressed
-       background */
-    &:focus-visible {
+    /* A ring that survives both themes, the translucency and the pressed
+       background.
+       
+       The doubled class is load-bearing, not a typo. Upstream's
+       `.excalidraw button:focus-visible` sets `outline: transparent` with
+       a 1px box-shadow, and at (0,2,1) it outranks a plain
+       `.gn-bar__button:focus-visible` at (0,2,0) — so this rule was
+       silently losing and the toolbar was showing a 1px ring around its
+       smallest, most densely packed targets. (0,3,0) wins it back. */
+    &.gn-bar__button:focus-visible {
       outline: 2px solid var(--gn-bar-focus);
       outline-offset: 1px;
+      box-shadow: none;
     }
 
     &[aria-pressed="true"],

@@ -149,17 +149,17 @@
     // active = filled *and* bolder: never colour alone
     &--on {
       font-weight: 700;
-      color: var(--gn-on-fill);
+      color: var(--gn-on-accent);
       background-color: var(--color-primary);
       border-color: var(--color-primary);
 
       .gn-chipnav__count {
-        color: var(--gn-on-fill);
+        color: var(--gn-on-accent);
         opacity: 0.85;
       }
 
       .gn-course-dot {
-        box-shadow: 0 0 0 1px var(--gn-on-fill);
+        box-shadow: 0 0 0 1px var(--gn-on-accent);
       }
     }
 
@@ -216,7 +216,7 @@
     text-transform: uppercase;
     padding: 0.1875rem 0.5rem;
     border-radius: 999px;
-    color: var(--gn-on-fill);
+    color: var(--gn-on-accent);
     background-color: var(--color-primary);
   }
 

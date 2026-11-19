@@ -246,7 +246,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
 
   const body = (
     <div
-      className={`gn-history excalidraw ${
+      className={`gn-versions excalidraw ${
         theme === "dark" ? "theme--dark" : ""
       }`}
       onPointerDown={(event) => {
@@ -256,7 +256,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       }}
     >
       <div
-        className="gn-history__panel"
+        className="gn-versions__panel"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -264,13 +264,13 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
         ref={dialogRef}
         onKeyDown={onKeyDown}
       >
-        <div className="gn-history__head">
-          <h2 className="gn-history__title" id={titleId}>
+        <div className="gn-versions__head">
+          <h2 className="gn-versions__title" id={titleId}>
             Earlier versions
           </h2>
           <button
             type="button"
-            className="gn-history__close"
+            className="gn-versions__close"
             onClick={onClose}
             ref={closeRef}
             aria-label="Close earlier versions"
@@ -279,20 +279,20 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
           </button>
         </div>
 
-        <p className="gn-history__intro" id={descriptionId}>
+        <p className="gn-versions__intro" id={descriptionId}>
           This notebook is saved automatically every few minutes. Put any of
           these back if something has gone wrong — whatever is on the page now
           is kept first, so a restore can itself be undone.
         </p>
 
         {error && (
-          <p className="gn-history__error" role="alert">
+          <p className="gn-versions__error" role="alert">
             {error}
           </p>
         )}
 
         {undoId && (
-          <div className="gn-history__undo">
+          <div className="gn-versions__undo">
             <span>Restored.</span>
             <button
               type="button"
@@ -310,23 +310,23 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
         )}
 
         {versions === null ? (
-          <p className="gn-history__empty">Reading earlier versions…</p>
+          <p className="gn-versions__empty">Reading earlier versions…</p>
         ) : versions.length === 0 ? (
-          <p className="gn-history__empty">
+          <p className="gn-versions__empty">
             No earlier versions yet. The first is kept a few minutes after you
             start writing.
           </p>
         ) : (
-          <ul className="gn-history__list">
+          <ul className="gn-versions__list">
             {versions.map((summary) => {
               const note = describeReason(summary);
               return (
-                <li className="gn-history__item" key={summary.id}>
-                  <div className="gn-history__when">
-                    <span className="gn-history__stamp">
+                <li className="gn-versions__item" key={summary.id}>
+                  <div className="gn-versions__when">
+                    <span className="gn-versions__stamp">
                       {describeSnapshotTime(summary.at, now)}
                     </span>
-                    <span className="gn-history__meta">
+                    <span className="gn-versions__meta">
                       {summary.pageCount} page
                       {summary.pageCount === 1 ? "" : "s"}
                       {note ? ` · ${note}` : ""}
@@ -334,7 +334,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                   </div>
                   <button
                     type="button"
-                    className="gn-history__pin"
+                    className="gn-versions__pin"
                     aria-pressed={Boolean(summary.pinned)}
                     onClick={() => void togglePin(summary)}
                     title={
@@ -347,7 +347,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                   </button>
                   <button
                     type="button"
-                    className="gn-history__restore"
+                    className="gn-versions__restore"
                     disabled={busyId !== null}
                     onClick={() => setConfirming(summary)}
                   >
@@ -360,18 +360,18 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
         )}
 
         {confirming && (
-          <div className="gn-history__confirm" role="alertdialog">
+          <div className="gn-versions__confirm" role="alertdialog">
             <p>
               Replace the page with the version from{" "}
               <strong>{describeSnapshotTime(confirming.at, now)}</strong>?
             </p>
-            <div className="gn-history__confirm-actions">
+            <div className="gn-versions__confirm-actions">
               <button type="button" onClick={() => setConfirming(null)}>
                 Cancel
               </button>
               <button
                 type="button"
-                className="gn-history__confirm-go"
+                className="gn-versions__confirm-go"
                 onClick={() => void doRestore(confirming)}
               >
                 Restore it
