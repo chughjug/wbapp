@@ -79,6 +79,7 @@ import { ToolMenu, useActiveToolMenu } from "./goodnotes/tool-menu";
 import { ObjectMenu } from "./goodnotes/object-menu";
 import { useGraphDialog } from "./goodnotes/graph";
 import { useHistoryPanel } from "./goodnotes/history";
+import { OutlinePanel } from "./goodnotes/outline";
 import { useMathDialog } from "./goodnotes/math";
 import { useInputGestures } from "./goodnotes/input";
 import { useSettingsScreen } from "./goodnotes/settings";
@@ -197,7 +198,7 @@ import "./index.scss";
 
 import { AppSidebar } from "./components/AppSidebar";
 
-import type { DocMeta } from "./goodnotes/types";
+import type { DocMeta, DocScene } from "./goodnotes/types";
 
 import type { CollabAPI } from "./collab/Collab";
 
@@ -516,6 +517,23 @@ const ExcalidrawWrapper = ({
   const history = useHistoryPanel(docId ?? null, {
     onRestored: onVersionRestored,
   });
+
+  /**
+   * "Contents" — a text outline of the notebook, as against `PagePanel`'s
+   * thumbnails. Built from the live scene when it opens, so it never goes
+   * stale and nothing extra is stored for it.
+   */
+  const [outlineScene, setOutlineScene] = useState<DocScene | null>(null);
+  const openOutline = useCallback(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    setOutlineScene({
+      elements: excalidrawAPI.getSceneElements(),
+      appState: {},
+      files: {},
+    });
+  }, [excalidrawAPI]);
   // one page at a time, fitted to the workspace; swipe/arrows move between
   const paged = usePagedView(excalidrawAPI);
   // The page-jump effect must not re-run every time the paged state changes
@@ -1614,6 +1632,15 @@ const ExcalidrawWrapper = ({
                   },
                 ]
               : []),
+            ...(surface.isWhiteboard
+              ? []
+              : [
+                  {
+                    id: "outline",
+                    label: "Contents…",
+                    onSelect: openOutline,
+                  },
+                ]),
             {
               id: "history",
               label: "Earlier versions…",
@@ -1927,6 +1954,29 @@ const ExcalidrawWrapper = ({
       {graph.dialog}
       {math.dialog}
       {history.panel}
+      {outlineScene && (
+        <OutlinePanel
+          scene={outlineScene}
+          currentPage={currentPageNumber}
+          theme={editorTheme}
+          onClose={() => setOutlineScene(null)}
+          onGoToPage={(page) => {
+            if (!excalidrawAPI) {
+              return;
+            }
+            // Same route the search page-jump takes, and for the same
+            // reason: in paged mode a plain `scrollToPage` is snapped back
+            // by the controller's viewport lock, so the jump has to go
+            // through the controller itself.
+            const index = page - 1;
+            if (pagedRef.current.isPaged) {
+              pagedRef.current.goToPage(index, { animate: false });
+            } else {
+              scrollToPage(excalidrawAPI, index);
+            }
+          }}
+        />
+      )}
       {settings.screen}
       {settings.firstRunHint}
       <PagedViewControls {...paged.controlsProps} />

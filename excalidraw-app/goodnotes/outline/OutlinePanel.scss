@@ -1,0 +1,168 @@
+/**
+ * Contents panel. Theme tokens only — see HistoryPanel.scss for why the
+ * literals are light-theme fallbacks rather than the actual colours.
+ */
+
+.gn-outline {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.45);
+
+  &__panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: min(30rem, 100%);
+    max-height: 100%;
+    overflow: hidden auto;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    background: var(--island-bg-color, #fff);
+    color: var(--text-primary-color, #1b1b1f);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 600;
+  }
+
+  &__close {
+    min-width: 2rem;
+    min-height: 2rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: inherit;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--button-hover-bg, rgba(0, 0, 0, 0.06));
+    }
+  }
+
+  &__intro {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--input-label-color, #495057);
+  }
+
+  &__filter {
+    min-height: 2rem;
+    padding: 0 0.625rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--default-border-color, #c5c5d0);
+    background: var(--input-bg-color, #fff);
+    color: inherit;
+    font: inherit;
+    font-size: 0.875rem;
+  }
+
+  &__empty {
+    margin: 0;
+    padding: 1rem 0;
+    text-align: center;
+    font-size: 0.8125rem;
+    color: var(--input-label-color, #495057);
+  }
+
+  &__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  &__row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.625rem;
+    width: 100%;
+    // comfortably past the 24px WCAG 2.2 target-size floor, and a row this
+    // tall is also what makes the list usable with a thumb
+    min-height: 2.25rem;
+    padding: 0.375rem 0.5rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--button-hover-bg, rgba(0, 0, 0, 0.05));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4dabf7);
+      outline-offset: -2px;
+    }
+
+    &[aria-current="true"] {
+      background: var(--color-primary-light, #e8e7fb);
+      font-weight: 600;
+    }
+  }
+
+  &__page {
+    flex: 0 0 auto;
+    min-width: 1.5rem;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--input-label-color, #495057);
+  }
+
+  &__label {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.875rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &--none {
+      font-style: italic;
+      color: var(--input-label-color, #868e96);
+    }
+  }
+
+  &__badge {
+    flex: 0 0 auto;
+    padding: 0.0625rem 0.3125rem;
+    border-radius: 0.25rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    background: var(--button-hover-bg, rgba(0, 0, 0, 0.08));
+    color: var(--input-label-color, #495057);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-outline,
+  .gn-outline * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
