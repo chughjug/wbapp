@@ -16,6 +16,11 @@ export const Modal: React.FC<{
   maxWidth?: number;
   onCloseRequest(): void;
   labelledBy: string;
+  /**
+   * Accessible name for a dialog that renders no visible title, and so has
+   * no element for `labelledBy` to point at.
+   */
+  ariaLabel?: string;
   theme?: AppState["theme"];
   closeOnClickOutside?: boolean;
 }> = (props) => {
@@ -53,7 +58,8 @@ export const Modal: React.FC<{
       role="dialog"
       aria-modal="true"
       onKeyDown={handleKeydown}
-      aria-labelledby={props.labelledBy}
+      aria-labelledby={props.ariaLabel ? undefined : props.labelledBy}
+      aria-label={props.ariaLabel}
     >
       <div
         className="Modal__background"

@@ -111,6 +111,15 @@ const normalizeDialogSnapshot = (dialog: Element) => {
       }
     });
 
+  // The dialog's accessible name points at `${containerId}-dialog-title`,
+  // and the container id is generated per mount, so it is volatile exactly
+  // the way the style above is. Normalise it rather than baking one run's
+  // id into the snapshot.
+  const labelledBy = dialogClone.getAttribute("aria-labelledby");
+  if (labelledBy?.endsWith("-dialog-title")) {
+    dialogClone.setAttribute("aria-labelledby", "dialog-title");
+  }
+
   return dialogClone.outerHTML;
 };
 

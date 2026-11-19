@@ -1,6 +1,12 @@
 .goodnotes-paper-picker {
   --gn-paper-fg: #1b1b1f;
-  --gn-paper-muted: #6b7280;
+  /* Not #6b7280: that is 4.83:1 on the white surface but only 4.29:1 on
+     `--gn-paper-surface-hover` (#f1f0ff), so every option label failed
+     WCAG AA the moment it was hovered or focused — axe flagged whichever
+     option the pointer happened to be over. 5.14:1 on the tint, 5.78:1 on
+     white. The dark theme's #9ca3af already clears it (5.22:1 on its own
+     hover surface) and is unchanged. */
+  --gn-paper-muted: #5f6672;
   --gn-paper-accent: #6965db;
   --gn-paper-surface: #ffffff;
   --gn-paper-surface-hover: #f1f0ff;

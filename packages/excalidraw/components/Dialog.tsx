@@ -27,6 +27,12 @@ export interface DialogProps {
   size?: DialogSize;
   onCloseRequest(): void;
   title: React.ReactNode | false;
+  /**
+   * Accessible name to use when `title` is `false`. Without it such a
+   * dialog has no name at all: there is no heading for `aria-labelledby`
+   * to reference, so a screen reader announces a bare "dialog".
+   */
+  ariaLabel?: string;
   autofocus?: boolean;
   closeOnClickOutside?: boolean;
 }
@@ -108,7 +114,11 @@ export const Dialog = (props: DialogProps) => {
       className={clsx("Dialog", props.className, {
         "Dialog--fullscreen": isFullscreen,
       })}
-      labelledBy="dialog-title"
+      // the heading below is `${id}-dialog-title`; the bare "dialog-title"
+      // this used to pass matched no element in the document, so every
+      // titled dialog was pointing `aria-labelledby` at nothing
+      labelledBy={`${id}-dialog-title`}
+      ariaLabel={props.title === false ? props.ariaLabel : undefined}
       maxWidth={getDialogSize(props.size)}
       onCloseRequest={onClose}
       closeOnClickOutside={props.closeOnClickOutside}

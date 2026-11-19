@@ -246,9 +246,15 @@ const ShareDialogPicker = (props: ShareDialogProps) => {
 
 const ShareDialogInner = (props: ShareDialogProps) => {
   const activeRoomLink = useAtomValue(activeRoomLinkAtom);
+  const { t } = useI18n();
 
   return (
-    <Dialog size="small" onCloseRequest={props.handleClose} title={false}>
+    <Dialog
+      size="small"
+      onCloseRequest={props.handleClose}
+      title={false}
+      ariaLabel={t("labels.share", null, "Share")}
+    >
       <div className="ShareDialog">
         {props.collabAPI && activeRoomLink ? (
           <ActiveRoomDialog

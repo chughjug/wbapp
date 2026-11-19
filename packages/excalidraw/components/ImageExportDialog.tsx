@@ -416,7 +416,12 @@ export const ImageExportDialog = ({
   });
 
   return (
-    <Dialog onCloseRequest={onCloseRequest} size="wide" title={false}>
+    <Dialog
+      onCloseRequest={onCloseRequest}
+      size="wide"
+      title={false}
+      ariaLabel={t("imageExportDialog.title", null, "Export image")}
+    >
       <ImageExportModal
         elementsSnapshot={elementsSnapshot}
         appStateSnapshot={appStateSnapshot}
