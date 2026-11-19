@@ -13,7 +13,9 @@
  * `./expression` — never to `eval`.
  */
 
-import { parseExpression, ExpressionError } from "./expression";
+import { compileExpression, ExpressionError } from "./expression";
+
+import { sampleValues } from "./sample";
 
 import { SERIES_COLORS } from "./palette";
 
@@ -23,6 +25,13 @@ export const GOODNOTES_CUSTOM_DATA_NAMESPACE = "goodnotes";
 export const GRAPH_CUSTOM_DATA_KEY = "graph";
 /** Bumped when the spec shape changes incompatibly. */
 export const GRAPH_SPEC_VERSION = 1;
+/**
+ * Evenly spaced probes used to decide whether a parsed expression has any
+ * value at all in range. Deliberately coarse: this runs on every keystroke
+ * (debounced), and a curve that is finite nowhere among 257 points spread
+ * across the range is not one a 200-point plot was going to show either.
+ */
+const EMPTY_CURVE_PROBE_SAMPLES = 257;
 
 export type GraphKind = "function" | "bar" | "line";
 
@@ -194,8 +203,9 @@ export const validateGraphSpec = (spec: GraphSpec): SpecProblem[] => {
         });
         continue;
       }
+      let evaluate: ((x: number) => number) | null = null;
       try {
-        parseExpression(series.expression);
+        evaluate = compileExpression(series.expression);
       } catch (error) {
         problems.push({
           field: `series:${series.id}`,
@@ -206,6 +216,44 @@ export const validateGraphSpec = (spec: GraphSpec): SpecProblem[] => {
           position:
             error instanceof ExpressionError ? error.position : undefined,
         });
+      }
+
+      // Parsing is not enough: `1/0`, `sqrt(-1)` and `1e999` all parse, then
+      // evaluate to Infinity or NaN everywhere, and the renderer draws
+      // nothing. Without this the dialog happily inserts empty axes.
+      //
+      // One finite sample is enough to pass. `ln(x)` over [-5, 5] is NaN on
+      // half its range and is a perfectly good graph, so this must reject
+      // only expressions that are undefined EVERYWHERE in the range.
+      if (
+        evaluate &&
+        Number.isFinite(spec.xMin) &&
+        Number.isFinite(spec.xMax)
+      ) {
+        let finite = false;
+        try {
+          for (const point of sampleValues(
+            evaluate,
+            spec.xMin,
+            spec.xMax,
+            EMPTY_CURVE_PROBE_SAMPLES,
+          )) {
+            if (Number.isFinite(point.y)) {
+              finite = true;
+              break;
+            }
+          }
+        } catch {
+          // an evaluator that throws is as unplottable as one that doesn't
+          finite = false;
+        }
+        if (!finite) {
+          problems.push({
+            field: `series:${series.id}`,
+            message:
+              "This has no value anywhere between “x from” and “x to”, so there would be nothing to draw. Check the expression, or widen the x-range.",
+          });
+        }
       }
     }
     return problems;
