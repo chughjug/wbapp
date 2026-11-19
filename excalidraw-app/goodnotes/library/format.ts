@@ -9,10 +9,36 @@ import type { DocMeta } from "../types";
 export const HOUR = 60 * 60 * 1000;
 export const DAY = 24 * HOUR;
 /** "Due soon" window. */
+/**
+ * Kept for callers that still think in hours. The urgency scale itself no
+ * longer uses it — see `getDueUrgency`.
+ */
 export const SOON_MS = 48 * HOUR;
 
 export type DueUrgency = "overdue" | "soon" | "upcoming" | "none";
 
+/**
+ * Whole days between two instants, by calendar day rather than by elapsed
+ * hours. Shared by the colour and the wording so the two cannot disagree.
+ */
+export const daysUntilDue = (dueDate: number, now: number): number => {
+  const startOfToday = new Date(now).setHours(0, 0, 0, 0);
+  const startOfDue = new Date(dueDate).setHours(0, 0, 0, 0);
+  return Math.round((startOfDue - startOfToday) / DAY);
+};
+
+/**
+ * How urgent a due date is.
+ *
+ * Measured in calendar days, NOT in elapsed hours, because that is how
+ * `formatDueDate` words it. With a rolling 48-hour window the two
+ * disagreed: a notebook due in 47 hours and one due in 49 both read "Due
+ * in 2 days" while one was amber and the other green — same sentence,
+ * different colour, no explanation available to the reader.
+ *
+ * "Soon" therefore means today or tomorrow, which is exactly when the
+ * label says "Due today" or "Due tomorrow".
+ */
 export const getDueUrgency = (
   dueDate: number | null,
   now: number = Date.now(),
@@ -23,10 +49,7 @@ export const getDueUrgency = (
   if (dueDate < now) {
     return "overdue";
   }
-  if (dueDate - now <= SOON_MS) {
-    return "soon";
-  }
-  return "upcoming";
+  return daysUntilDue(dueDate, now) <= 1 ? "soon" : "upcoming";
 };
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -41,9 +64,7 @@ export const formatDueDate = (
   if (dueDate == null) {
     return "No due date";
   }
-  const startOfToday = new Date(now).setHours(0, 0, 0, 0);
-  const startOfDue = new Date(dueDate).setHours(0, 0, 0, 0);
-  const days = Math.round((startOfDue - startOfToday) / DAY);
+  const days = daysUntilDue(dueDate, now);
   if (days === 0) {
     return "Due today";
   }

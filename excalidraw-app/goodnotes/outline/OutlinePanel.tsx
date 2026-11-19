@@ -215,6 +215,9 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
                   >
                     {entry.title ?? untitledLabel(entry)}
                   </span>
+                  {entry.page === currentPage && (
+                    <span className="gn-outline__current">Current</span>
+                  )}
                   {entry.source === "pdf" && (
                     <span className="gn-outline__badge">PDF</span>
                   )}
@@ -223,6 +226,9 @@ export const OutlinePanel: React.FC<OutlinePanelProps> = ({
             ))}
           </ol>
         )}
+        <button type="button" className="gn-outline__done" onClick={onClose}>
+          Done
+        </button>
       </div>
     </div>
   );

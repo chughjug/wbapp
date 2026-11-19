@@ -130,9 +130,16 @@
       outline-offset: -2px;
     }
 
+    /* The page you are on.
+     *
+     * A tint alone measured 1.06:1 against the focus tint next to it, so
+     * the current page and a merely-focused row were indistinguishable.
+     * An accent bar down the leading edge plus a "Current" label carries
+     * it without relying on a colour difference at all. */
     &[aria-current="true"] {
       background: var(--color-primary-light, #e8e7fb);
       font-weight: 600;
+      box-shadow: inset 3px 0 0 0 var(--color-primary, #6965db);
     }
   }
 
@@ -155,6 +162,36 @@
     &--none {
       font-style: italic;
       color: var(--input-label-color, #868e96);
+    }
+  }
+
+  &__current {
+    flex: 0 0 auto;
+    padding: 0.0625rem 0.3125rem;
+    border-radius: 0.25rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    background: var(--color-primary, #6965db);
+    color: #fff;
+  }
+
+  &__done {
+    align-self: stretch;
+    min-height: 2.75rem;
+    margin-top: 0.25rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: var(--color-primary, #6965db);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4dabf7);
+      outline-offset: 2px;
     }
   }
 
