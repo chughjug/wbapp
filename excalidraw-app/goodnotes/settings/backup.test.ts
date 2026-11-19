@@ -22,6 +22,7 @@ import {
   getScene,
   listDocs,
   saveScene,
+  trashDoc,
 } from "../library";
 
 import {
@@ -136,6 +137,34 @@ describe("backup", () => {
     expect(sceneAAfter?.elements.map((e) => e.id)).toEqual(["a1", "a2", "a3"]);
     expect(sceneAAfter).toEqual(sceneABefore);
     expect((await getScene(b.id))?.elements).toHaveLength(1);
+  });
+
+  /**
+   * The trash came later than this format. A notebook in it is data the
+   * user can still get back, so a backup has to carry it — and carry the
+   * fact that it is in the trash, or a restore would quietly resurrect
+   * everything the user had deleted. Nothing in the format needed
+   * changing for this; the test is here so it stays true.
+   */
+  it("carries a trashed notebook, and restores it still trashed", async () => {
+    const live = await createDoc({ title: "Current" });
+    const binned = await createDoc({ title: "Deleted last week" });
+    await saveScene(binned.id, sceneOf(["b1"]));
+    await trashDoc(binned.id, 1_700_000_000_000);
+
+    const { bundle } = await roundTripBundle();
+    expect(bundle.documents).toHaveLength(2);
+
+    await wipeLocal();
+    await importBackup(bundle, { mode: "replace" });
+
+    const after = await listDocs();
+    const restoredLive = after.find((d) => d.id === live.id);
+    const restoredBinned = after.find((d) => d.id === binned.id);
+    expect(restoredLive?.deletedAt).toBeUndefined();
+    expect(restoredBinned?.deletedAt).toBe(1_700_000_000_000);
+    // its pages came back too, so "put back" still has something to put
+    expect((await getScene(binned.id))?.elements).toHaveLength(1);
   });
 
   it("restores a document whose scene was never saved", async () => {

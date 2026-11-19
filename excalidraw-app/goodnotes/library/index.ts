@@ -199,8 +199,16 @@ export {
   touchDoc,
   /** Copy metadata + scene under a new id. */
   duplicateDoc,
-  /** Delete metadata + scene. */
+  /** Delete metadata + scene, for good. Prefer `trashDoc`. */
   deleteDoc,
+  /** Move to the trash: reversible, keeps the scene. */
+  trashDoc,
+  /** Take a document back out of the trash. */
+  restoreDoc,
+  /** Hard-delete everything trashed before a cutoff. */
+  purgeExpiredTrash,
+  trashManyDocs,
+  restoreManyDocs,
   /** Subscribe to any library mutation. Returns an unsubscribe fn. */
   subscribe,
   /** Coalesce many writes into one change notification. */
