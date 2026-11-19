@@ -1,12 +1,17 @@
 # PDF import — integration
 
-> ## ⚠️ Install this first: `pdfjs-dist` is NOT in the repo
+> ## Status: installed and wired up
 >
-> ```bash
-> yarn workspace excalidraw-app add pdfjs-dist@^4.10.38   # ^4.7.0 || ^5.x also fine
-> ```
+> `pdfjs-dist@^4.10.38` is a dependency of `excalidraw-app`, and
+> `excalidraw-app/index.tsx` hands it to this module through `configurePdfjs`.
+> Nothing below needs doing again — the sections are kept as a description of
+> how the pieces fit, not as a to-do list.
 >
-> Nothing else here needs installing. The feature **builds, type-checks and renders its UI without the package** — but any actual import fails with `PdfImportError { code: "missing-dependency" }` and the dialog shows a prominent install banner, because the raster comes from pdf.js. The import code was written against a _dynamic_ `import("pdfjs-dist")` precisely so the app keeps compiling until someone can run that command.
+> The module still resolves pdf.js indirectly, through injection or a dynamic
+> `import()`, so it keeps compiling if the dependency is ever dropped. Without
+> an injected build, a bundled browser build cannot resolve the bare specifier
+> and every import fails with `PdfImportError { code: "missing-dependency" }` —
+> so the `configurePdfjs` call in the entry point is load-bearing, not optional.
 
 ---
 
@@ -63,18 +68,29 @@ Either wire your taskbar/toolbar button to `setIsImportPdfOpen(true)`, or add a 
 
 That is the whole integration. The dialog talks to the editor through the imperative API only (`getSceneElements`, `addFiles`, `updateScene`), so no other state has to be threaded through.
 
-### e) optional — static pdf.js wiring (recommended once installed)
+### e) pdf.js wiring — required, and lazy
 
-By default pdf.js is resolved lazily at runtime and its worker is left to pdf.js's own defaults. To let Vite bundle both (faster first import, no CDN, works offline), call this once at app start — e.g. just below the imports in `excalidraw-app/index.tsx`:
+This is what the app actually does, in `excalidraw-app/index.tsx`:
 
 ```tsx
-import * as pdfjs from "pdfjs-dist";
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-
 import { configurePdfjs } from "./goodnotes/import-pdf";
 
-configurePdfjs({ pdfjs, workerSrc: pdfWorkerUrl });
+configurePdfjs({
+  load: () => import("pdfjs-dist"),
+  loadWorkerSrc: () =>
+    import("pdfjs-dist/build/pdf.worker.min.mjs?url").then((m) => m.default),
+});
 ```
+
+Thunks, not eager imports. Rollup still resolves the dependency statically, so
+the specifier works in the browser, but it emits pdf.js as its own chunk that
+is fetched the first time someone imports a PDF. Importing it eagerly instead
+puts ~370 kB (~109 kB gzipped) in the entry chunk of an app whose users mostly
+never open a PDF; measured on this repo, the eager form cost 375 kB raw /
+108 kB gzipped on every cold start.
+
+The eager form — `configurePdfjs({ pdfjs, workerSrc })` — is still supported,
+for a host that already has a pdf.js instance in hand.
 
 ### f) optional — drag a PDF onto the canvas
 
@@ -157,4 +173,12 @@ Verified empirically in the running app (Playwright + Chromium, dev server on :3
 - progress callbacks `0/n … n/n`, cancellation via `AbortSignal`, corrupt-file and empty-selection errors, `parsePageRange` edge cases;
 - dialog accessibility (role/aria-modal, labelled controls, focus trap in both directions, Escape, `aria-live` progress, `aria-invalid` range validation, 2 px focus rings) and correct colours in light **and** dark theme.
 
-**Not verified, because `pdfjs-dist` is not installed:** the pdf.js calls themselves. The rendering path was exercised with a stub that mimics `getDocument` / `getViewport` / `render` / `getTextContent` and the pdf.js exception names. The code targets the documented pdf.js 4.x/5.x API, but until the dependency is installed, treat "pdf.js renders this PDF correctly" as untested — in particular worker setup (§1e), CMap/standard-font handling for PDFs with embedded CJK or unusual fonts, and `PasswordException` behaviour for real encrypted files.
+**Verified end to end** against the production build: a 3-page PDF imported
+into an open document produced three new pages carrying the rendered rasters,
+with no console errors, and the pdf.js chunk was fetched only on opening the
+dialog — not at boot.
+
+**Still unverified:** CMap and standard-font handling for PDFs with embedded
+CJK or unusual fonts, and `PasswordException` behaviour for real encrypted
+files. Both paths are covered only by a stub that mimics `getDocument` /
+`getViewport` / `render` / `getTextContent` and the pdf.js exception names.

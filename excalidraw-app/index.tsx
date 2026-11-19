@@ -1,9 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
-import * as pdfjsLib from "pdfjs-dist";
-// eslint-disable-next-line import/no-unresolved
-import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 import "../excalidraw-app/sentry";
 
@@ -16,14 +13,21 @@ performance.mark("excalidraw:app-start");
 
 window.__EXCALIDRAW_SHA__ = import.meta.env.VITE_APP_GIT_SHA;
 
-// PDF import resolves pdf.js through a dynamic import so the app still
-// builds without it. Nothing called configurePdfjs, so the bundler never
-// saw the dependency and EVERY import failed at runtime with
-// "missing-dependency". Injecting the real build here, with its worker as
-// a Vite asset URL, is what actually turns PDF import on.
+// PDF import resolves pdf.js through a dynamic import, which a bundled
+// browser build cannot satisfy on its own: the specifier is bare, so every
+// import failed at runtime with "missing-dependency" until something handed
+// the module in. These loaders are what turn PDF import on.
+//
+// They are thunks, not eager imports, on purpose. Importing pdf.js here
+// instead puts ~350 kB (~99 kB gzipped) in the entry chunk of a note-taking
+// app whose users mostly never open a PDF. As thunks, Rollup still resolves
+// the dependency statically but emits it as its own chunk, fetched the first
+// time someone actually imports a PDF.
 configurePdfjs({
-  pdfjs: pdfjsLib as never,
-  workerSrc: pdfjsWorkerUrl,
+  load: () => import("pdfjs-dist"),
+  loadWorkerSrc: () =>
+    // eslint-disable-next-line import/no-unresolved
+    import("pdfjs-dist/build/pdf.worker.min.mjs?url").then((m) => m.default),
 });
 
 // Apply the saved ink-feel preference before the first stroke. The editor

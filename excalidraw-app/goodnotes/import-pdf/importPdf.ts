@@ -20,13 +20,16 @@
  *
  * DEPENDENCY (IMPORTANT)
  * ----------------------
- * This module needs **`pdfjs-dist`**, which is NOT currently a dependency of
- * this repo. Everything here is written against a *dynamic* import so the app
- * still builds and type-checks without it; at runtime, importing a PDF
- * without the package fails with a
- * `PdfImportError` whose `code` is `"missing-dependency"` and whose message
- * names the package. Install it (see `INTEGRATION.md`) or inject your own
- * pdf.js build with {@link configurePdfjs}.
+ * This module needs **`pdfjs-dist`**. It is a dependency of `excalidraw-app`
+ * and the entry point hands it over through {@link configurePdfjs}, but this
+ * module never imports it directly: everything here goes through injection or
+ * a dynamic import, so the app still builds and type-checks without it.
+ *
+ * That indirection means the injection is required, not a nicety. With no
+ * build injected, the fallback is a bare runtime specifier that only resolves
+ * where bare specifiers resolve (Node, an import map) — not in a bundled
+ * browser build, where every import then fails with a `PdfImportError` whose
+ * `code` is `"missing-dependency"`. See `INTEGRATION.md` §1e.
  */
 
 import { CaptureUpdateAction } from "@excalidraw/excalidraw";
@@ -190,10 +193,29 @@ interface PdfPageLike {
 
 let injectedPdfjs: PdfjsLike | null = null;
 let injectedWorkerSrc: string | null = null;
+let injectedLoader: (() => Promise<unknown>) | null = null;
+let injectedWorkerSrcLoader: (() => Promise<string>) | null = null;
 let pdfjsPromise: Promise<PdfjsLike> | null = null;
 
 /**
- * Supply a pdf.js build (and/or its worker URL) yourself, e.g.
+ * Supply a pdf.js build (and/or its worker URL) yourself.
+ *
+ * Prefer the `load` / `loadWorkerSrc` form: the bundler still sees the
+ * dependency statically (so it resolves), but puts it in its own chunk that
+ * is only fetched when something actually imports a PDF. pdf.js is ~350 kB
+ * (~99 kB gzipped) and most sessions never open a PDF, so the eager form
+ * below costs every cold start that much for nothing.
+ *
+ * ```ts
+ * configurePdfjs({
+ *   load: () => import("pdfjs-dist"),
+ *   loadWorkerSrc: () =>
+ *     import("pdfjs-dist/build/pdf.worker.min.mjs?url").then((m) => m.default),
+ * });
+ * ```
+ *
+ * The eager form is still accepted, for a host that already has a pdf.js
+ * instance in hand:
  *
  * ```ts
  * import * as pdfjs from "pdfjs-dist";
@@ -201,19 +223,36 @@ let pdfjsPromise: Promise<PdfjsLike> | null = null;
  * configurePdfjs({ pdfjs, workerSrc: worker });
  * ```
  *
- * Call this once at app start if you want the bundler to see the dependency
- * statically; otherwise this module resolves `pdfjs-dist` lazily at runtime.
+ * With neither, this module resolves `pdfjs-dist` through a bare runtime
+ * specifier, which only works where bare specifiers resolve (Node, an import
+ * map) — not in a plain bundled browser build.
  */
 export const configurePdfjs = (config: {
   pdfjs?: PdfjsLike;
   workerSrc?: string;
+  load?: () => Promise<unknown>;
+  loadWorkerSrc?: () => Promise<string>;
 }) => {
+  // each form clears its counterpart: an injected instance otherwise wins
+  // forever, so a host that switched from the eager form to the lazy one
+  // would silently keep using the old build.
   if (config.pdfjs) {
     injectedPdfjs = config.pdfjs;
+    injectedLoader = null;
+    pdfjsPromise = null;
+  }
+  if (config.load) {
+    injectedLoader = config.load;
+    injectedPdfjs = null;
     pdfjsPromise = null;
   }
   if (config.workerSrc) {
     injectedWorkerSrc = config.workerSrc;
+    injectedWorkerSrcLoader = null;
+  }
+  if (config.loadWorkerSrc) {
+    injectedWorkerSrcLoader = config.loadWorkerSrc;
+    injectedWorkerSrc = null;
   }
 };
 
@@ -237,7 +276,7 @@ export const isPdfjsAvailable = async (): Promise<boolean> => {
  */
 export const loadPdfjs = async (): Promise<PdfjsLike> => {
   if (injectedPdfjs) {
-    applyWorkerSrc(injectedPdfjs);
+    await applyWorkerSrc(injectedPdfjs);
     return injectedPdfjs;
   }
   if (!pdfjsPromise) {
@@ -245,10 +284,11 @@ export const loadPdfjs = async (): Promise<PdfjsLike> => {
       const specifier = PDFJS_PACKAGE;
       let mod: Record<string, unknown>;
       try {
-        mod = (await import(/* @vite-ignore */ specifier)) as Record<
-          string,
-          unknown
-        >;
+        mod = (
+          injectedLoader
+            ? await injectedLoader()
+            : await import(/* @vite-ignore */ specifier)
+        ) as Record<string, unknown>;
       } catch (error) {
         throw new PdfImportError(
           "missing-dependency",
@@ -265,7 +305,7 @@ export const loadPdfjs = async (): Promise<PdfjsLike> => {
           `"${PDFJS_PACKAGE}" resolved but does not expose getDocument(); expected ${PDFJS_VERSION_RANGE}.`,
         );
       }
-      applyWorkerSrc(candidate);
+      await applyWorkerSrc(candidate);
       return candidate;
     })();
     // don't cache failures: installing the package shouldn't need a reload
@@ -276,8 +316,21 @@ export const loadPdfjs = async (): Promise<PdfjsLike> => {
   return pdfjsPromise;
 };
 
-const applyWorkerSrc = (pdfjs: PdfjsLike) => {
-  if (injectedWorkerSrc && pdfjs.GlobalWorkerOptions) {
+const applyWorkerSrc = async (pdfjs: PdfjsLike) => {
+  if (!pdfjs.GlobalWorkerOptions) {
+    return;
+  }
+  if (!injectedWorkerSrc && injectedWorkerSrcLoader) {
+    // resolved once and remembered: the URL is a build-time constant, and a
+    // failure here must not take the whole import down — pdf.js can still
+    // fall back to its own worker resolution.
+    try {
+      injectedWorkerSrc = await injectedWorkerSrcLoader();
+    } catch {
+      injectedWorkerSrcLoader = null;
+    }
+  }
+  if (injectedWorkerSrc) {
     pdfjs.GlobalWorkerOptions.workerSrc = injectedWorkerSrc;
   }
 };
