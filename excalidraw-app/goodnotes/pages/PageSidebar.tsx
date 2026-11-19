@@ -17,6 +17,7 @@
  */
 
 import { exportScene, getNonDeletedElements } from "@excalidraw/excalidraw";
+
 import React, {
   useCallback,
   useEffect,
@@ -34,6 +35,8 @@ import type {
   BinaryFiles,
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types";
+
+import { requestUndo } from "../input/history";
 
 import { renderPaper } from "../paper";
 import { getPageImageBackground, preloadPageImages } from "../paper/pageImages";
@@ -96,6 +99,49 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
     movePageUp,
     movePageDown,
   } = usePages(excalidrawAPI);
+
+  /**
+   * The page just deleted, and a way back.
+   *
+   * Deleting a page of handwritten notes is one tap from a 24px target
+   * that sat two pixels from "Move down". `Ctrl+Z` always restored it,
+   * but on a tablet with no keyboard the only undo was an unlabelled
+   * icon in the far corner of the editor, so for most users the delete
+   * read as final. This is the visible way back.
+   */
+  const [deleted, setDeleted] = useState<{ page: number } | null>(null);
+  const deletedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (deletedTimer.current) {
+        clearTimeout(deletedTimer.current);
+      }
+    },
+    [],
+  );
+
+  const onDeletePage = useCallback(
+    (index: number) => {
+      deletePage(index);
+      setDeleted({ page: index + 1 });
+      if (deletedTimer.current) {
+        clearTimeout(deletedTimer.current);
+      }
+      // long enough to notice and reach, short enough not to become
+      // permanent furniture in a narrow panel
+      deletedTimer.current = setTimeout(() => setDeleted(null), 9000);
+    },
+    [deletePage],
+  );
+
+  const undoDelete = useCallback(() => {
+    if (deletedTimer.current) {
+      clearTimeout(deletedTimer.current);
+    }
+    setDeleted(null);
+    requestUndo();
+  }, []);
 
   // The format picker. Owned here so the panel works standalone; a host that
   // wants ONE flow shared with the nav bar passes `onAddPage` instead.
@@ -241,7 +287,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
                   className="goodnotes-page__action goodnotes-page__action--danger"
                   aria-label={`Delete page ${index + 1}`}
                   disabled={pages.length <= 1}
-                  onClick={() => deletePage(index)}
+                  onClick={() => onDeletePage(index)}
                 >
                   <TrashIcon />
                 </button>
@@ -250,6 +296,15 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           );
         })}
       </ul>
+
+      {deleted && (
+        <div className="goodnotes-pages__snack" role="status">
+          <span>Page {deleted.page} deleted.</span>
+          <button type="button" onClick={undoDelete}>
+            Undo
+          </button>
+        </div>
+      )}
 
       <div className="goodnotes-pages__footer">
         <button

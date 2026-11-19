@@ -1628,6 +1628,10 @@ const ExcalidrawWrapper = ({
       style={{ height: "100%", position: "relative" }}
       className={clsx("excalidraw-app", "gn-shell-layout", {
         "is-collaborating": isCollaborating,
+        // Excalidraw puts `theme--dark` on its own container, which is a
+        // DESCENDANT of the shell — so shell-level rules could never key
+        // off it. The backdrop around the page is a shell-level surface.
+        "gn-shell-layout--dark": editorTheme === "dark",
       })}
     >
       {/* band 1 — document tabs */}

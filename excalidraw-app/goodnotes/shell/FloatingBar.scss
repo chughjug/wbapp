@@ -142,7 +142,13 @@
      cover the bar */
   z-index: 125;
 
+  --gn-bar-on-accent: #fff;
+
   &.theme--dark {
+    /* `--color-primary` lightens to #a8a5ff in dark; white on it is
+       2.2:1. Same split the shelf makes between "on a dark scrim" and
+       "on the accent fill". */
+    --gn-bar-on-accent: #1b1b1f;
     --gn-bar-bg: var(--island-bg-color, #232329);
     --gn-bar-border: var(--color-border-outline-variant, #46464f);
     --gn-bar-text: var(--text-primary-color, #e3e3e8);
@@ -334,10 +340,27 @@
       box-shadow: none;
     }
 
+    /* The selected tool.
+     *
+     * The tint alone measured 1.05:1 against the white bar, so "am I
+     * about to erase?" was not answerable in peripheral vision — and
+     * that is the most consequential state in a note-taking app. A
+     * solid accent fill with inverted glyph reads at a glance, and the
+     * ring survives forced-colors where a background does not. */
     &[aria-pressed="true"],
     &[aria-expanded="true"] {
-      background-color: var(--gn-bar-active-bg);
-      color: var(--gn-bar-active-text);
+      background-color: var(--color-primary, #6965db);
+      color: var(--gn-bar-on-accent, #fff);
+      box-shadow: inset 0 0 0 1px rgb(0 0 0 / 8%);
+    }
+
+    @media (forced-colors: active) {
+      &[aria-pressed="true"],
+      &[aria-expanded="true"] {
+        background-color: Highlight;
+        color: HighlightText;
+        forced-color-adjust: none;
+      }
     }
 
     &:disabled,
@@ -550,4 +573,46 @@ body.gn-shell-suppress-default-ui {
     min-height: 0;
     min-width: 0;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Upstream chrome this shell replaces
+   ---------------------------------------------------------------------------
+   Excalidraw's own menu trigger, library sidebar trigger and bottom
+   colour bar are all still mounted under our bar. Measured at 390px:
+   `.main-menu-trigger` (32x32 at 12,12) and `.sidebar-trigger` (32x32 at
+   346,12) both sit *underneath* `.gn-bar`, so `elementFromPoint` returned
+   them rather than the bar — the library sidebar was hijacking taps at the
+   bar's right end. The menu trigger also has no accessible name, so a
+   screen reader announced a bare "button" pointing at functionality this
+   fork has replaced.
+
+   `App-bottom-bar` is a second, unbranded colour picker duplicating the
+   pen tray's own colour row.
+
+   Hidden rather than left stacked: every route they offer exists in the
+   floating bar or its overflow menu. */
+.gn-shell-layout {
+  .main-menu-trigger,
+  .layer-ui__wrapper__top-right .sidebar-trigger,
+  .App-bottom-bar {
+    display: none !important;
+  }
+}
+
+/* The editor's backdrop around the page.
+ *
+ * `viewBackgroundColor` is "transparent" so the paper layer shows through,
+ * and the paper layer paints nothing outside a page — so whatever is behind
+ * the canvas is the surround. Untreated that was pure white, which in dark
+ * mode made the majority of the screen the brightest thing on it. */
+.gn-shell-canvas {
+  background-color: var(--default-bg-color, #fff);
+}
+
+.gn-shell-layout--dark .gn-shell-canvas {
+  /* Not `--default-bg-color`: that token is defined on `.excalidraw`,
+     which is inside this element, so it resolves to the light value
+     here. The literal matches `goodnotes/paper`'s dark surround. */
+  background-color: #121212;
 }
