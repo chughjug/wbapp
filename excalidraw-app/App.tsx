@@ -22,7 +22,8 @@ import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
 import { CourseBrowser, useCanvasConnect } from "./goodnotes/canvas";
 import { Dashboard } from "./goodnotes/dashboard";
 import { useDarkMode } from "./goodnotes/dark";
-import { flushSceneSaves } from "./goodnotes/library";
+import { isLatexDoc } from "./goodnotes/latex";
+import { flushSceneSaves, getDoc, updateDocMeta } from "./goodnotes/library";
 import { useNewDocument } from "./goodnotes/pages";
 import {
   GlobalPdfDropOverlay,
@@ -39,6 +40,19 @@ import type { DocMeta } from "./goodnotes/types";
  * then cached by the module map for the life of the page.
  */
 const ExcalidrawWrapper = lazy(() => import("./Editor"));
+
+/**
+ * The LaTeX document editor, also lazy.
+ *
+ * Its own chunk rather than the editor's: a student who only writes
+ * notebooks never loads it, and a student who only writes problem sets
+ * never loads Excalidraw.
+ */
+const LatexEditor = lazy(() =>
+  import("./goodnotes/latex/LatexEditor").then((m) => ({
+    default: m.LatexEditor,
+  })),
+);
 
 /**
  * A shared-scene URL (`#room=…` for live collaboration, `#json=…` for an
@@ -90,6 +104,39 @@ const GoodNotesRoot = () => {
     theme: editorTheme,
     onCreated: openDocument,
   });
+
+  /**
+   * Is the open document a `.tex` one?
+   *
+   * `null` while we are finding out, which the route below waits for —
+   * guessing wrong would mount Excalidraw over a LaTeX document and
+   * autosave an empty scene across it.
+   */
+  const [isLatex, setIsLatex] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!docId) {
+      setIsLatex(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLatex(null);
+    void isLatexDoc(docId).then((answer) => {
+      if (!cancelled) {
+        setIsLatex(answer);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [docId]);
+
+  const [latexTitle, setLatexTitle] = useState("");
+  useEffect(() => {
+    if (!docId || isLatex !== true) {
+      return;
+    }
+    void getDoc(docId).then((meta) => setLatexTitle(meta?.title ?? "Document"));
+  }, [docId, isLatex]);
 
   const closeDocument = useCallback(() => {
     void flushSceneSaves();
@@ -179,18 +226,35 @@ const GoodNotesRoot = () => {
 
   return (
     <>
-      {/* No spinner: the chunk is small enough on a warm cache that a
+      {isLatex === true && docId ? (
+        <Suspense fallback={null}>
+          <LatexEditor
+            docId={docId}
+            title={latexTitle}
+            theme={editorTheme}
+            onClose={closeDocument}
+            onRename={(title) => {
+              setLatexTitle(title);
+              void updateDocMeta(docId, { title });
+            }}
+          />
+        </Suspense>
+      ) : isLatex === null && docId && !isTransientScene ? null : (
+        <>
+          {/* No spinner: the chunk is small enough on a warm cache that a
           flash of "Loading…" is worse than a beat of the previous screen,
           and on a cold one the shelf stays interactive behind it. */}
-      <Suspense fallback={null}>
-        <ExcalidrawWrapper
-          key={docId ?? "transient"}
-          docId={docId}
-          onCloseDocument={closeDocument}
-          onNewDocument={() => newDocument.open()}
-          onOpenDocument={openDocument}
-        />
-      </Suspense>
+          <Suspense fallback={null}>
+            <ExcalidrawWrapper
+              key={docId ?? "transient"}
+              docId={docId}
+              onCloseDocument={closeDocument}
+              onNewDocument={() => newDocument.open()}
+              onOpenDocument={openDocument}
+            />
+          </Suspense>
+        </>
+      )}
       {newDocument.dialog}
     </>
   );

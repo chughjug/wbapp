@@ -38,6 +38,14 @@ export interface StarterSeedText {
 
 export interface NotebookStarter {
   id: string;
+  /**
+   * A LaTeX document rather than a notebook of pages.
+   *
+   * Same library row, same shelf, same course and due date — only the
+   * body differs: a string of `.tex` instead of a scene of elements.
+   * See `goodnotes/latex/store.ts`.
+   */
+  latex?: true;
   label: string;
   /** One line explaining when to pick it, shown under the label. */
   description: string;
@@ -112,6 +120,16 @@ export const NOTEBOOK_STARTERS: readonly NotebookStarter[] = [
       { text: "Results", atX: 0.08, atY: 0.5, fontSize: HEADING },
       { text: "Conclusion", atX: 0.08, atY: 0.78, fontSize: HEADING },
     ],
+  },
+  {
+    id: "latex",
+    label: "LaTeX document",
+    description: "Type a problem set in LaTeX and export a PDF.",
+    template: "blank",
+    size: "A4",
+    landscape: false,
+    latex: true,
+    seed: [],
   },
   {
     id: "music",

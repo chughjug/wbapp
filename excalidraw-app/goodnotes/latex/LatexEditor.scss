@@ -1,0 +1,236 @@
+/**
+ * The LaTeX editor shell.
+ *
+ * `.gn-tex.gn-tex` throughout for the same reason the reference pane and
+ * the audio bar need it: this element carries `excalidraw` to pick up the
+ * theme tokens, and that class's own base rule is a flex row with
+ * `overflow: hidden` which wins at equal specificity.
+ */
+
+.gn-tex.gn-tex {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--default-bg-color, #fff);
+  color: var(--text-primary-color, #1b1b1f);
+  font-family: var(--ui-font, system-ui, sans-serif);
+}
+
+.gn-tex {
+  &__bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+    padding: 0.5rem calc(0.75rem + env(safe-area-inset-right))
+      0.5rem calc(0.75rem + env(safe-area-inset-left));
+    padding-top: calc(0.5rem + env(safe-area-inset-top));
+    border-block-end: 1px solid var(--default-border-color, #c5c5d0);
+    flex-wrap: wrap;
+  }
+
+  &__back,
+  &__actions button,
+  &__toggle {
+    // 44px: this bar is used one-handed on a tablet
+    min-height: 2.75rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--default-border-color, #c5c5d0);
+    border-radius: 0.5rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--button-hover-bg, rgba(0, 0, 0, 0.06));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4dabf7);
+      outline-offset: 1px;
+    }
+  }
+
+  &__back {
+    border-color: transparent;
+    font-weight: 600;
+  }
+
+  &__name {
+    flex: 1 1 12rem;
+    min-width: 0;
+    min-height: 2.75rem;
+    padding: 0 0.625rem;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+
+    &:hover,
+    &:focus {
+      border-color: var(--default-border-color, #c5c5d0);
+      background: var(--input-bg-color, #fff);
+    }
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+  }
+
+  &__engine {
+    min-height: 2.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--default-border-color, #c5c5d0);
+    background: var(--input-bg-color, #fff);
+    color: inherit;
+    font: inherit;
+    font-size: 0.875rem;
+  }
+
+  &__print {
+    border-color: transparent !important;
+    background: var(--color-primary, #6965db) !important;
+    color: #fff !important;
+    font-weight: 600;
+  }
+
+  &__toggle[aria-pressed="true"] {
+    border-color: var(--color-primary, #6965db);
+  }
+
+  &__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+  }
+
+  &__sourcepane {
+    display: flex;
+    flex: 0 0 44%;
+    min-width: 0;
+    border-inline-end: 1px solid var(--default-border-color, #c5c5d0);
+  }
+
+  &__srlabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  &__source {
+    flex: 1 1 auto;
+    min-width: 0;
+    resize: none;
+    border: 0;
+    padding: 1rem;
+    background: var(--input-bg-color, #fff);
+    color: var(--text-primary-color, #1b1b1f);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    tab-size: 2;
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4dabf7);
+      outline-offset: -2px;
+    }
+  }
+
+  &__footer {
+    flex: 0 0 auto;
+    padding: 0.375rem 0.75rem calc(0.375rem + env(safe-area-inset-bottom));
+    border-block-start: 1px solid var(--default-border-color, #c5c5d0);
+    font-size: 0.75rem;
+    color: var(--input-label-color, #495057);
+  }
+}
+
+/* Below a tablet there is no room for two columns; the source pane
+   becomes a full-width view you toggle, rather than a 170px gutter. */
+@media (max-width: 48rem) {
+  .gn-tex__body {
+    flex-direction: column;
+  }
+
+  .gn-tex__sourcepane {
+    flex: 1 1 auto;
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--default-border-color, #c5c5d0);
+  }
+}
+
+/**
+ * Printing.
+ *
+ * Export PDF is `window.print()`: the preview is already A4 sheets, every
+ * platform including iPad prints to PDF, maths stays vector rather than
+ * being rasterised, and it costs nothing in the bundle. Everything that
+ * is app rather than document is hidden.
+ */
+@media print {
+  body > *:not(.gn-tex) {
+    display: none !important;
+  }
+
+  .gn-tex.gn-tex {
+    position: static;
+    display: block;
+    overflow: visible;
+  }
+
+  .gn-tex__bar,
+  .gn-tex__footer,
+  .gn-tex__sourcepane,
+  .gn-tex__warnings,
+  .gn-tex__note {
+    display: none !important;
+  }
+
+  .gn-tex__body {
+    display: block;
+  }
+
+  .gn-tex__preview {
+    overflow: visible;
+    padding: 0;
+    background: #fff;
+  }
+
+  .gn-tex__sheet {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  /* keep a heading with the text under it, and never split a formula */
+  .gn-tex__sheet h2,
+  .gn-tex__sheet h3,
+  .gn-tex__sheet h4 {
+    break-after: avoid;
+  }
+
+  .gn-tex__display,
+  .gn-tex__verbatim {
+    break-inside: avoid;
+  }
+
+  @page {
+    size: A4;
+    margin: 2cm;
+  }
+}

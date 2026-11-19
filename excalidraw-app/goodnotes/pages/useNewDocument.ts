@@ -17,12 +17,17 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 
 import { createDoc, flushSceneSaves } from "../library";
 
+import { saveLatexSource, STARTER_SOURCE } from "../latex/store";
+
+import { getStarter } from "../starters/starters";
+
 import { NewPageDialog } from "./NewPageDialog";
 import {
   DEFAULT_NEW_PAGE_CHOICE,
   readNewPageChoice,
   writeNewPageChoice,
 } from "./newPageChoice";
+
 import { setPendingNewDocumentSeed } from "./pendingNewDocument";
 
 import type { NewPageSubmission } from "./NewPageDialog";
@@ -105,6 +110,16 @@ export const useNewDocument = (
       imageFit: submission.imageFit,
       ...(submission.starterId ? { starterId: submission.starterId } : {}),
     });
+
+    // A LaTeX document needs its source row to exist before the router
+    // looks: the route asks `isLatexDoc(id)` and would otherwise mount
+    // the notebook editor over it and autosave an empty scene across it.
+    const starter = submission.starterId
+      ? getStarter(submission.starterId)
+      : null;
+    if (starter?.latex) {
+      await saveLatexSource(doc.id, STARTER_SOURCE);
+    }
 
     pendingInitRef.current = {};
     onCreatedRef.current(doc);
