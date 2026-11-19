@@ -1,0 +1,215 @@
+/**
+ * The audio bar.
+ *
+ * Bottom-centre and above the safe-area inset, so it clears a phone's
+ * home indicator. Theme tokens only — the literals are light-theme
+ * fallbacks for rendering outside an `.excalidraw` scope.
+ */
+
+.gn-audio {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  align-items: center;
+  max-width: calc(100vw - 1rem);
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+
+  &__bar {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.3125rem;
+    border-radius: 999px;
+    background: var(--island-bg-color, #fff);
+    color: var(--text-primary-color, #1b1b1f);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    // 44px: this is operated mid-lecture, often one-handed, and one of
+    // these buttons ends a recording you cannot get back
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    justify-content: center;
+    padding: 0 0.875rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4dabf7);
+      outline-offset: 1px;
+    }
+  }
+
+  &__record,
+  &__stop {
+    font-weight: 600;
+  }
+
+  &__stop {
+    background: var(--color-danger, #c92a2a);
+    color: #fff;
+  }
+
+  &__ghost:hover {
+    background: var(--button-hover-bg, rgba(0, 0, 0, 0.06));
+  }
+
+  &__dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 50%;
+    background: var(--color-danger, #c92a2a);
+  }
+
+  &__square {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 0.125rem;
+    background: currentColor;
+  }
+
+  &__time {
+    padding: 0 0.5rem;
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+
+    &--live::after {
+      content: "";
+      display: inline-block;
+      margin-left: 0.375rem;
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background: var(--color-danger, #c92a2a);
+      animation: gn-audio-pulse 1.6s ease-in-out infinite;
+    }
+  }
+
+  &__scrub {
+    width: min(14rem, 40vw);
+    accent-color: var(--color-primary, #6965db);
+  }
+
+  &__error {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 24rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    background: var(--color-danger-background, #ffe3e3);
+    color: var(--color-danger-text, #c92a2a);
+
+    button {
+      min-height: 1.75rem;
+      min-width: 1.75rem;
+      padding: 0;
+      font-size: 1rem;
+    }
+  }
+
+  &__hint {
+    margin: 0;
+    padding: 0.25rem 0.625rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    text-align: center;
+    background: var(--island-bg-color, #fff);
+    color: var(--input-label-color, #495057);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    width: min(22rem, calc(100vw - 1rem));
+    max-height: 40vh;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0.375rem;
+    list-style: none;
+    border-radius: 0.625rem;
+    background: var(--island-bg-color, #fff);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  &__item-open {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.0625rem !important;
+    border-radius: 0.5rem !important;
+    text-align: left;
+
+    &:hover {
+      background: var(--button-hover-bg, rgba(0, 0, 0, 0.05));
+    }
+  }
+
+  &__item-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  &__item-meta {
+    font-size: 0.75rem;
+    color: var(--input-label-color, #495057);
+  }
+
+  &__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@keyframes gn-audio-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-audio__time--live::after {
+    animation: none;
+  }
+}

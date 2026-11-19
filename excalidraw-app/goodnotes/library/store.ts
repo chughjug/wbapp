@@ -33,6 +33,7 @@ import type {
 
 import type { AppState } from "@excalidraw/excalidraw/types";
 
+import { forgetRecordings } from "../audio/store";
 import { forgetHistory, maybeSnapshot } from "../history/store";
 import { forgetDocText, indexSceneText } from "../search";
 import { PAGE_FRAME_PREFIX } from "../types";
@@ -721,6 +722,14 @@ export const deleteDoc = async (id: string): Promise<void> => {
     await forgetHistory(id);
   } catch {
     // orphaned snapshots are purged by retention; never fail the delete
+  }
+  // Recordings matter more than snapshots here: an hour of lecture audio
+  // left behind with no notebook to reach it from is the largest thing
+  // this app can orphan, and nothing would ever clean it up.
+  try {
+    await forgetRecordings(id);
+  } catch {
+    // never fail the delete over it
   }
   emitChange();
 };

@@ -78,6 +78,7 @@ import { TabBar, useOpenDocs } from "./goodnotes/tabs";
 import { ToolMenu, useActiveToolMenu } from "./goodnotes/tool-menu";
 import { ObjectMenu } from "./goodnotes/object-menu";
 import { useGraphDialog } from "./goodnotes/graph";
+import { AudioBar, useAudio } from "./goodnotes/audio";
 import { useHistoryPanel } from "./goodnotes/history";
 import { OutlinePanel } from "./goodnotes/outline";
 import {
@@ -528,6 +529,13 @@ const ExcalidrawWrapper = ({
   const history = useHistoryPanel(docId ?? null, {
     onRestored: onVersionRestored,
   });
+
+  // lecture audio: the recorder, the marks it collects, and playback
+  const audio = useAudio(docId ?? null);
+  const audioRef = useRef(audio);
+  audioRef.current = audio;
+  /** Last element a tap seeked to, so holding a selection does not re-seek. */
+  const lastSeekedElementRef = useRef<string | null>(null);
 
   /**
    * "Contents" — a text outline of the notebook, as against `PagePanel`'s
@@ -1334,6 +1342,34 @@ const ExcalidrawWrapper = ({
       saveSceneDebounced(docId, { elements, appState, files });
     }
 
+    // Note which strokes appeared while a recording is running, so each
+    // can be tapped later to hear what was being said as it was written.
+    // Read through a ref: this is the hot path, and a changing callback
+    // identity here would be a re-render per pointer move.
+    audioRef.current.noteSceneChange(elements);
+
+    /**
+     * Tap a stroke while a recording is open, hear what was being said.
+     *
+     * Driven off the selection rather than a pointer handler so it costs
+     * nothing when no recording is loaded, and so it works with every
+     * way of selecting — tap, keyboard, lasso. Only a single selection
+     * counts: a marquee over half the page is not a question about one
+     * moment.
+     */
+    if (audioRef.current.playingId) {
+      const selected = Object.keys(appState.selectedElementIds ?? {});
+      if (
+        selected.length === 1 &&
+        selected[0] !== lastSeekedElementRef.current
+      ) {
+        lastSeekedElementRef.current = selected[0];
+        audioRef.current.seekToElement(selected[0]);
+      } else if (selected.length !== 1) {
+        lastSeekedElementRef.current = null;
+      }
+    }
+
     // keep the paper layer in step with the canvas; bail out to the previous
     // object when nothing it cares about moved, so this hot path does not
     // re-render the layer on every pointer event
@@ -2007,6 +2043,30 @@ const ExcalidrawWrapper = ({
       {graph.dialog}
       {math.dialog}
       {history.panel}
+      <AudioBar
+        phase={audio.phase}
+        elapsedMs={audio.elapsedMs}
+        error={audio.error}
+        onClearError={audio.clearError}
+        recordings={audio.recordings}
+        playingId={audio.playingId}
+        isPlaying={audio.isPlaying}
+        positionMs={audio.positionMs}
+        durationMs={audio.durationMs}
+        onStart={() => void audio.start()}
+        onPause={audio.pause}
+        onResume={audio.resume}
+        onStop={() => void audio.stop()}
+        onOpen={(id) => void audio.open(id)}
+        onTogglePlay={audio.togglePlay}
+        onSeek={audio.seekMs}
+        onClose={audio.close}
+        onDelete={(id) => void audio.remove(id)}
+        theme={editorTheme}
+        // the bar is chrome, and presenting is the one mode where every
+        // piece of chrome is in the way
+        hidden={presentation.active}
+      />
       {outlineScene && (
         <OutlinePanel
           scene={outlineScene}
