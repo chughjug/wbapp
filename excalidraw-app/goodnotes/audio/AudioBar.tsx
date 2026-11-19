@@ -20,6 +20,7 @@
  */
 
 import React, { useCallback, useId, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { formatTimecode } from "./marks";
 
@@ -100,7 +101,7 @@ export const AudioBar: React.FC<AudioBarProps> = ({
   // exist is the kind of chrome this app keeps removing.
   const idleAndEmpty = !recording && !playing && recordings.length === 0;
 
-  return (
+  const bar = (
     <div
       className={`gn-audio excalidraw${theme === "dark" ? " theme--dark" : ""}`}
     >
@@ -253,4 +254,11 @@ export const AudioBar: React.FC<AudioBarProps> = ({
       )}
     </div>
   );
+
+  // Portalled to the body like the other overlays. `position: fixed` is
+  // relative to the nearest ancestor with a transform, filter or
+  // backdrop-filter rather than to the viewport, and the editor shell has
+  // several — rendered in place, the bar landed at the top of the window
+  // across the tab strip instead of above the home indicator.
+  return createPortal(bar, document.body);
 };

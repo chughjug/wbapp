@@ -514,3 +514,40 @@ body.gn-shell-suppress-default-ui {
     }
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Reference pane
+   ---------------------------------------------------------------------------
+   The pane is a plain flex sibling of `.gn-shell-canvas`, so side-by-side
+   needs no rule at all — it is the body's existing row layout. Stacking on
+   a narrow screen is only a change of main axis. `min-height: 0` on both
+   children is what stops a tall rasterised page from pushing the canvas
+   off the bottom of a column flex container. */
+
+/* With a reference pane open, the bar's scope starts where the canvas
+   does, so the pill centres over the page being written in rather than
+   over the seam between the two. Without this the toolbar sat on top of
+   the pane's header and covered its close button. */
+/* Specificity matched to `.gn-bar-scope.gn-bar-scope--floating`, which
+   sets `inset: 0` — a single-class selector here lost to it silently and
+   the bar stayed centred over the seam. */
+.gn-shell-body--with-reference
+  .gn-bar-scope.gn-bar-scope.gn-bar-scope--floating {
+  inset-inline-start: var(--gn-reference-inset, 0%);
+}
+
+/* The pane renders after the canvas in the DOM (so the editor is never
+   remounted) and is placed first visually. */
+.gn-shell-body > .gn-ref {
+  order: -1;
+}
+
+.gn-shell-body--stacked {
+  flex-direction: column;
+
+  > .gn-ref,
+  > .gn-shell-canvas {
+    min-height: 0;
+    min-width: 0;
+  }
+}

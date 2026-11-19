@@ -80,6 +80,7 @@ import { ObjectMenu } from "./goodnotes/object-menu";
 import { useGraphDialog } from "./goodnotes/graph";
 import { AudioBar, useAudio } from "./goodnotes/audio";
 import { useHistoryPanel } from "./goodnotes/history";
+import { ReferencePane, useReferencePane } from "./goodnotes/split";
 import { OutlinePanel } from "./goodnotes/outline";
 import {
   buildStarterElements,
@@ -530,6 +531,47 @@ const ExcalidrawWrapper = ({
     onRestored: onVersionRestored,
   });
 
+  /**
+   * A second notebook open alongside — the lecture PDF, last week's
+   * notes. Read-only; see goodnotes/split for why it rasterises pages
+   * rather than mounting a second editor.
+   */
+  const [shellWidth, setShellWidth] = useState(0);
+  const [isPickingReference, setIsPickingReference] = useState(false);
+  const shellBodyRef = useRef<HTMLDivElement | null>(null);
+  const reference = useReferencePane(docId ?? null, shellWidth);
+  useEffect(() => {
+    const node = shellBodyRef.current;
+    if (!node || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      const next = entries[0]?.contentRect.width ?? 0;
+      setShellWidth((prev) => (Math.abs(prev - next) < 1 ? prev : next));
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  /**
+   * Excalidraw measures its own container once and caches the box, so a
+   * pane opening beside it leaves the canvas thinking it is still full
+   * width — strokes land offset from the pointer. `refresh()` is the
+   * documented way to tell it the box moved.
+   */
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => excalidrawAPI.refresh());
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    excalidrawAPI,
+    reference.referenceId,
+    reference.split,
+    reference.orientation,
+  ]);
+
   // lecture audio: the recorder, the marks it collects, and playback
   const audio = useAudio(docId ?? null);
   const audioRef = useRef(audio);
@@ -563,6 +605,13 @@ const ExcalidrawWrapper = ({
   const surface = useSurface(excalidrawAPI, { docId: docId ?? undefined });
   const [isPagePanelOpen, setIsPagePanelOpen] = useState(false);
   const openDocs = useOpenDocs(docId ?? undefined);
+
+  /** The document the reference pane is showing, for its title. Must sit
+   *  below `openDocs`, which it reads. */
+  const referenceDoc = useMemo(
+    () => openDocs.allDocs.find((doc) => doc.id === reference.referenceId),
+    [openDocs.allDocs, reference.referenceId],
+  );
 
   /**
    * "Switch to another notebook", in the command palette.
@@ -1607,7 +1656,33 @@ const ExcalidrawWrapper = ({
       {/* band 3 — page panel + canvas */}
       {/* the active tool's settings, docked as a band under the bar */}
       <ToolMenu {...toolMenu.menuProps} />
-      <div className="gn-shell-body">
+      <div
+        className={clsx("gn-shell-body", {
+          // the pane is a flex sibling of the canvas; stacking it on a
+          // narrow screen is just a change of main axis
+          "gn-shell-body--stacked":
+            reference.referenceId !== null &&
+            reference.orientation === "stacked",
+          "gn-shell-body--with-reference": reference.referenceId !== null,
+        })}
+        style={
+          reference.referenceId
+            ? ({
+                // The floating bar spans the whole stage so its pill can
+                // centre. With a pane open that centred it over the seam,
+                // putting the toolbar on top of the pane's header — the
+                // close button measured as covered by a toolbar icon, and
+                // it is the only way out of the pane. Insetting the bar's
+                // scope past the pane re-centres it over the canvas.
+                "--gn-reference-inset":
+                  reference.orientation === "side-by-side"
+                    ? `${(reference.split * 100).toFixed(2)}%`
+                    : "0%",
+              } as React.CSSProperties)
+            : undefined
+        }
+        ref={shellBodyRef}
+      >
         <NavBar
           excalidrawAPI={excalidrawAPI}
           suppressDefaultChrome
@@ -1730,6 +1805,23 @@ const ExcalidrawWrapper = ({
                     onSelect: openOutline,
                   },
                 ]),
+            ...(reference.referenceId
+              ? [
+                  {
+                    id: "reference-close",
+                    label: "Close the reference pane",
+                    onSelect: reference.close,
+                  },
+                ]
+              : openDocs.allDocs.filter((doc) => doc.id !== docId).length > 0
+              ? [
+                  {
+                    id: "reference-open",
+                    label: "Open another notebook alongside…",
+                    onSelect: () => setIsPickingReference(true),
+                  },
+                ]
+              : []),
             {
               id: "history",
               label: "Earlier versions…",
@@ -2035,6 +2127,21 @@ const ExcalidrawWrapper = ({
             )}
           </Excalidraw>
         </div>
+        {/* Rendered AFTER the canvas and placed first with CSS `order`.
+            As a preceding sibling it changed React's child order, which
+            unmounted and remounted the <Excalidraw> subtree every time the
+            pane opened or closed — losing canvas state, and throwing
+            "Missing Provider from createIsolation" on the remount. */}
+        {reference.referenceId && referenceDoc && (
+          <ReferencePane
+            docId={reference.referenceId}
+            title={referenceDoc.title}
+            orientation={reference.orientation}
+            theme={editorTheme}
+            onClose={reference.close}
+            style={{ flex: `0 0 ${(reference.split * 100).toFixed(2)}%` }}
+          />
+        )}
       </div>
       {/* Contextual actions above the selection. It hides itself while the
           lasso overlay is active; it does not need hiding for the tool menu,
@@ -2067,6 +2174,66 @@ const ExcalidrawWrapper = ({
         // piece of chrome is in the way
         hidden={presentation.active}
       />
+      {isPickingReference && (
+        <div
+          className="gn-refpick excalidraw"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setIsPickingReference(false);
+            }
+          }}
+        >
+          <div
+            className="gn-refpick__panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Open another notebook alongside"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setIsPickingReference(false);
+              }
+            }}
+          >
+            <h2 className="gn-refpick__title">Open alongside</h2>
+            <p className="gn-refpick__intro">
+              Shown beside this one for reading — a lecture PDF, last
+              week&rsquo;s notes. It cannot be edited from here.
+            </p>
+            <ul className="gn-refpick__list">
+              {openDocs.allDocs
+                .filter((doc) => doc.id !== docId)
+                .slice(0, 40)
+                .map((doc) => (
+                  <li key={doc.id}>
+                    <button
+                      type="button"
+                      className="gn-refpick__row"
+                      onClick={() => {
+                        reference.open(doc.id);
+                        setIsPickingReference(false);
+                      }}
+                    >
+                      <span className="gn-refpick__row-title">{doc.title}</span>
+                      {doc.course && (
+                        <span className="gn-refpick__row-meta">
+                          {doc.course}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+            </ul>
+            <button
+              type="button"
+              className="gn-refpick__cancel"
+              onClick={() => setIsPickingReference(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       {outlineScene && (
         <OutlinePanel
           scene={outlineScene}

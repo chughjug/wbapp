@@ -1,0 +1,263 @@
+/**
+ * The reference pane.
+ *
+ * Laid out by the host as a grid column (side-by-side) or row (stacked);
+ * this file owns the pane's own chrome only. Theme tokens throughout.
+ */
+
+/* The pane carries `excalidraw` to pick up the theme tokens, and that
+   class's own base rule is a flex ROW with `overflow: hidden` — at equal
+   specificity it won on stylesheet order and laid the header out beside
+   the page list, clipping the title and close button out of sight. The
+   override is a separate doubled-class rule rather than this block's
+   selector, because `&__head` nested under `.gn-ref.gn-ref` compiles to
+   `.gn-ref.gn-ref__head`, which matches nothing — that mistake left the
+   whole header unstyled. */
+.gn-ref.gn-ref {
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.gn-ref {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--island-bg-color, #fff);
+  color: var(--text-primary-color, #1b1b1f);
+
+  &--side-by-side {
+    border-inline-end: 1px solid var(--default-border-color, #c5c5d0);
+  }
+
+  &--stacked {
+    border-block-end: 1px solid var(--default-border-color, #c5c5d0);
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+    padding: 0.375rem 0.5rem;
+    border-block-end: 1px solid var(--default-border-color, #c5c5d0);
+  }
+
+  &__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__badge {
+    flex: 0 0 auto;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    background: var(--button-hover-bg, rgba(0, 0, 0, 0.07));
+    color: var(--input-label-color, #495057);
+  }
+
+  &__close {
+    flex: 0 0 auto;
+    // 44px: a one-handed tap target, and the only way out of the pane
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: inherit;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--button-hover-bg, rgba(0, 0, 0, 0.06));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4dabf7);
+      outline-offset: -2px;
+    }
+  }
+
+  &__scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0.5rem;
+    background: var(--color-surface-low, #f1f0ff);
+  }
+
+  &__pages {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__page {
+    position: relative;
+  }
+
+  &__holder {
+    display: block;
+    border-radius: 0.25rem;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+    background: #fff;
+  }
+
+  /* An A4-ish box so the scrollbar is honest before anything is rendered
+     and pages do not jump as they load. */
+  &__skeleton {
+    width: 100%;
+    aspect-ratio: 210 / 297;
+    background: linear-gradient(
+      var(--color-surface-high, #e9ecef),
+      var(--color-surface-high, #e9ecef)
+    );
+  }
+
+  &__canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  &__pagenum {
+    position: absolute;
+    inset-block-end: 0.375rem;
+    inset-inline-end: 0.375rem;
+    padding: 0.0625rem 0.3125rem;
+    border-radius: 999px;
+    font-size: 0.625rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    background: rgb(0 0 0 / 55%);
+  }
+
+  &__note {
+    margin: 0;
+    padding: 1.25rem 0.75rem;
+    text-align: center;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--input-label-color, #495057);
+  }
+}
+
+/* The "open alongside" picker. Same overlay shape as the other dialogs,
+   including the border-box on the root — see HistoryPanel.scss for the
+   390px clipping that caught out. */
+
+.gn-refpick {
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.45);
+
+  &__panel {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    width: min(26rem, 100%);
+    max-width: 100%;
+    max-height: 100%;
+    overflow: hidden auto;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    background: var(--island-bg-color, #fff);
+    color: var(--text-primary-color, #1b1b1f);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 600;
+  }
+
+  &__intro {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--input-label-color, #495057);
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.0625rem;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.375rem 0.5rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--button-hover-bg, rgba(0, 0, 0, 0.05));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-highlight-color, #4dabf7);
+      outline-offset: -2px;
+    }
+  }
+
+  &__row-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  &__row-meta {
+    font-size: 0.75rem;
+    color: var(--input-label-color, #495057);
+  }
+
+  &__cancel {
+    align-self: flex-end;
+    min-height: 2.25rem;
+    padding: 0 0.875rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--default-border-color, #c5c5d0);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+}

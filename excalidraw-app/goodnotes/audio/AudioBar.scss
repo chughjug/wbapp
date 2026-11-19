@@ -6,6 +6,31 @@
  * fallbacks for rendering outside an `.excalidraw` scope.
  */
 
+/* Doubled class for the same reason as `.gn-ref.gn-ref` — `.excalidraw`
+   sets `position: relative`, and at equal specificity it won, dropping
+   the bar into normal flow at the top of the document instead of pinning
+   it above the home indicator. Portalling to the body did not help,
+   because the conflict is the cascade, not the containing block.
+   Kept as its own rule: nesting the children under a doubled selector
+   compiles them to `.gn-audio.gn-audio__bar`, which matches nothing. */
+.gn-audio.gn-audio {
+  // `.excalidraw` sets `inset: 0` and a size; measured, the bar came out
+  // 1178x834 pinned to the top because its `top: 0` survived alongside
+  // this rule's `bottom`. Every one of these is undoing a specific
+  // property that measurement showed was still coming from there.
+  position: fixed;
+  inset: auto auto calc(0.75rem + env(safe-area-inset-bottom, 0px)) 50%;
+  transform: translateX(-50%);
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - 1rem);
+  overflow: visible;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .gn-audio {
   position: fixed;
   left: 50%;
