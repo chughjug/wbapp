@@ -48,6 +48,7 @@ export const DocumentCard = React.memo((props: DocumentItemProps) => {
     selectionActive,
     isHero,
     courseStyle,
+    contentMatch,
     onFocusCard,
     onToggleSelect,
     onSelectTag,
@@ -172,6 +173,18 @@ export const DocumentCard = React.memo((props: DocumentItemProps) => {
                 />
                 {courseStyle?.emoji ? `${courseStyle.emoji} ` : ""}
                 {formatCoursePath(doc.course)}
+              </span>
+            )}
+            {contentMatch && (
+              <span className="gn-card__match">
+                <span className="gn-card__match-page">
+                  {contentMatch.page > 0
+                    ? `Page ${contentMatch.page}`
+                    : "In this notebook"}
+                </span>
+                <span className="gn-card__match-text">
+                  {contentMatch.snippet}
+                </span>
               </span>
             )}
             <span className="gn-card__meta">

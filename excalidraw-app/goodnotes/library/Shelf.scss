@@ -584,6 +584,34 @@
     color: var(--gn-text-muted);
   }
 
+  /* Why a search result is a search result: the matching words, and where. */
+  .gn-card__match {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin-top: 0.15rem;
+    min-width: 0;
+  }
+
+  .gn-card__match-page {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--color-primary, #5b57d1);
+  }
+
+  .gn-card__match-text {
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: var(--gn-text-muted);
+    /* two lines at most: a card is not a reading surface */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
   .gn-card__tags {
     display: flex;
     flex-wrap: wrap;

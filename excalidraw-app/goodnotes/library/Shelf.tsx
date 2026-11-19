@@ -49,6 +49,8 @@ import React, {
   useState,
 } from "react";
 
+import { ensureSearchIndex, searchNotes } from "../search";
+
 import { useDocuments } from "./useDocuments";
 import { useCourseStyles } from "./courses";
 import {
@@ -64,6 +66,7 @@ import {
   matchesQuery,
   visibleTags,
 } from "./filters";
+import { getScene } from "./store";
 import {
   coursePathLabel,
   formatCoursePath,
@@ -455,13 +458,65 @@ export const Shelf = ({
     }
   }, [filter, documents]);
 
+  /**
+   * Hits from *inside* the notebooks, keyed by document id.
+   *
+   * The shelf only ever matched title, course and tags, so "which notebook
+   * did I write about eigenvalues in?" had no answer short of opening them
+   * one at a time. `../search` keeps a small text-only index — typed text,
+   * imported PDF page text, graph descriptions — which is what this reads.
+   * Handwriting is not in it: nothing here recognises strokes.
+   */
+  const [contentHits, setContentHits] = useState<
+    Map<string, { page: number; snippet: string }>
+  >(new Map());
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setContentHits(new Map());
+      return;
+    }
+    let cancelled = false;
+    // debounced: indexing reads IndexedDB, and this runs per keystroke
+    const timer = window.setTimeout(() => {
+      void ensureSearchIndex(documents, getScene)
+        .then(() => {
+          if (cancelled) {
+            return;
+          }
+          setContentHits(
+            new Map(
+              searchNotes(trimmed).map((hit) => [
+                hit.docId,
+                { page: hit.page, snippet: hit.snippet },
+              ]),
+            ),
+          );
+        })
+        .catch(() => {
+          // search is an enhancement; a failure must leave the shelf usable
+          if (!cancelled) {
+            setContentHits(new Map());
+          }
+        });
+    }, 180);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [query, documents]);
+
   const visible = useMemo(() => {
+    const trimmed = query.trim();
     return documents
       .filter(
-        (doc) => matchesQuery(doc, query.trim()) && isInView(doc, filter, now),
+        (doc) =>
+          (matchesQuery(doc, trimmed) || contentHits.has(doc.id)) &&
+          isInView(doc, filter, now),
       )
       .sort((a, b) => comparePinnedFirst(a, b, sortKey));
-  }, [documents, query, filter, sortKey, now]);
+  }, [documents, query, filter, sortKey, now, contentHits]);
 
   // Covers are generated here, from the scenes the library already owns,
   // because nothing else in the app ever generated one — see thumbnails.ts.
@@ -1074,6 +1129,7 @@ export const Shelf = ({
     courseSuggestions,
     isHero: doc.id === heroId,
     courseStyle: styleFor(doc.course),
+    contentMatch: contentHits.get(doc.id),
     onOpen: handleOpen,
     onStartEdit: setEditingId,
     onStopEdit: handleStopEdit,
@@ -1136,8 +1192,8 @@ export const Shelf = ({
                   type="search"
                   value={query}
                   autoFocus
-                  placeholder="Search title, course or tag"
-                  aria-label="Search documents by title, course or tag"
+                  placeholder="Search your notes"
+                  aria-label="Search inside your notes, and by title, course or tag. Handwriting is not searchable."
                   onChange={(event) => setQuery(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === "Escape") {

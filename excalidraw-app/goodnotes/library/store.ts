@@ -33,6 +33,7 @@ import type {
 
 import type { AppState } from "@excalidraw/excalidraw/types";
 
+import { forgetDocText, indexSceneText } from "../search";
 import { PAGE_FRAME_PREFIX } from "../types";
 
 import {
@@ -442,8 +443,17 @@ export const saveScene = async (id: string, scene: DocScene): Promise<void> => {
     );
     // this tab is now the last writer; anything newer than this is somebody
     // else and must be merged, not overwritten
+    const written = (await getDoc(id))?.updatedAt ?? 0;
     if (sceneBaselines.has(id)) {
-      sceneBaselines.set(id, (await getDoc(id))?.updatedAt ?? 0);
+      sceneBaselines.set(id, written);
+    }
+    // keep the search text current. Strings only, so this is cheap next to
+    // the scene write above; a failure must not fail the save, since a
+    // stale search index is a far smaller problem than lost strokes.
+    try {
+      await indexSceneText(id, payload, written);
+    } catch {
+      // ignored on purpose — see above
     }
   }
   emitChange();
@@ -596,7 +606,14 @@ export const deleteDoc = async (id: string): Promise<void> => {
     clearTimeout(pending.timer);
     pendingSaves.delete(id);
   }
+  sceneBaselines.delete(id);
   await Promise.all([del(id, metaStore), del(id, sceneStore)]);
+  // a deleted notebook must stop turning up in search
+  try {
+    await forgetDocText(id);
+  } catch {
+    // a stale index entry is harmless; the shelf filters to live documents
+  }
   emitChange();
 };
 

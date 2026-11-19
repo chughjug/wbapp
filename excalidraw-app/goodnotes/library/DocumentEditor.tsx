@@ -64,6 +64,13 @@ export interface DocumentItemProps {
     modifiers: { shift: boolean; meta: boolean },
   ) => void;
 
+  /**
+   * Why this card is in a search result: the matching text from inside the
+   * notebook, and the page it is on. Absent when the document matched on
+   * title/course/tag, or when nothing is being searched for.
+   */
+  contentMatch?: { page: number; snippet: string };
+
   // ------------------------------------------------------- flags + filters
   isPinned?: boolean;
   isArchived?: boolean;
