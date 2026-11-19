@@ -1003,6 +1003,50 @@ const ExcalidrawWrapper = ({
    * chooser is still a tap away as "New page…".
    */
   const addPageWithRememberedFormat = newPage.addPageWithChoice;
+  /**
+   * Let the keyboard out of the canvas.
+   *
+   * Excalidraw's container is `tabindex="0"` and swallows Tab, so focus
+   * entering it never left: measured, ten consecutive Tab presses all
+   * returned `div.excalidraw`, and the toolbar, undo/redo and the way
+   * back to the shelf were unreachable by keyboard entirely. That is a
+   * WCAG 2.1.2 keyboard trap, and the only escape was reloading the page.
+   *
+   * Tab from the canvas itself now moves to the toolbar (Shift+Tab to
+   * the last control in it), and Escape does the same — the convention
+   * Excalidraw's own docs describe. Only fires when the canvas container
+   * is what holds focus: a text element being edited, or any control
+   * inside the editor, keeps normal Tab behaviour.
+   */
+  const onCanvasKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Tab" && event.key !== "Escape") {
+        return;
+      }
+      const active = document.activeElement;
+      if (
+        !(active instanceof HTMLElement) ||
+        !active.classList.contains("excalidraw-container")
+      ) {
+        return;
+      }
+      const bar = document.querySelector<HTMLElement>(".gn-bar");
+      const stops = bar
+        ? [...bar.querySelectorAll<HTMLElement>("button:not([disabled])")]
+        : [];
+      if (stops.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      (event.shiftKey && event.key === "Tab"
+        ? stops[stops.length - 1]
+        : stops[0]
+      ).focus();
+    },
+    [],
+  );
+
   const quickAddPage = useCallback(() => {
     void addPageWithRememberedFormat();
   }, [addPageWithRememberedFormat]);
@@ -1892,7 +1936,7 @@ const ExcalidrawWrapper = ({
         {/* NOT a <main>: Excalidraw's footer sets role="contentinfo"
             explicitly, so wrapping the canvas nests a contentinfo landmark
             inside main, which is worse than the region warning it cures. */}
-        <div className="gn-shell-canvas">
+        <div className="gn-shell-canvas" onKeyDownCapture={onCanvasKeyDown}>
           <PaperBackgroundLayer
             // `undefined` on paper, so the layer keeps deriving pages from
             // `elements`; a stable `[]` on a whiteboard, which paints nothing.
