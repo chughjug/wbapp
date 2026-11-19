@@ -31,7 +31,16 @@ export interface DocumentActions {
   /** Create a document; resolves with the new (already-listed) metadata. */
   create: (init?: Partial<DocMeta>) => Promise<DocMeta>;
   rename: (id: string, title: string) => Promise<DocMeta>;
+  /**
+   * Move to the trash — reversible, and what the shelf's delete action
+   * calls. The document keeps its scene and reappears under "Recently
+   * deleted" until the retention window expires.
+   */
   remove: (id: string) => Promise<void>;
+  /** Take a document back out of the trash. */
+  restore: (id: string) => Promise<void>;
+  /** Delete for good. Only reachable from inside "Recently deleted". */
+  purge: (id: string) => Promise<void>;
   duplicate: (id: string) => Promise<DocMeta>;
   /** `null` clears the due date. */
   setDueDate: (id: string, dueDate: number | null) => Promise<DocMeta>;
@@ -83,6 +92,8 @@ export interface DocumentActions {
   bulkDuplicate: (ids: readonly string[]) => Promise<DocMeta[]>;
   /** Delete many. ONE confirmation belongs in the UI, not here. */
   bulkRemove: (ids: readonly string[]) => Promise<number>;
+  bulkRestore: (ids: readonly string[]) => Promise<number>;
+  bulkPurge: (ids: readonly string[]) => Promise<number>;
 
   // ------------------------------------------------------- library-wide ops
   /** Rename a tag on every document carrying it. Resolves with the count. */
@@ -164,7 +175,13 @@ export const useDocuments = (): UseDocumentsResult => {
         store.updateDocMeta(id, {
           title: title.trim() || store.DEFAULT_DOC_TITLE,
         }),
-      remove: (id: string) => store.deleteDoc(id),
+      remove: async (id: string) => {
+        await store.trashDoc(id);
+      },
+      restore: async (id: string) => {
+        await store.restoreDoc(id);
+      },
+      purge: (id: string) => store.deleteDoc(id),
       duplicate: (id: string) => store.duplicateDoc(id),
       setDueDate: (id: string, dueDate: number | null) =>
         store.updateDocMeta(id, { dueDate }),
@@ -268,7 +285,9 @@ export const useDocuments = (): UseDocumentsResult => {
       bulkSetPinned: (ids, pinned) =>
         store.setTagOnMany(ids, PINNED_TAG, pinned),
       bulkDuplicate: (ids) => store.duplicateManyDocs(ids),
-      bulkRemove: (ids) => store.deleteManyDocs(ids),
+      bulkRemove: (ids) => store.trashManyDocs(ids),
+      bulkRestore: (ids) => store.restoreManyDocs(ids),
+      bulkPurge: (ids) => store.deleteManyDocs(ids),
       renameTag: (from: string, to: string) =>
         store.renameTagEverywhere(from, to),
       deleteTag: (tag: string) => store.deleteTagEverywhere(tag),

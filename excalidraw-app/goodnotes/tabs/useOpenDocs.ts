@@ -145,11 +145,14 @@ export const useOpenDocs = (
       if (cancelled || !isMountedRef.current) {
         return;
       }
-      setMetas(new Map(docs.map((doc) => [doc.id, doc])));
+      // a document in the trash is deleted as far as the rest of the app is
+      // concerned: it keeps its scene only so it can be put back
+      const live = docs.filter((doc) => typeof doc.deletedAt !== "number");
+      setMetas(new Map(live.map((doc) => [doc.id, doc])));
       setIsHydrated(true);
       // a tab whose document was deleted has nothing to show and nothing to
       // open; drop it rather than render a ghost
-      pruneOpenDocs(docs.map((doc) => doc.id));
+      pruneOpenDocs(live.map((doc) => doc.id));
     };
     void load();
     const unsubscribe = subscribe(() => void load());

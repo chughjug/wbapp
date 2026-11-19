@@ -41,6 +41,15 @@ export interface DocumentItemProps {
   onStopEdit: () => void;
   onDuplicate: (doc: DocMeta) => void;
   onDelete: (doc: DocMeta) => void;
+  /**
+   * Take a trashed document back out of the trash. Given only inside
+   * "Recently deleted", where it replaces the whole menu: nothing else on
+   * it — pin, archive, duplicate, edit details — means anything for a
+   * document the user has deleted.
+   */
+  onRestore?: (doc: DocMeta) => void;
+  /** Whole days before this document is purged. Trash view only. */
+  trashDaysLeft?: number;
   onRename: (id: string, title: string) => void;
   onSetCourse: (id: string, course: string | null) => void;
   onSetDueDate: (id: string, dueDate: number | null) => void;
@@ -336,6 +345,7 @@ export const DocumentActions = ({
   onStopEdit,
   onDuplicate,
   onDelete,
+  onRestore,
   onToggleFavourite,
   onTogglePinned,
   onToggleArchived,
@@ -353,6 +363,7 @@ export const DocumentActions = ({
   | "onStopEdit"
   | "onDuplicate"
   | "onDelete"
+  | "onRestore"
   | "onToggleFavourite"
   | "onTogglePinned"
   | "onToggleArchived"
@@ -364,78 +375,102 @@ export const DocumentActions = ({
       buttonClassName="gn-icon-button gn-card__more"
       icon={<Icon path={ICON_MORE} />}
     >
-      {(close) => (
-        <>
-          <MenuItem
-            label={isFavourite ? "Remove from favourites" : "Add to favourites"}
-            icon={<Icon path={ICON_STAR} filled={isFavourite} />}
-            onClick={() => {
-              onToggleFavourite(doc);
-              close();
-            }}
-          />
-          {onTogglePinned && (
+      {(close) =>
+        onRestore ? (
+          <>
             <MenuItem
-              label={isPinned ? "Unpin from the top" : "Pin to the top"}
-              icon={<Icon path={ICON_PIN} filled={!!isPinned} />}
-              onClick={() => {
-                onTogglePinned(doc);
-                close();
-              }}
-            />
-          )}
-          {onToggleArchived && (
-            <MenuItem
-              label={isArchived ? "Unarchive" : "Archive"}
+              label="Put back"
               icon={<Icon path={ICON_ARCHIVE} />}
               onClick={() => {
-                onToggleArchived(doc);
+                onRestore(doc);
                 close();
               }}
             />
-          )}
-          {onToggleSelect && (
             <MenuItem
-              label="Select"
-              description="then pick more to act on several at once"
-              icon={<Icon path={ICON_CHECK} />}
+              label="Delete permanently…"
+              danger
+              icon={<Icon path={ICON_TRASH} />}
               onClick={() => {
-                onToggleSelect(doc.id, { shift: false, meta: true });
+                onDelete(doc);
                 close();
               }}
             />
-          )}
-          <MenuItem
-            label={isEditing ? "Close details" : "Edit details…"}
-            icon={<Icon path={ICON_PENCIL} />}
-            onClick={() => {
-              if (isEditing) {
-                onStopEdit();
-              } else {
-                onStartEdit(doc.id);
+          </>
+        ) : (
+          <>
+            <MenuItem
+              label={
+                isFavourite ? "Remove from favourites" : "Add to favourites"
               }
-              close();
-            }}
-          />
-          <MenuItem
-            label="Duplicate"
-            icon={<Icon path={ICON_COPY} />}
-            onClick={() => {
-              onDuplicate(doc);
-              close();
-            }}
-          />
-          <MenuItem
-            label="Delete…"
-            danger
-            icon={<Icon path={ICON_TRASH} />}
-            onClick={() => {
-              onDelete(doc);
-              close();
-            }}
-          />
-        </>
-      )}
+              icon={<Icon path={ICON_STAR} filled={isFavourite} />}
+              onClick={() => {
+                onToggleFavourite(doc);
+                close();
+              }}
+            />
+            {onTogglePinned && (
+              <MenuItem
+                label={isPinned ? "Unpin from the top" : "Pin to the top"}
+                icon={<Icon path={ICON_PIN} filled={!!isPinned} />}
+                onClick={() => {
+                  onTogglePinned(doc);
+                  close();
+                }}
+              />
+            )}
+            {onToggleArchived && (
+              <MenuItem
+                label={isArchived ? "Unarchive" : "Archive"}
+                icon={<Icon path={ICON_ARCHIVE} />}
+                onClick={() => {
+                  onToggleArchived(doc);
+                  close();
+                }}
+              />
+            )}
+            {onToggleSelect && (
+              <MenuItem
+                label="Select"
+                description="then pick more to act on several at once"
+                icon={<Icon path={ICON_CHECK} />}
+                onClick={() => {
+                  onToggleSelect(doc.id, { shift: false, meta: true });
+                  close();
+                }}
+              />
+            )}
+            <MenuItem
+              label={isEditing ? "Close details" : "Edit details…"}
+              icon={<Icon path={ICON_PENCIL} />}
+              onClick={() => {
+                if (isEditing) {
+                  onStopEdit();
+                } else {
+                  onStartEdit(doc.id);
+                }
+                close();
+              }}
+            />
+            <MenuItem
+              label="Duplicate"
+              icon={<Icon path={ICON_COPY} />}
+              onClick={() => {
+                onDuplicate(doc);
+                close();
+              }}
+            />
+            <MenuItem
+              label="Delete…"
+              danger
+              icon={<Icon path={ICON_TRASH} />}
+              onClick={() => {
+                onDelete(doc);
+                close();
+              }}
+            />
+          </>
+        )
+      }
     </MenuButton>
   </div>
 );

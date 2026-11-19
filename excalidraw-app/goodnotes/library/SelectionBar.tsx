@@ -35,6 +35,12 @@ export interface SelectionBarProps {
   onToggleArchived: (next: boolean) => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  /**
+   * Inside "Recently deleted" the only two things that make sense are
+   * putting the documents back and destroying them, so when this is given
+   * the bar drops everything else and Delete becomes permanent.
+   */
+  onRestore?: () => void;
 }
 
 export const SelectionBar = ({
@@ -55,6 +61,7 @@ export const SelectionBar = ({
   onToggleArchived,
   onDuplicate,
   onDelete,
+  onRestore,
 }: SelectionBarProps) => {
   const noun = count === 1 ? "document" : "documents";
   const scope = `${count} ${noun}`;
@@ -70,81 +77,104 @@ export const SelectionBar = ({
       </p>
 
       <div className="gn-selbar__actions">
-        <button
-          type="button"
-          className="gn-button gn-button--small"
-          onClick={onMove}
-        >
-          Move to course…
-          <span className="gn-sr-only">{` (${scope})`}</span>
-        </button>
-        <button
-          type="button"
-          className="gn-button gn-button--small"
-          onClick={onAddTag}
-        >
-          Add tag…
-          <span className="gn-sr-only">{` (${scope})`}</span>
-        </button>
-        <button
-          type="button"
-          className="gn-button gn-button--small"
-          onClick={onRemoveTag}
-        >
-          Remove tag…
-          <span className="gn-sr-only">{` (${scope})`}</span>
-        </button>
-        <button
-          type="button"
-          className="gn-button gn-button--small"
-          aria-pressed={allFavourite}
-          onClick={() => onToggleFavourite(!allFavourite)}
-        >
-          {allFavourite ? "Unfavourite" : "Favourite"}
-          <span className="gn-sr-only">{` ${scope}`}</span>
-        </button>
-        <button
-          type="button"
-          className="gn-button gn-button--small"
-          aria-pressed={allPinned}
-          onClick={() => onTogglePinned(!allPinned)}
-        >
-          {allPinned ? "Unpin" : "Pin"}
-          <span className="gn-sr-only">{` ${scope}`}</span>
-        </button>
-        <button
-          type="button"
-          className="gn-button gn-button--small"
-          onClick={onSetDueDate}
-        >
-          Set due date…
-          <span className="gn-sr-only">{` (${scope})`}</span>
-        </button>
-        <button
-          type="button"
-          className="gn-button gn-button--small"
-          aria-pressed={allArchived}
-          onClick={() => onToggleArchived(!allArchived)}
-        >
-          {allArchived ? "Unarchive" : "Archive"}
-          <span className="gn-sr-only">{` ${scope}`}</span>
-        </button>
-        <button
-          type="button"
-          className="gn-button gn-button--small"
-          onClick={onDuplicate}
-        >
-          Duplicate
-          <span className="gn-sr-only">{` ${scope}`}</span>
-        </button>
-        <button
-          type="button"
-          className="gn-button gn-button--small gn-button--danger"
-          onClick={onDelete}
-        >
-          Delete
-          <span className="gn-sr-only">{` ${scope}`}</span>
-        </button>
+        {onRestore ? (
+          <>
+            <button
+              type="button"
+              className="gn-button gn-button--small"
+              onClick={onRestore}
+            >
+              Restore
+              <span className="gn-sr-only">{` ${scope}`}</span>
+            </button>
+            <button
+              type="button"
+              className="gn-button gn-button--small gn-button--danger"
+              onClick={onDelete}
+            >
+              Delete permanently
+              <span className="gn-sr-only">{` ${scope}`}</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="gn-button gn-button--small"
+              onClick={onMove}
+            >
+              Move to course…
+              <span className="gn-sr-only">{` (${scope})`}</span>
+            </button>
+            <button
+              type="button"
+              className="gn-button gn-button--small"
+              onClick={onAddTag}
+            >
+              Add tag…
+              <span className="gn-sr-only">{` (${scope})`}</span>
+            </button>
+            <button
+              type="button"
+              className="gn-button gn-button--small"
+              onClick={onRemoveTag}
+            >
+              Remove tag…
+              <span className="gn-sr-only">{` (${scope})`}</span>
+            </button>
+            <button
+              type="button"
+              className="gn-button gn-button--small"
+              aria-pressed={allFavourite}
+              onClick={() => onToggleFavourite(!allFavourite)}
+            >
+              {allFavourite ? "Unfavourite" : "Favourite"}
+              <span className="gn-sr-only">{` ${scope}`}</span>
+            </button>
+            <button
+              type="button"
+              className="gn-button gn-button--small"
+              aria-pressed={allPinned}
+              onClick={() => onTogglePinned(!allPinned)}
+            >
+              {allPinned ? "Unpin" : "Pin"}
+              <span className="gn-sr-only">{` ${scope}`}</span>
+            </button>
+            <button
+              type="button"
+              className="gn-button gn-button--small"
+              onClick={onSetDueDate}
+            >
+              Set due date…
+              <span className="gn-sr-only">{` (${scope})`}</span>
+            </button>
+            <button
+              type="button"
+              className="gn-button gn-button--small"
+              aria-pressed={allArchived}
+              onClick={() => onToggleArchived(!allArchived)}
+            >
+              {allArchived ? "Unarchive" : "Archive"}
+              <span className="gn-sr-only">{` ${scope}`}</span>
+            </button>
+            <button
+              type="button"
+              className="gn-button gn-button--small"
+              onClick={onDuplicate}
+            >
+              Duplicate
+              <span className="gn-sr-only">{` ${scope}`}</span>
+            </button>
+            <button
+              type="button"
+              className="gn-button gn-button--small gn-button--danger"
+              onClick={onDelete}
+            >
+              Delete
+              <span className="gn-sr-only">{` ${scope}`}</span>
+            </button>
+          </>
+        )}
       </div>
 
       <div className="gn-selbar__end">

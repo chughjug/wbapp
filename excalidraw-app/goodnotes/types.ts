@@ -99,6 +99,16 @@ export interface DocMeta {
    */
   surface?: "paper" | "whiteboard";
   /**
+   * When the document was moved to the trash, or absent when it is live.
+   *
+   * Deleting used to remove the metadata row and the scene in one step, so
+   * one mis-tap past a confirm dialog destroyed a term of notes with no way
+   * back. A trashed document keeps everything and is simply hidden; the
+   * shelf's "Recently deleted" view restores it, and anything older than
+   * the retention window is purged for real on the next library load.
+   */
+  deletedAt?: number;
+  /**
    * When the cover thumbnail was taken, as the `updatedAt` it was taken at.
    * Lets the library tell a stale cover from a current one without keeping a
    * parallel stamp table of its own.

@@ -49,6 +49,7 @@ export const DocumentCard = React.memo((props: DocumentItemProps) => {
     isHero,
     courseStyle,
     contentMatch,
+    trashDaysLeft,
     onFocusCard,
     onToggleSelect,
     onSelectTag,
@@ -173,6 +174,20 @@ export const DocumentCard = React.memo((props: DocumentItemProps) => {
                 />
                 {courseStyle?.emoji ? `${courseStyle.emoji} ` : ""}
                 {formatCoursePath(doc.course)}
+              </span>
+            )}
+            {trashDaysLeft !== undefined && (
+              <span className="gn-card__match">
+                <span className="gn-card__match-page">
+                  {trashDaysLeft === 0
+                    ? "Deleted — removed today"
+                    : `Deleted — ${trashDaysLeft} ${
+                        trashDaysLeft === 1 ? "day" : "days"
+                      } left`}
+                </span>
+                <span className="gn-card__match-text">
+                  Put it back from the menu to keep it.
+                </span>
               </span>
             )}
             {contentMatch && (

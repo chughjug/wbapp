@@ -50,6 +50,12 @@ export interface SidebarProps {
     dueWeek: number;
     /** Archived documents. Omitted renders the Archived row with 0. */
     archived?: number;
+    /**
+     * Documents in the trash. The row is hidden at 0 — an empty bin is
+     * not a place anyone needs to visit, and an always-present "Recently
+     * deleted" invites the thought that something is lurking in it.
+     */
+    trash?: number;
   };
   /** Flat course list; used only when `courseTree` is not supplied. */
   courses: SidebarCourse[];
@@ -75,6 +81,7 @@ const SMART_FILTERS: { filter: LibraryFilter; icon: string }[] = [
   { filter: { kind: "recent" }, icon: ICON_CLOCK },
   { filter: { kind: "due-week" }, icon: ICON_CALENDAR },
   { filter: { kind: "archived" }, icon: ICON_ARCHIVE },
+  { filter: { kind: "trash" }, icon: ICON_TRASH },
 ];
 
 const useStorageEstimate = (revision: number) => {
@@ -283,6 +290,8 @@ export const Sidebar = ({
         return counts.dueWeek;
       case "archived":
         return counts.archived ?? 0;
+      case "trash":
+        return counts.trash ?? 0;
       case "all":
       default:
         return counts.all;
@@ -302,6 +311,11 @@ export const Sidebar = ({
           const label = filterLabel(candidate);
           const count = countFor(candidate);
           const isActive = id === activeId;
+          // an empty bin is not a place to visit, and a permanent
+          // "Recently deleted" row suggests something is lurking in it
+          if (candidate.kind === "trash" && count === 0 && !isActive) {
+            return null;
+          }
           return (
             <li key={id}>
               <button

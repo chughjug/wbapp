@@ -64,10 +64,13 @@ import {
   isInView,
   isPinned,
   isRecent,
+  isTrashed,
+  daysLeftInTrash,
+  TRASH_RETENTION_MS,
   matchesQuery,
   visibleTags,
 } from "./filters";
-import { getScene } from "./store";
+import { getScene, purgeExpiredTrash } from "./store";
 import {
   coursePathLabel,
   formatCoursePath,
@@ -350,6 +353,49 @@ export const Shelf = ({
   /** Last bulk action, announced politely once it has been applied. */
   const [announcement, setAnnouncement] = useState("");
 
+  /**
+   * The visible counterpart of {@link announcement}: a short-lived bar with
+   * one action.
+   *
+   * It exists for deletion. "Recently deleted" lives behind the browse
+   * drawer, which is exactly where nobody looks in the two seconds after
+   * deleting the wrong notebook — so the way back has to come to them.
+   * Everything it offers is also reachable without it.
+   */
+  const [snack, setSnack] = useState<{
+    id: number;
+    message: string;
+    actionLabel?: string;
+    onAction?: () => void;
+  } | null>(null);
+  const snackSeq = useRef(0);
+
+  const showSnack = useCallback(
+    (message: string, action?: { label: string; onAction: () => void }) => {
+      snackSeq.current += 1;
+      setSnack({
+        id: snackSeq.current,
+        message,
+        actionLabel: action?.label,
+        onAction: action?.onAction,
+      });
+      setAnnouncement(message);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!snack) {
+      return;
+    }
+    // long enough to read a sentence and reach for Undo, short enough not
+    // to sit over the shelf while you work
+    const timer = window.setTimeout(() => {
+      setSnack((current) => (current?.id === snack.id ? null : current));
+    }, 9000);
+    return () => window.clearTimeout(timer);
+  }, [snack]);
+
   const controlsId = useId();
   const gridRef = useRef<HTMLUListElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -404,20 +450,49 @@ export const Shelf = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const now = useMemo(() => Date.now(), [documents]);
 
+  /**
+   * Everything not in the trash. Every count, the course list and the
+   * search index are built from this: a deleted notebook must not be in
+   * "All documents", must not inflate a course's count, and must not come
+   * back as a search hit.
+   */
+  const liveDocuments = useMemo(
+    () => documents.filter((doc) => !isTrashed(doc)),
+    [documents],
+  );
+
+  /** The shelf behaves differently inside "Recently deleted". */
+  const isTrashView = filter.kind === "trash";
+
+  /**
+   * Enforce the retention window once, when the library opens.
+   *
+   * Not on a timer and not on every render: a notes app is not running in
+   * the background, and "30 days since you deleted it" does not need to be
+   * enforced to the minute. A failure here is silent on purpose — the only
+   * consequence is that something stays recoverable slightly longer.
+   */
+  useEffect(() => {
+    void purgeExpiredTrash(Date.now() - TRASH_RETENTION_MS).catch(
+      () => undefined,
+    );
+  }, []);
+
   const counts = useMemo(
     () => ({
-      all: documents.length,
-      favourites: documents.filter(isFavourite).length,
-      recent: documents.filter((doc) => isRecent(doc, now)).length,
-      dueWeek: documents.filter((doc) => isDueThisWeek(doc, now)).length,
-      archived: documents.filter(isArchived).length,
+      all: liveDocuments.length,
+      favourites: liveDocuments.filter(isFavourite).length,
+      recent: liveDocuments.filter((doc) => isRecent(doc, now)).length,
+      dueWeek: liveDocuments.filter((doc) => isDueThisWeek(doc, now)).length,
+      archived: liveDocuments.filter(isArchived).length,
+      trash: documents.length - liveDocuments.length,
     }),
-    [documents, now],
+    [documents, liveDocuments, now],
   );
 
   const courseRows = useMemo(() => {
     return courses.map((name) => {
-      const docs = documents.filter((doc) => doc.course === name);
+      const docs = liveDocuments.filter((doc) => doc.course === name);
       return {
         name,
         count: docs.length,
@@ -425,7 +500,7 @@ export const Shelf = ({
         style: courseStyles.styleOf(name),
       };
     });
-  }, [courses, documents, now, courseStyles]);
+  }, [courses, liveDocuments, now, courseStyles]);
 
   const sidebarCourses: SidebarCourse[] = courseRows;
   const folders: CourseFolder[] = courseRows;
@@ -481,7 +556,7 @@ export const Shelf = ({
     let cancelled = false;
     // debounced: indexing reads IndexedDB, and this runs per keystroke
     const timer = window.setTimeout(() => {
-      void ensureSearchIndex(documents, getScene)
+      void ensureSearchIndex(liveDocuments, getScene)
         .then(() => {
           if (cancelled) {
             return;
@@ -506,7 +581,7 @@ export const Shelf = ({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [query, documents]);
+  }, [query, liveDocuments]);
 
   const visible = useMemo(() => {
     const trimmed = query.trim();
@@ -742,16 +817,40 @@ export const Shelf = ({
     }
     const index = visible.findIndex((it) => it.id === doc.id);
     const neighbour = visible[index + 1] ?? visible[index - 1] ?? null;
-    void actions.remove(doc.id).then(() => {
+    // inside the trash the same control destroys the document for good;
+    // everywhere else it only moves it there
+    const permanent = isTrashed(doc);
+    const run = permanent ? actions.purge(doc.id) : actions.remove(doc.id);
+    void run.then(() => {
       if (neighbour) {
         pendingFocusRef.current = neighbour.id;
         setActiveId(neighbour.id);
+      }
+      if (permanent) {
+        showSnack(`Deleted “${doc.title}” permanently`);
+      } else {
+        showSnack(`“${doc.title}” moved to Recently deleted`, {
+          label: "Undo",
+          onAction: () => {
+            void actions.restore(doc.id);
+            setSnack(null);
+          },
+        });
       }
     });
     if (editingId === doc.id) {
       setEditingId(null);
     }
-  }, [actions, visible, editingId, pendingDelete]);
+  }, [actions, visible, editingId, pendingDelete, showSnack]);
+
+  const handleRestore = useCallback(
+    (doc: DocMeta) => {
+      void actions
+        .restore(doc.id)
+        .then(() => showSnack(`“${doc.title}” is back in your library`));
+    },
+    [actions, showSnack],
+  );
 
   const handleRename = useCallback(
     (id: string, title: string) => {
@@ -1027,10 +1126,24 @@ export const Shelf = ({
     }
     switch (state.kind) {
       case "delete-docs":
-        void actions.bulkRemove(state.ids).then((removed) => {
-          selection.clear();
-          setAnnouncement(`Deleted ${bulkNoun(removed)}`);
-        });
+        if (isTrashView) {
+          void actions.bulkPurge(state.ids).then((removed) => {
+            selection.clear();
+            showSnack(`Deleted ${bulkNoun(removed)} permanently`);
+          });
+        } else {
+          const ids = state.ids;
+          void actions.bulkRemove(ids).then((removed) => {
+            selection.clear();
+            showSnack(`Moved ${bulkNoun(removed)} to Recently deleted`, {
+              label: "Undo",
+              onAction: () => {
+                void actions.bulkRestore(ids);
+                setSnack(null);
+              },
+            });
+          });
+        }
         break;
       case "delete-tag":
         void actions.deleteTag(state.tag).then((changed) => {
@@ -1054,7 +1167,7 @@ export const Shelf = ({
       default:
         break;
     }
-  }, [actions, confirming, selection]);
+  }, [actions, confirming, selection, isTrashView, showSnack]);
 
   const docsInCourseTree = useCallback(
     (course: string) =>
@@ -1138,6 +1251,10 @@ export const Shelf = ({
     isHero: doc.id === heroId,
     courseStyle: styleFor(doc.course),
     contentMatch: contentHits.get(doc.id),
+    // inside the trash a card offers only "Put back" and a permanent
+    // delete; its other actions would be acting on a deleted document
+    onRestore: isTrashView ? handleRestore : undefined,
+    trashDaysLeft: isTrashed(doc) ? daysLeftInTrash(doc, now) : undefined,
     onOpen: handleOpen,
     onStartEdit: setEditingId,
     onStopEdit: handleStopEdit,
@@ -1335,6 +1452,31 @@ export const Shelf = ({
               {announcement}
             </p>
 
+            {snack && (
+              // not role="alert": the live region above already announces
+              // this, and two announcements of one event is worse than none
+              <div className="gn-snack" key={snack.id}>
+                <span className="gn-snack__text">{snack.message}</span>
+                {snack.actionLabel && snack.onAction && (
+                  <button
+                    type="button"
+                    className="gn-snack__action"
+                    onClick={snack.onAction}
+                  >
+                    {snack.actionLabel}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="gn-snack__close"
+                  aria-label="Dismiss"
+                  onClick={() => setSnack(null)}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
             {error && (
               <div className="gn-notice gn-notice--error" role="alert">
                 Could not read your document library: {error.message}
@@ -1417,6 +1559,20 @@ export const Shelf = ({
                     onDelete={() =>
                       setConfirming({ kind: "delete-docs", ids: selectedIds })
                     }
+                    onRestore={
+                      isTrashView
+                        ? () => {
+                            void actions
+                              .bulkRestore(selectedIds)
+                              .then((restored) => {
+                                selection.clear();
+                                setAnnouncement(
+                                  `Put back ${bulkNoun(restored)}`,
+                                );
+                              });
+                          }
+                        : undefined
+                    }
                   />
                 )}
                 {view === "list" && (
@@ -1497,10 +1653,18 @@ export const Shelf = ({
             }
             body={
               confirming.kind === "delete-docs" ? (
-                <>
-                  This permanently removes {confirming.ids.length} documents and
-                  all of their pages from this device. It cannot be undone.
-                </>
+                isTrashView ? (
+                  <>
+                    This permanently removes {confirming.ids.length} documents
+                    and all of their pages from this device. It cannot be
+                    undone.
+                  </>
+                ) : (
+                  <>
+                    They move to Recently deleted, where you can put them back
+                    for the next 30 days. Nothing is erased yet.
+                  </>
+                )
               ) : confirming.kind === "delete-tag" ? (
                 <>
                   The tag is removed from {confirming.count}{" "}
@@ -1532,15 +1696,28 @@ export const Shelf = ({
 
         {pendingDelete && (
           <ConfirmDialog
-            title={`Delete “${pendingDelete.title}”?`}
-            body={
-              <>
-                This removes the document and all {pendingDelete.pageCount}{" "}
-                {pendingDelete.pageCount === 1 ? "page" : "pages"} of its
-                contents from this device. It cannot be undone.
-              </>
+            title={
+              isTrashed(pendingDelete)
+                ? `Permanently delete “${pendingDelete.title}”?`
+                : `Delete “${pendingDelete.title}”?`
             }
-            confirmLabel="Delete document"
+            body={
+              isTrashed(pendingDelete) ? (
+                <>
+                  This removes the document and all {pendingDelete.pageCount}{" "}
+                  {pendingDelete.pageCount === 1 ? "page" : "pages"} of its
+                  contents from this device. It cannot be undone.
+                </>
+              ) : (
+                <>
+                  It moves to Recently deleted, where you can put it back for
+                  the next 30 days. Nothing is erased yet.
+                </>
+              )
+            }
+            confirmLabel={
+              isTrashed(pendingDelete) ? "Delete permanently" : "Delete"
+            }
             onCancel={() => setPendingDelete(null)}
             onConfirm={handleConfirmDelete}
           />

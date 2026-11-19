@@ -1608,3 +1608,101 @@
   // now, it is the body of the Browse drawer, which is the same ~21rem
   // panel at every width and wants its vertical layout everywhere.)
 }
+
+/* ---------------------------------------------------------------------------
+   The undo bar
+   ---------------------------------------------------------------------------
+   Shown after a delete. "Recently deleted" is behind the browse drawer,
+   which is not where anyone looks in the two seconds after deleting the
+   wrong notebook, so the way back comes to them instead.
+
+   Pinned to the bottom of the viewport, clear of the home indicator, and
+   above the selection bar's own z-index so the two never fight. */
+.gn-snack {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 60;
+
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: min(32rem, calc(100vw - 2rem));
+  padding: 0.5rem 0.5rem 0.5rem 0.875rem;
+
+  color: var(--gn-snack-ink, #f6f6f6);
+  background-color: var(--gn-snack-bg, #23222a);
+  border-radius: 0.625rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+
+  animation: gn-snack-in 160ms ease-out;
+}
+
+.gn-snack__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gn-snack__action {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.625rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--gn-snack-action, #b6b1ff);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--gn-snack-action, #b6b1ff);
+    outline-offset: 1px;
+  }
+}
+
+.gn-snack__close {
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  opacity: 0.75;
+
+  &:hover {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+@keyframes gn-snack-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gn-snack {
+    animation: none;
+  }
+}

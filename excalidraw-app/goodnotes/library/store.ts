@@ -209,6 +209,7 @@ const normalizeMeta = (raw: Partial<DocMeta> & { id: string }): DocMeta => {
       : { defaultImageFit: raw.defaultImageFit }),
     ...(raw.surface === undefined ? {} : { surface: raw.surface }),
     ...(raw.thumbnailAt === undefined ? {} : { thumbnailAt: raw.thumbnailAt }),
+    ...(raw.deletedAt === undefined ? {} : { deletedAt: raw.deletedAt }),
   };
 };
 
@@ -599,7 +600,96 @@ export const duplicateDoc = async (id: string): Promise<DocMeta> => {
   return copy;
 };
 
-/** Remove a document's metadata and its scene payload. */
+/* -------------------------------------------------------------------------- */
+/* the trash                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Move a document to the trash: nothing is destroyed, it is only stamped
+ * and hidden (see `DocMeta.deletedAt` and `./filters`).
+ *
+ * The text index is dropped at the same time, so a deleted notebook stops
+ * turning up in search immediately; {@link restoreDoc} puts it back.
+ */
+export const trashDoc = async (
+  id: string,
+  at: number = now(),
+): Promise<DocMeta | null> => {
+  const existing = await getDoc(id);
+  if (!existing || typeof existing.deletedAt === "number") {
+    return existing;
+  }
+  // flush first: a debounced save landing after the stamp would rewrite the
+  // scene of a document the user believes they have just deleted
+  const pending = pendingSaves.get(id);
+  if (pending) {
+    clearTimeout(pending.timer);
+    pendingSaves.delete(id);
+  }
+  const next = await updateDocMeta(id, {
+    deletedAt: at,
+    // the shelf sorts the trash by when it was deleted, and an untouched
+    // `updatedAt` is also what tells a restore where the document belongs
+    updatedAt: existing.updatedAt,
+  });
+  try {
+    await forgetDocText(id);
+  } catch {
+    // search is an enhancement; a stale entry is filtered out by the shelf
+  }
+  return next;
+};
+
+/** Take a document back out of the trash. */
+export const restoreDoc = async (id: string): Promise<DocMeta | null> => {
+  const existing = await getDoc(id);
+  if (!existing || typeof existing.deletedAt !== "number") {
+    return existing;
+  }
+  const { deletedAt: _dropped, ...rest } = existing;
+  const next = normalizeMeta({ ...rest, updatedAt: existing.updatedAt });
+  await set(id, next, metaStore);
+  emitChange();
+  // re-index in the background: a restored notebook should be findable
+  // again, but search must never hold up the restore itself
+  void getScene(id)
+    .then((scene) =>
+      scene ? indexSceneText(id, scene, next.updatedAt) : undefined,
+    )
+    .catch(() => undefined);
+  return next;
+};
+
+/**
+ * Hard-delete everything trashed before `cutoff`. Returns the ids purged.
+ *
+ * Called once when the library loads rather than on a timer: a notes app
+ * is not running in the background, and "30 days since you deleted it"
+ * does not need to be enforced to the minute.
+ */
+export const purgeExpiredTrash = async (cutoff: number): Promise<string[]> => {
+  const docs = await listDocs();
+  const expired = docs.filter(
+    (doc) => typeof doc.deletedAt === "number" && doc.deletedAt <= cutoff,
+  );
+  if (expired.length === 0) {
+    return [];
+  }
+  return runBatched(async () => {
+    for (const doc of expired) {
+      await deleteDoc(doc.id);
+    }
+    return expired.map((doc) => doc.id);
+  });
+};
+
+/**
+ * Remove a document's metadata and its scene payload, for good.
+ *
+ * This is the irreversible one. The shelf's delete action calls
+ * {@link trashDoc}; this runs when the user empties the trash, deletes
+ * from inside it, or the retention window expires.
+ */
 export const deleteDoc = async (id: string): Promise<void> => {
   const pending = pendingSaves.get(id);
   if (pending) {
@@ -656,7 +746,41 @@ export const updateManyDocs = async (
     return written;
   });
 
-/** Delete many documents (metadata + scenes). Resolves with the count. */
+/** Move many documents to the trash. Resolves with the count moved. */
+export const trashManyDocs = async (ids: readonly string[]): Promise<number> =>
+  runBatched(async () => {
+    const at = now();
+    let moved = 0;
+    for (const id of ids) {
+      const existing = await getDoc(id);
+      if (existing && typeof existing.deletedAt !== "number") {
+        await trashDoc(id, at);
+        moved++;
+      }
+    }
+    return moved;
+  });
+
+/** Take many documents back out of the trash. */
+export const restoreManyDocs = async (
+  ids: readonly string[],
+): Promise<number> =>
+  runBatched(async () => {
+    let restored = 0;
+    for (const id of ids) {
+      const existing = await getDoc(id);
+      if (existing && typeof existing.deletedAt === "number") {
+        await restoreDoc(id);
+        restored++;
+      }
+    }
+    return restored;
+  });
+
+/**
+ * Delete many documents for good (metadata + scenes). Resolves with the
+ * count. The shelf only reaches this from inside "Recently deleted".
+ */
 export const deleteManyDocs = async (ids: readonly string[]): Promise<number> =>
   runBatched(async () => {
     let removed = 0;

@@ -90,9 +90,16 @@ export const Dashboard = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const now = useMemo(() => Date.now(), [work.rows, work.lastSyncedAt]);
 
+  // a deleted notebook is not part of anyone's workload, so it must not
+  // appear in a course summary or count toward one
+  const liveDocuments = useMemo(
+    () => documents.filter((doc) => typeof doc.deletedAt !== "number"),
+    [documents],
+  );
+
   const summaries = useMemo(
-    () => buildCourseSummaries(work.rows, documents, now),
-    [work.rows, documents, now],
+    () => buildCourseSummaries(work.rows, liveDocuments, now),
+    [work.rows, liveDocuments, now],
   );
 
   const handleSelectCourse = useCallback((course: string) => {

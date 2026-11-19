@@ -62,6 +62,36 @@ export const isArchived = (doc: DocMeta): boolean => hasTag(doc, ARCHIVED_TAG);
 
 export const isPinned = (doc: DocMeta): boolean => hasTag(doc, PINNED_TAG);
 
+/* -------------------------------------------------------------------------- */
+/* the trash                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How long a deleted notebook is kept before it is purged for good.
+ *
+ * Thirty days is what the apps a student already uses do (Files, Photos,
+ * GoodNotes), so it is the window they will expect without being told.
+ */
+export const TRASH_RETENTION_MS = 30 * DAY;
+
+/**
+ * Unlike the three flags above, this is NOT a reserved tag: the trash needs
+ * to know *when* something was deleted, both to purge it on schedule and to
+ * tell the user how long they have. A tag carries one bit and no date.
+ */
+export const isTrashed = (doc: DocMeta): boolean =>
+  typeof doc.deletedAt === "number";
+
+/** When this document will be purged, or `null` if it is not trashed. */
+export const trashExpiresAt = (doc: DocMeta): number | null =>
+  typeof doc.deletedAt === "number" ? doc.deletedAt + TRASH_RETENTION_MS : null;
+
+/** Whole days left before the purge; 0 means "today". */
+export const daysLeftInTrash = (doc: DocMeta, now: number): number => {
+  const expires = trashExpiresAt(doc);
+  return expires === null ? 0 : Math.max(0, Math.ceil((expires - now) / DAY));
+};
+
 /** True when the document carries `tag` (case-insensitive). */
 export const hasUserTag = (doc: DocMeta, tag: string): boolean =>
   hasTag(doc, tag);
@@ -94,6 +124,7 @@ export const isRecent = (doc: DocMeta, now: number): boolean =>
 
 export type LibraryFilter =
   | { kind: "all" }
+  | { kind: "trash" }
   | { kind: "favourites" }
   | { kind: "recent" }
   | { kind: "due-week" }
@@ -129,6 +160,8 @@ export const filterLabel = (filter: LibraryFilter): string => {
       return "Due this week";
     case "archived":
       return "Archived";
+    case "trash":
+      return "Recently deleted";
     case "tag":
       return `#${filter.tag}`;
     case "course":
@@ -158,6 +191,8 @@ export const matchesFilter = (
       return isDueThisWeek(doc, now);
     case "archived":
       return isArchived(doc);
+    case "trash":
+      return isTrashed(doc);
     case "tag":
       return hasTag(doc, filter.tag);
     case "course":
@@ -178,13 +213,22 @@ export const isHiddenByArchive = (
   filter: LibraryFilter,
 ): boolean => filter.kind !== "archived" && isArchived(doc);
 
-/** The single predicate the shelf applies: filter + archive visibility. */
+/**
+ * A trashed document is hidden from *every* other view, the Archived one
+ * included — deleting something archived should not leave it on screen.
+ */
+export const isHiddenByTrash = (doc: DocMeta, filter: LibraryFilter): boolean =>
+  filter.kind !== "trash" && isTrashed(doc);
+
+/** The single predicate the shelf applies: filter + archive + trash. */
 export const isInView = (
   doc: DocMeta,
   filter: LibraryFilter,
   now: number,
 ): boolean =>
-  matchesFilter(doc, filter, now) && !isHiddenByArchive(doc, filter);
+  matchesFilter(doc, filter, now) &&
+  !isHiddenByArchive(doc, filter) &&
+  !isHiddenByTrash(doc, filter);
 
 /** Free-text match over title, course and (visible) tags. */
 export const matchesQuery = (doc: DocMeta, query: string): boolean => {
