@@ -32,6 +32,8 @@ import { Shelf, useCourseStyles, useDocuments } from "../library";
 import { ConnectInvite } from "./ConnectInvite";
 import { CourseCards } from "./CourseCards";
 import { DueSoonStrip } from "./DueSoonStrip";
+import { UpNextStrip } from "./UpNextStrip";
+import { buildLocalDeadlines } from "./localDeadlines";
 import { dismissConnectInvite, isConnectInviteDismissed } from "./dismissal";
 import { buildCourseSummaries } from "./model";
 import { selectCourseInShelf } from "./shelfBridge";
@@ -84,11 +86,19 @@ export const Dashboard = ({
   );
 
   const dueHeadingId = `${useId()}-due`;
+  const upNextHeadingId = `${useId()}-up-next`;
   const coursesHeadingId = `${useId()}-courses`;
 
-  // one clock read per data change keeps every badge mutually consistent
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const now = useMemo(() => Date.now(), [work.rows, work.lastSyncedAt]);
+  // One clock read per data change keeps every badge mutually consistent.
+  // `documents` is in here as well as the Canvas state because the local
+  // "Up next" strip reads this clock: without it, editing a due date would
+  // re-bucket the row against the time the screen first loaded.
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const now = useMemo(
+    () => Date.now(),
+    [work.rows, work.lastSyncedAt, documents],
+  );
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // a deleted notebook is not part of anyone's workload, so it must not
   // appear in a course summary or count toward one
@@ -113,6 +123,18 @@ export const Dashboard = ({
 
   const connected = work.status !== "disconnected";
 
+  /**
+   * The library's own deadlines, for the screen with no Canvas connection.
+   *
+   * Only then: with Canvas on, the strip above already answers "what is
+   * due", and two deadline rows on one screen — one from the LMS, one from
+   * the notebooks — would be the same question answered twice.
+   */
+  const localDeadlines = useMemo(
+    () => (connected ? [] : buildLocalDeadlines(liveDocuments, now)),
+    [connected, liveDocuments, now],
+  );
+
   return (
     <div
       ref={rootRef}
@@ -135,6 +157,18 @@ export const Dashboard = ({
             onSelectCourse={handleSelectCourse}
             loading={work.status === "loading" && work.rows.length === 0}
             headingId={coursesHeadingId}
+          />
+        </div>
+      )}
+
+      {!connected && localDeadlines.length > 0 && (
+        <div className="gn-dash__top">
+          <UpNextStrip
+            items={localDeadlines}
+            now={now}
+            styleOf={courseStyles.styleOf}
+            onOpenDocument={onOpenDocument}
+            headingId={upNextHeadingId}
           />
         </div>
       )}

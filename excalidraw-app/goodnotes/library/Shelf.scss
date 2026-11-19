@@ -662,46 +662,6 @@
     }
   }
 
-  // ---------------------------------------------------------------- due badge
-  .gn-due {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    align-self: flex-start;
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
-
-    &__dot {
-      width: 0.4rem;
-      height: 0.4rem;
-      border-radius: 50%;
-      background-color: currentColor;
-    }
-
-    &--overdue {
-      color: var(--color-danger-color);
-      background-color: var(--color-danger-background);
-    }
-
-    &--soon {
-      color: var(--color-warning-color);
-      background-color: var(--color-warning-background);
-    }
-
-    &--upcoming {
-      color: var(--color-success-text);
-      background-color: var(--color-success);
-    }
-
-    &--none {
-      color: var(--gn-text-muted);
-      background-color: var(--color-surface-low);
-      border: 1px solid var(--color-border-outline-variant);
-    }
-  }
-
   // ---------------------------------------------------------------- actions
   .gn-card__actions {
     position: absolute;
@@ -1704,5 +1664,56 @@
 @media (prefers-reduced-motion: reduce) {
   .gn-snack {
     animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The due badge
+   ---------------------------------------------------------------------------
+   Scoped to `.excalidraw` rather than to the shelf, because the dashboard's
+   "Up next" row renders the same badge and must get the same urgency colour.
+   It lived inside `.excalidraw.gn-shelf`, so in the dashboard the pill lost
+   its red/amber/green entirely — the one thing the row is there to show.
+   One definition rather than two: the shelf is always mounted under the
+   dashboard, so this stylesheet is always present for both. */
+.excalidraw {
+  // ---------------------------------------------------------------- due badge
+  .gn-due {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    align-self: flex-start;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+
+    &__dot {
+      width: 0.4rem;
+      height: 0.4rem;
+      border-radius: 50%;
+      background-color: currentColor;
+    }
+
+    &--overdue {
+      color: var(--color-danger-color);
+      background-color: var(--color-danger-background);
+    }
+
+    &--soon {
+      color: var(--color-warning-color);
+      background-color: var(--color-warning-background);
+    }
+
+    &--upcoming {
+      color: var(--color-success-text);
+      background-color: var(--color-success);
+    }
+
+    &--none {
+      color: var(--gn-text-muted);
+      background-color: var(--color-surface-low);
+      border: 1px solid var(--color-border-outline-variant);
+    }
   }
 }

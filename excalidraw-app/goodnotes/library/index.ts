@@ -32,6 +32,9 @@ export {
   formatUpdatedAt,
   formatShortDate,
   formatBytes,
+  /** The cover tint a document gets from its id — reused by the dashboard's
+   *  "Up next" row, so a row and its card read as the same notebook. */
+  hueFromId,
 } from "./format";
 export type { DueUrgency } from "./format";
 
