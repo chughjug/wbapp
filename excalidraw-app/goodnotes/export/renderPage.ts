@@ -24,7 +24,7 @@ import type {
 } from "@excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 
-import { toLightExportAppState } from "../dark";
+import { toLightExportAppState, toPrintableElements } from "../dark";
 import {
   getPaperPageRects,
   preloadPageImages,
@@ -130,6 +130,14 @@ export const createPageRenderer = async ({
   // light or dark-mode element colours leak into the raster.
   const exportAppState = toLightExportAppState({ ...(appState ?? {}) });
 
+  // Forcing the theme fixes ink the student never chose; it cannot fix ink
+  // they chose *because* the page was dark. White-on-dark is a reasonable
+  // thing to pick while writing and a blank sheet once printed, so the last
+  // step before rasterising lifts any stroke that cannot be seen against
+  // the paper up to a 3:1 contrast, hue intact. Highlighters and images are
+  // left alone — see `toPrintableElements`.
+  const printableElements = toPrintableElements(sceneElements);
+
   const templateFor = (frame: ExcalidrawFrameElement): PaperTemplateId =>
     templateByFrameId.get(frame.id) ?? defaultPaperTemplate;
 
@@ -144,7 +152,7 @@ export const createPageRenderer = async ({
     const inkCanvas = await exportScene({
       type: "canvas",
       data: {
-        elements: sceneElements,
+        elements: printableElements,
         appState: exportAppState,
         files: files ?? undefined,
       },

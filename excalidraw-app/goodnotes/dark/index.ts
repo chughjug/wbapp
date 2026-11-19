@@ -62,6 +62,10 @@ export {
   /** Same, for callers that pass an export config instead. */
   toLightExportConfig,
   EXPORT_PAPER_COLOR,
+  /** Darken ink that would be invisible on the paper it prints on. */
+  inkForPaper,
+  toPrintableElements,
+  MIN_EXPORT_INK_CONTRAST,
 } from "./exportSafety";
 export type { ExportThemeFields } from "./exportSafety";
 
