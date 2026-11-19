@@ -27,10 +27,10 @@ import type { CourseStyle } from "../library";
 import type { DocMeta } from "../types";
 
 /** Most that fit before the row stops being a glance and becomes a list. */
-export const MAX_PINNED_SHOWN = 6;
+export const MAX_FAVOURITES_SHOWN = 6;
 
-export interface PinnedStripProps {
-  /** Pinned documents, already filtered to live (non-trashed) ones. */
+export interface FavouritesStripProps {
+  /** Starred documents, already filtered to live (non-trashed) ones. */
   items: readonly DocMeta[];
   styleOf: (course: string) => CourseStyle;
   onOpenDocument: (doc: DocMeta) => void;
@@ -39,13 +39,13 @@ export interface PinnedStripProps {
 }
 
 /**
- * Pinned documents in the order the row shows them: most recently opened
+ * Starred documents in the order the row shows them: most recently opened
  * first, falling back to last edited for one never opened since it was
  * starred.
  */
-export const orderPinned = (
+export const orderFavourites = (
   docs: readonly DocMeta[],
-  limit: number = MAX_PINNED_SHOWN,
+  limit: number = MAX_FAVOURITES_SHOWN,
 ): DocMeta[] =>
   [...docs]
     .sort(
@@ -54,29 +54,29 @@ export const orderPinned = (
     )
     .slice(0, limit);
 
-export const PinnedStrip = ({
+export const FavouritesStrip = ({
   items,
   styleOf,
   onOpenDocument,
   headingId,
-}: PinnedStripProps) => {
+}: FavouritesStripProps) => {
   if (items.length === 0) {
     return null;
   }
 
   return (
-    <section className="gn-pinned" aria-labelledby={headingId}>
-      <h2 className="gn-pinned__heading" id={headingId}>
-        Pinned
+    <section className="gn-favourites" aria-labelledby={headingId}>
+      <h2 className="gn-favourites__heading" id={headingId}>
+        Favourites
       </h2>
-      <ul className="gn-pinned__list">
+      <ul className="gn-favourites__list">
         {items.map((doc) => {
           const course = doc.course ? styleOf(doc.course) : null;
           return (
             <li key={doc.id}>
               <button
                 type="button"
-                className="gn-pinned__item"
+                className="gn-favourites__item"
                 style={
                   { "--gn-hue": `${hueFromId(doc.id)}` } as React.CSSProperties
                 }
@@ -85,15 +85,15 @@ export const PinnedStrip = ({
                 }`}
                 onClick={() => onOpenDocument(doc)}
               >
-                <span className="gn-pinned__star" aria-hidden="true">
+                <span className="gn-favourites__star" aria-hidden="true">
                   ★
                 </span>
-                <span className="gn-pinned__text">
-                  <span className="gn-pinned__title">{doc.title}</span>
+                <span className="gn-favourites__text">
+                  <span className="gn-favourites__title">{doc.title}</span>
                   {doc.course && (
-                    <span className="gn-pinned__course">
+                    <span className="gn-favourites__course">
                       <span
-                        className="gn-pinned__dot"
+                        className="gn-favourites__dot"
                         aria-hidden="true"
                         style={
                           course

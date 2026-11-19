@@ -647,14 +647,14 @@
   background-color: var(--gn-course-color, currentColor);
 }
 
-/* ---- Pinned row -------------------------------------------------------
+/* ---- Favourites row -------------------------------------------------------
  *
  * Shares the Up-next row's shape so the two read as one system when both
  * are on screen. Colours are Excalidraw theme tokens, never literals —
  * literal fallbacks were what made the Up-next cards white in dark mode.
  */
 
-.gn-pinned {
+.gn-favourites {
   &__heading {
     margin: 0 0 0.5rem;
     font-size: 0.75rem;
@@ -750,7 +750,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gn-pinned__item {
+  .gn-favourites__item {
     transition: none;
   }
 }

@@ -122,5 +122,9 @@ export type { DeadlineUrgency } from "./urgency";
  */
 export { selectCourseInShelf, findCourseButton } from "./shelfBridge";
 
-export { PinnedStrip, orderPinned, MAX_PINNED_SHOWN } from "./PinnedStrip";
-export type { PinnedStripProps } from "./PinnedStrip";
+export {
+  FavouritesStrip,
+  orderFavourites,
+  MAX_FAVOURITES_SHOWN,
+} from "./FavouritesStrip";
+export type { FavouritesStripProps } from "./FavouritesStrip";

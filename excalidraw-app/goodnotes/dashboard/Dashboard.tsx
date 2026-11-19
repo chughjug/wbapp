@@ -34,7 +34,7 @@ import { CourseCards } from "./CourseCards";
 import { DueSoonStrip } from "./DueSoonStrip";
 import { UpNextStrip } from "./UpNextStrip";
 import { buildLocalDeadlines } from "./localDeadlines";
-import { orderPinned, PinnedStrip } from "./PinnedStrip";
+import { FavouritesStrip, orderFavourites } from "./FavouritesStrip";
 import { dismissConnectInvite, isConnectInviteDismissed } from "./dismissal";
 import { buildCourseSummaries } from "./model";
 import { selectCourseInShelf } from "./shelfBridge";
@@ -89,7 +89,7 @@ export const Dashboard = ({
   const dueHeadingId = `${useId()}-due`;
   const upNextHeadingId = `${useId()}-up-next`;
   const coursesHeadingId = `${useId()}-courses`;
-  const pinnedHeadingId = `${useId()}-pinned`;
+  const favouritesHeadingId = `${useId()}-favourites`;
 
   // One clock read per data change keeps every badge mutually consistent.
   // `documents` is in here as well as the Canvas state because the local
@@ -141,13 +141,23 @@ export const Dashboard = ({
    * Starred notebooks, most recently opened first.
    *
    * Shown whether or not Canvas is connected: "what is due" and "what am I
-   * working in" are different questions, and the pinned row answers the
-   * second one in a single tap rather than a filter click.
+   * working in" are different questions, and this row answers the second
+   * in a single tap rather than a filter click.
+   *
+   * Minus anything already in the deadline row below it. Without that, a
+   * starred notebook that is also due soon takes two of the handful of
+   * slots above the fold — measured on a realistic library, one notebook
+   * occupied the hero card, a deadline tile and a favourites tile at the
+   * same time, on a phone where only one card fits on screen at all.
    */
-  const pinned = useMemo(
-    () => orderPinned(liveDocuments.filter(isFavourite)),
-    [liveDocuments],
-  );
+  const favourites = useMemo(() => {
+    const alreadyShown = new Set(localDeadlines.map((item) => item.doc.id));
+    return orderFavourites(
+      liveDocuments.filter(
+        (doc) => isFavourite(doc) && !alreadyShown.has(doc.id),
+      ),
+    );
+  }, [liveDocuments, localDeadlines]);
 
   return (
     <div
@@ -175,25 +185,39 @@ export const Dashboard = ({
         </div>
       )}
 
-      {pinned.length > 0 && (
+      {/* One band, not one per strip: each `gn-dash__top` carries its own
+          padding and bottom border, so stacking them put ~200px of fixed
+          chrome above the library on desktop and nearly half the viewport
+          on a phone. */}
+      {!connected && (localDeadlines.length > 0 || favourites.length > 0) && (
         <div className="gn-dash__top">
-          <PinnedStrip
-            items={pinned}
-            styleOf={courseStyles.styleOf}
-            onOpenDocument={onOpenDocument}
-            headingId={pinnedHeadingId}
-          />
+          {localDeadlines.length > 0 && (
+            <UpNextStrip
+              items={localDeadlines}
+              now={now}
+              styleOf={courseStyles.styleOf}
+              onOpenDocument={onOpenDocument}
+              headingId={upNextHeadingId}
+            />
+          )}
+          {favourites.length > 0 && (
+            <FavouritesStrip
+              items={favourites}
+              styleOf={courseStyles.styleOf}
+              onOpenDocument={onOpenDocument}
+              headingId={favouritesHeadingId}
+            />
+          )}
         </div>
       )}
 
-      {!connected && localDeadlines.length > 0 && (
+      {connected && favourites.length > 0 && (
         <div className="gn-dash__top">
-          <UpNextStrip
-            items={localDeadlines}
-            now={now}
+          <FavouritesStrip
+            items={favourites}
             styleOf={courseStyles.styleOf}
             onOpenDocument={onOpenDocument}
-            headingId={upNextHeadingId}
+            headingId={favouritesHeadingId}
           />
         </div>
       )}
