@@ -74,8 +74,23 @@ const EDGE_MARGIN = 8;
  * a two-item-tall menu.
  */
 const MIN_SPACE_BELOW = 220;
-/** The design cap, matching the `min(60vh, 28rem)` used when not portalled. */
-const MAX_MENU_HEIGHT = 448;
+/**
+ * The design cap, matching the `min(60vh, 28rem)` used when not portalled.
+ *
+ * A flat 448 was the whole cap, on every screen. The editor's overflow
+ * menu runs to ~27 items (over 1000px of content), so on a 1194x834
+ * tablet it needed ~600px of scrolling inside the popup while 778px of
+ * vertical room went unused. Measured after this change: 448 -> 651 on
+ * the tablet, and 658 on a 390x844 phone.
+ *
+ * The phone grows too, deliberately. 78% of the screen is a lot of menu,
+ * but a menu you scroll blind is worse than one that covers the page
+ * while it is open, and that is the shape a sheet takes on a phone
+ * anyway. Short viewports (a phone in landscape) keep the old cap, where
+ * a tall menu really would leave nothing to see.
+ */
+const maxMenuHeight = (viewportH: number): number =>
+  viewportH >= 640 ? Math.min(Math.round(viewportH * 0.78), 704) : 448;
 
 /**
  * Where to mount the popover. The nearest `.excalidraw` ancestor rather than
@@ -128,7 +143,7 @@ const measure = (labelledBy: string): MenuFrame | null => {
       // usable stub (it scrolls internally below that)
       maxHeight: Math.round(
         Math.min(
-          MAX_MENU_HEIGHT,
+          maxMenuHeight(viewportH),
           Math.max(120, flipUp ? spaceAbove : spaceBelow),
         ),
       ),

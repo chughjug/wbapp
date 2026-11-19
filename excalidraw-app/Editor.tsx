@@ -993,6 +993,20 @@ const ExcalidrawWrapper = ({
     theme: editorTheme,
   });
 
+  /**
+   * "Add page" adds a page.
+   *
+   * It used to open the format dialog every time — four taps including a
+   * scroll in the overflow menu, to do the single most routine thing in
+   * a notebook — even though the dialog's own copy says "Your choice is
+   * remembered for this notebook". It is remembered; this uses it. The
+   * chooser is still a tap away as "New page…".
+   */
+  const addPageWithRememberedFormat = newPage.addPageWithChoice;
+  const quickAddPage = useCallback(() => {
+    void addPageWithRememberedFormat();
+  }, [addPageWithRememberedFormat]);
+
   const [langCode, setLangCode] = useAppLangCode();
 
   const editorInterface = useEditorInterface();
@@ -1757,7 +1771,7 @@ const ExcalidrawWrapper = ({
           // they are meaningless. FloatingBar treats them as optional and
           // renders neither the counter nor "Add page" when they are absent —
           // better than a "+" that can never do anything in this document.
-          onAddPage={surface.isWhiteboard ? undefined : newPage.open}
+          onAddPage={surface.isWhiteboard ? undefined : quickAddPage}
           onShare={() => setShareDialogState({ isOpen: true, type: "share" })}
           pageCount={surface.isWhiteboard ? undefined : pages.length}
           currentPage={
@@ -1798,6 +1812,11 @@ const ExcalidrawWrapper = ({
             ...(surface.isWhiteboard
               ? []
               : [
+                  {
+                    id: "new-page-choose",
+                    label: "New page…",
+                    onSelect: () => newPage.open(),
+                  },
                   {
                     id: "outline",
                     label: "Contents…",
@@ -1847,7 +1866,7 @@ const ExcalidrawWrapper = ({
           onClose={() => setIsPagePanelOpen(false)}
           theme={editorTheme}
           excalidrawAPI={excalidrawAPI}
-          onAddPage={newPage.open}
+          onAddPage={quickAddPage}
           docId={docId ?? undefined}
         />
         {isRenamingDoc && docId && (

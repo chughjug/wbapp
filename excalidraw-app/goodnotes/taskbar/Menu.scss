@@ -22,6 +22,14 @@
   overflow-y: auto;
   padding: 0.25rem;
 
+  /* A scroll affordance. This menu runs to 27 items — a 448px box over
+     1054px of content — and with no scrollbar on touch there was nothing
+     to say so; a section heading simply ended mid-word at the fold. */
+  background-attachment: local, local, scroll, scroll;
+  background-repeat: no-repeat;
+  background-size: 100% 0.75rem, 100% 0.75rem, 100% 0.5rem, 100% 0.5rem;
+  background-position: top, bottom, top, bottom;
+
   border: 1px solid var(--dialog-border-color, #e9ecef);
   border-radius: 0.625rem;
   background-color: var(--popup-bg-color, #fff);
@@ -68,6 +76,12 @@
   }
 
   &__heading {
+    /* Sticky, so you can always see which section you are scrolled into
+       rather than meeting a half-cut heading at the fold. */
+    position: sticky;
+    top: -0.25rem;
+    z-index: 1;
+    background-color: var(--popup-bg-color, #fff);
     padding: 0.25rem 0.5rem 0.125rem;
     font-size: 0.6875rem;
     font-weight: 600;
@@ -136,5 +150,15 @@
 
   .gn-menu__item[aria-checked="true"] {
     border: 1px solid Highlight;
+  }
+}
+
+/* On anything bigger than a phone the menu stayed 192px wide and 448px
+   tall while 1194x834 of room went unused, so a 27-item menu needed
+   ~600px of scrolling inside the popup. Where there is space, use it. */
+@media (min-width: 48rem) and (min-height: 40rem) {
+  .gn-menu {
+    min-width: 14rem;
+    max-height: min(78vh, 44rem);
   }
 }
