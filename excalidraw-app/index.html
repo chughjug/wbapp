@@ -180,9 +180,12 @@
 
   <body>
     <noscript> You need to enable JavaScript to run this app. </noscript>
-    <header>
-      <h1 class="visually-hidden">Notebook</h1>
-    </header>
+    <!-- The document's accessible title, read before the app mounts. NOT
+         wrapped in <header>: that made it a `banner` landmark, and the
+         shelf renders a real one of its own, so screen readers saw two
+         unnamed banners and could not tell them apart. An <h1> needs no
+         landmark to do its job. -->
+    <h1 class="visually-hidden">Notebook</h1>
     <div id="root"></div>
     <script type="module" src="index.tsx"></script>
     <% if (typeof PROD != 'undefined' && PROD == true) { %>

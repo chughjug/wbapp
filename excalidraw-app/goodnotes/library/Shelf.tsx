@@ -1257,7 +1257,7 @@ export const Shelf = ({
             )}
           </header>
 
-          <div className="gn-shelf__content">
+          <main className="gn-shelf__content">
             <p className="gn-sr-only" role="status" aria-live="polite">
               {loading
                 ? "Loading documents"
@@ -1388,7 +1388,7 @@ export const Shelf = ({
                 </ul>
               </>
             )}
-          </div>
+          </main>
         </div>
 
         {browseOpen && (

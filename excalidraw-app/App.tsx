@@ -1446,6 +1446,9 @@ const ExcalidrawWrapper = ({
             }}
           />
         )}
+        {/* NOT a <main>: Excalidraw's footer sets role="contentinfo"
+            explicitly, so wrapping the canvas nests a contentinfo landmark
+            inside main, which is worse than the region warning it cures. */}
         <div className="gn-shell-canvas">
           <PaperBackgroundLayer
             // `undefined` on paper, so the layer keeps deriving pages from
