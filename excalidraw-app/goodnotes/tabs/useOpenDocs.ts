@@ -73,6 +73,16 @@ export interface UseOpenDocsResult {
   state: OpenDocsState;
   /** False until the library has been read at least once. */
   isHydrated: boolean;
+  /**
+   * Every live notebook, most recently touched first — not just the open
+   * ones.
+   *
+   * This hook already reads the whole library on every store change to
+   * build the strip and prune dead tabs, so exposing the list costs
+   * nothing. The editor's command palette uses it to offer "switch to
+   * another notebook" without a second subscription doing the same reads.
+   */
+  allDocs: DocMeta[];
   actions: OpenDocsActions;
 }
 
@@ -185,11 +195,21 @@ export const useOpenDocs = (
     [state, metas],
   );
 
+  const allDocs = useMemo(
+    () =>
+      [...metas.values()].sort(
+        (a, b) =>
+          (b.lastOpenedAt ?? b.updatedAt) - (a.lastOpenedAt ?? a.updatedAt),
+      ),
+    [metas],
+  );
+
   return {
     tabs,
     activeId: state.activeId,
     state,
     isHydrated,
+    allDocs,
     actions: ACTIONS,
   };
 };

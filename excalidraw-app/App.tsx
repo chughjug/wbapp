@@ -421,15 +421,25 @@ const initializeScene = async (opts: {
   return { scene: null, isExternalScene: false };
 };
 
+/**
+ * How many notebooks the palette offers. A shortlist beats a directory:
+ * past this many the fuzzy match gets noisier, and the shelf's own search
+ * is the right tool for a library this size.
+ */
+const MAX_SWITCH_ITEMS = 40;
+
 const ExcalidrawWrapper = ({
   docId,
   onCloseDocument,
   onNewDocument,
+  onOpenDocument,
 }: {
   /** null for a transient scene (shared `#room=` / `#json=` link). */
   docId: string | null;
   onCloseDocument: () => void;
   onNewDocument: () => void;
+  /** Navigate to another notebook, for the command palette's switcher. */
+  onOpenDocument: (doc: DocMeta) => void;
 }) => {
   const excalidrawAPI = useExcalidrawAPI();
 
@@ -481,6 +491,42 @@ const ExcalidrawWrapper = ({
   const surface = useSurface(excalidrawAPI, { docId: docId ?? undefined });
   const [isPagePanelOpen, setIsPagePanelOpen] = useState(false);
   const openDocs = useOpenDocs(docId ?? undefined);
+
+  /**
+   * "Switch to another notebook", in the command palette.
+   *
+   * Getting from one notebook to another meant going home and finding it
+   * again — fine with three notebooks, the main friction with a term's
+   * worth. The palette (Cmd/Ctrl+/ or Cmd/Ctrl+Shift+P) already exists in
+   * the editor, so this is the cheapest place to put a switcher, and it
+   * searches the same titles, courses and tags the shelf does.
+   *
+   * The list comes from `openDocs`, which already reads the library on
+   * every store change to keep the tab strip honest — no second
+   * subscription re-reading the same rows while you draw.
+   */
+  const switchItems = useMemo(
+    () =>
+      openDocs.allDocs
+        .filter((doc) => doc.id !== docId)
+        // most recent first (the hook's order); a palette is a shortlist,
+        // not a file browser, and a long one makes the fuzzy match worse
+        .slice(0, MAX_SWITCH_ITEMS)
+        .map((doc) => ({
+          label: doc.title,
+          category: "Notebooks",
+          keywords: [
+            "notebook",
+            "switch",
+            "open",
+            ...(doc.course ? [doc.course] : []),
+            ...doc.tags,
+          ],
+          perform: () => onOpenDocument(doc),
+        })),
+    [docId, onOpenDocument, openDocs.allDocs],
+  );
+
   const presentation = usePresentation(excalidrawAPI, pages);
 
   /**
@@ -1735,6 +1781,7 @@ const ExcalidrawWrapper = ({
 
             <CommandPalette
               customCommandPaletteItems={[
+                ...switchItems,
                 {
                   label: "New document",
                   category: DEFAULT_CATEGORIES.app,
@@ -2038,6 +2085,7 @@ const GoodNotesRoot = () => {
         docId={docId}
         onCloseDocument={closeDocument}
         onNewDocument={() => newDocument.open()}
+        onOpenDocument={openDocument}
       />
       {newDocument.dialog}
     </>
