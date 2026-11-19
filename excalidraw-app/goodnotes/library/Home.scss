@@ -114,6 +114,15 @@
     margin: 0 0 1rem;
   }
 
+  /* The rail scrolls to 1119px of chips inside 366px on a phone, with no
+     scrollbar on touch and no other hint — every course chip and the
+     "Browse" chip (the only route to tags, Archived and Recently deleted)
+     sat off-screen behind a blind horizontal scroll. The mask fades the
+     trailing edge so there is something to see. */
+  .gn-rail {
+    position: relative;
+  }
+
   .gn-rail__list {
     list-style: none;
     display: flex;
@@ -123,6 +132,18 @@
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: thin;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 0,
+      #000 calc(100% - 2rem),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      #000 0,
+      #000 calc(100% - 2rem),
+      transparent 100%
+    );
     -webkit-overflow-scrolling: touch;
   }
 
@@ -144,6 +165,18 @@
 
     &:hover {
       background-color: var(--button-hover-bg, var(--color-surface-high));
+    }
+
+    /* Forced colours flatten every background to Canvas, so the filled
+       chip became byte-identical to an unfilled one — the selected
+       filter was indistinguishable. System colours survive. */
+    @media (forced-colors: active) {
+      &--on {
+        background-color: Highlight;
+        color: HighlightText;
+        border-color: Highlight;
+        forced-color-adjust: none;
+      }
     }
 
     // active = filled *and* bolder: never colour alone

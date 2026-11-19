@@ -222,7 +222,11 @@ export const DocumentCard = React.memo((props: DocumentItemProps) => {
                   <button
                     type="button"
                     className="gn-chip gn-chip--button"
-                    tabIndex={tabIndex}
+                    // A real tab stop, not the card's roving -1. The chip
+                    // is a sibling of the card button rather than part of
+                    // its gridcell, so the grid's arrow keys never reached
+                    // it either — a visibly interactive control that no
+                    // keyboard could activate at all.
                     aria-label={`Show all documents tagged ${tag}`}
                     onClick={() => onSelectTag(tag)}
                   >

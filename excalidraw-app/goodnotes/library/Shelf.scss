@@ -1398,6 +1398,11 @@
     font-size: 0.6875rem;
     font-weight: 600;
     cursor: pointer;
+    /* Measured 45.1 x 19.2 — the only control in the app under the
+       24x24 WCAG 2.2 floor, and it sits directly above the card body
+       it would otherwise be mis-tapped against. The pill keeps its
+       look; the box grows. */
+    min-height: 1.5rem;
 
     &:hover {
       border-color: var(--color-primary);

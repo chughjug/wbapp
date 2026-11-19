@@ -904,7 +904,18 @@ export const Shelf = ({
   );
   const handleToggleFavourite = useCallback(
     (doc: DocMeta) => {
-      void actions.toggleFavourite(doc.id);
+      // Announced, like archiving and deleting already were. The only
+      // other signal is a small star on the cover, so without this a
+      // screen-reader user had no confirmation the tap did anything.
+      void actions.toggleFavourite(doc.id).then((next) => {
+        setAnnouncement(
+          `${next.title} ${
+            isFavourite(next)
+              ? "added to favourites"
+              : "removed from favourites"
+          }`,
+        );
+      });
     },
     [actions],
   );
@@ -1017,7 +1028,11 @@ export const Shelf = ({
 
   const handleTogglePinned = useCallback(
     (doc: DocMeta) => {
-      void actions.togglePinned(doc.id);
+      void actions.togglePinned(doc.id).then((next) => {
+        setAnnouncement(
+          `${next.title} ${isPinned(next) ? "pinned to the top" : "unpinned"}`,
+        );
+      });
     },
     [actions],
   );
