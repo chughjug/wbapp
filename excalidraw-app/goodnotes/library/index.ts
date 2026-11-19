@@ -184,6 +184,12 @@ export {
   flushSceneSaves,
   /** Scene writes that failed with nobody left waiting on them. */
   subscribeSaveError,
+  /** Record the version this tab is editing a document from. */
+  noteSceneBaseline,
+  /** Drop a document's watermark when it is closed or deleted. */
+  forgetSceneBaseline,
+  /** Notified when a save folded in another tab's concurrent work. */
+  subscribeSceneMerged,
   /** Store a page-1 PNG data URL preview. */
   setThumbnail,
   /** Stamp lastOpenedAt. */

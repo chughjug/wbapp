@@ -21,7 +21,17 @@
  */
 
 import { randomId } from "@excalidraw/common";
+import { reconcileElements } from "@excalidraw/excalidraw/data/reconcile";
 import { createStore, del, entries, get, set } from "idb-keyval";
+
+import type { OrderedExcalidrawElement } from "@excalidraw/element/types";
+
+import type {
+  ReconciledExcalidrawElement,
+  RemoteExcalidrawElement,
+} from "@excalidraw/excalidraw/data/reconcile";
+
+import type { AppState } from "@excalidraw/excalidraw/types";
 
 import { PAGE_FRAME_PREFIX } from "../types";
 
@@ -284,6 +294,115 @@ export const updateDocMeta = async (
   return next;
 };
 
+/* -------------------------------------------------------------------------- */
+/* concurrent writers (the same notebook open twice)                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The `updatedAt` each document was at when this tab last read or wrote it.
+ *
+ * Saving is last-write-wins over the whole scene, so with the same notebook
+ * open in two tabs each save overwrote the other tab's strokes outright and
+ * said nothing. Opening your own notes in a second tab — from history, from
+ * a link, by accident — quietly destroyed whichever side saved first.
+ *
+ * A watermark is enough to *notice*: if the stored `updatedAt` is not the one
+ * we last saw, somebody else wrote in between.
+ */
+const sceneBaselines = new Map<string, number>();
+
+/**
+ * Record the version this tab is editing from. Call it when a document is
+ * opened in the editor — NOT from every read, since thumbnails and backups
+ * read scenes too and must not claim to be writers.
+ */
+export const noteSceneBaseline = async (id: string): Promise<void> => {
+  const meta = await getDoc(id);
+  sceneBaselines.set(id, meta?.updatedAt ?? 0);
+};
+
+/** Forget a document's watermark (it was closed, or deleted). */
+export const forgetSceneBaseline = (id: string): void => {
+  sceneBaselines.delete(id);
+};
+
+type SceneMergedListener = (id: string, scene: DocScene) => void;
+
+const sceneMergedListeners = new Set<SceneMergedListener>();
+
+/**
+ * Notified when a save had to merge in another tab's work. The host should
+ * put the merged elements on screen: this tab's canvas does not contain them,
+ * so without this it keeps showing a scene narrower than the one on disk.
+ */
+export const subscribeSceneMerged = (
+  listener: SceneMergedListener,
+): (() => void) => {
+  sceneMergedListeners.add(listener);
+  return () => {
+    sceneMergedListeners.delete(listener);
+  };
+};
+
+/**
+ * If another tab wrote since our baseline, fold its elements into `payload`
+ * (mutating `payload.elements`) and return `true`.
+ *
+ * The merge is Excalidraw's own `reconcileElements`, the same function the
+ * collaboration path uses: union by element id, per-element `version` with a
+ * deterministic `versionNonce` tiebreak, then fractional-index ordering. Ours
+ * is the local side, so our edit to a shared element wins; elements only the
+ * other tab has are carried over intact.
+ *
+ * KNOWN LIMIT — a concurrent *delete* can come back. We strip `isDeleted`
+ * elements when saving, so there are no tombstones, and an element the other
+ * tab still has looks to the merge like one we never had. Re-adding a stroke
+ * somebody erased is a far smaller harm than throwing away everything they
+ * wrote, which is what happened before, so this is the deliberate trade.
+ */
+const mergeConcurrentWrite = async (
+  id: string,
+  payload: DocScene,
+  meta: DocMeta | null,
+): Promise<boolean> => {
+  const baseline = sceneBaselines.get(id);
+  // No baseline means this tab never opened the document for editing (an
+  // import, a restore); there is nothing to compare against.
+  if (baseline === undefined || !meta || meta.updatedAt === baseline) {
+    return false;
+  }
+
+  let stored: DocScene | null = null;
+  try {
+    stored = await getScene(id);
+  } catch {
+    // a scene we cannot read is one we cannot merge; the write below still
+    // happens, which is the old behaviour rather than a new failure
+    return false;
+  }
+  if (!stored || stored.elements.length === 0) {
+    return false;
+  }
+
+  payload.elements = reconcileElements(
+    payload.elements as readonly OrderedExcalidrawElement[],
+    stored.elements as readonly RemoteExcalidrawElement[],
+    payload.appState as AppState,
+  ) as readonly ReconciledExcalidrawElement[] as DocScene["elements"];
+
+  // the other tab's files too, or its images merge in as broken placeholders
+  payload.files = { ...stored.files, ...payload.files };
+
+  for (const listener of sceneMergedListeners) {
+    try {
+      listener(id, payload);
+    } catch {
+      // a listener must not be able to fail the save
+    }
+  }
+  return true;
+};
+
 /**
  * Persist a scene and bump the owning document's `updatedAt` (and `pageCount`,
  * derived from `page:`-prefixed frames).
@@ -297,9 +416,19 @@ export const saveScene = async (id: string, scene: DocScene): Promise<void> => {
     appState: sanitizeAppState(scene.appState),
     files: scene.files ?? {},
   };
+
+  // Read the metadata BEFORE writing: its `updatedAt` is how we notice that
+  // another tab has written to this document since we last did.
+  let meta = await getDoc(id);
+  const merged = await mergeConcurrentWrite(id, payload, meta);
+
   await set(id, payload, sceneStore);
 
-  const meta = await getDoc(id);
+  if (merged) {
+    // re-read: the merge did not write, but the other tab's write means the
+    // metadata we read a moment ago may already be stale for pageCount
+    meta = await getDoc(id);
+  }
   if (meta) {
     const pageCount = countPages(payload);
     await set(
@@ -311,6 +440,11 @@ export const saveScene = async (id: string, scene: DocScene): Promise<void> => {
       }),
       metaStore,
     );
+    // this tab is now the last writer; anything newer than this is somebody
+    // else and must be merged, not overwritten
+    if (sceneBaselines.has(id)) {
+      sceneBaselines.set(id, (await getDoc(id))?.updatedAt ?? 0);
+    }
   }
   emitChange();
 };

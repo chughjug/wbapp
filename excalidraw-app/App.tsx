@@ -120,6 +120,8 @@ import {
   saveSceneDebounced,
   flushSceneSaves,
   subscribeSaveError,
+  subscribeSceneMerged,
+  noteSceneBaseline,
   updateDocMeta,
   PromptDialog,
 } from "./goodnotes/library";
@@ -599,6 +601,36 @@ const ExcalidrawWrapper = ({
     });
   }, [excalidrawAPI]);
 
+  /**
+   * The same notebook open in two tabs. The store merges the other tab's work
+   * into ours on save rather than overwriting it, but only the saved copy has
+   * both halves — this canvas still shows ours alone, and would keep drawing
+   * on a scene narrower than the one on disk. Put the merged scene on screen,
+   * and say so, because strokes appearing unannounced is its own kind of
+   * alarming.
+   */
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+    return subscribeSceneMerged((mergedDocId, scene) => {
+      if (mergedDocId !== docId) {
+        return;
+      }
+      excalidrawAPI.addFiles(Object.values(scene.files ?? {}));
+      excalidrawAPI.updateScene({
+        elements: scene.elements,
+        captureUpdate: CaptureUpdateAction.NEVER,
+      });
+      excalidrawAPI.setToast({
+        message:
+          "This notebook is open in another tab. Both sets of changes have been kept.",
+        closable: true,
+        duration: 8000,
+      });
+    });
+  }, [excalidrawAPI, docId]);
+
   const { editorTheme, appTheme, setAppTheme } = useDarkMode();
   const settingsExtraSections = useMemo(
     () => (
@@ -854,6 +886,11 @@ const ExcalidrawWrapper = ({
       // `data.scene` keeps the usual defaults and the `#json=` import path
       // working for a document that has never been saved.
       const docScene = docId ? await getScene(docId) : null;
+      if (docId) {
+        // remember the version this tab is editing from, so a save can tell
+        // "nothing changed underneath me" from "another tab wrote"
+        await noteSceneBaseline(docId);
+      }
       // A brand-new library document has no saved scene. `data.scene` is
       // upstream Excalidraw's *single*-scene localStorage, so falling back to
       // it here opened every new notebook on the previous notebook's ink —
