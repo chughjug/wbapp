@@ -27,50 +27,32 @@
  * nothing in the editor, the storage or the export path needs to change.
  */
 
-import { parseLatex } from "./parse";
-
-import type { LatexDocument } from "./parse";
-
-export interface CompileResult {
-  /** The parsed document, for the preview renderer. */
-  document: LatexDocument;
-  /** A real engine would also return a PDF; the lite engine does not. */
-  pdf: Blob | null;
-  /** Which engine produced this, for the UI to be honest about. */
-  engineId: string;
-}
-
 export interface LatexEngine {
   id: string;
   label: string;
   /** Shown where the user chooses an engine, and in the preview's footer. */
   description: string;
-  /** True when the engine renders a real PDF rather than an approximation. */
+  /** True when the engine renders a real PDF rather than HTML. */
   producesPdf: boolean;
-  /** Bytes this engine downloads on first use. 0 for the built-in. */
+  /** Bytes this engine downloads on first use. */
   downloadBytes: number;
-  compile: (source: string) => Promise<CompileResult>;
 }
 
 /**
- * The built-in engine: parse the subset, let the preview render it.
+ * The built-in engine: LaTeX.js, with Computer Modern and KaTeX.
  *
- * Synchronous work wrapped in a promise so the interface is the same one
- * a wasm engine will need. The PDF is produced from the rendered preview
- * by the browser's own print pipeline, not here — see `exportLatexPdf`.
+ * Loaded with the LaTeX editor's own chunk and excluded from the service
+ * worker's precache, so a student who only writes notebooks never
+ * downloads a typesetter. The rendering itself lives in
+ * `LatexPreview.tsx`; this record is what the UI names.
  */
 export const liteEngine: LatexEngine = {
-  id: "lite",
+  id: "latexjs",
   label: "Built in",
   description:
-    "Renders the common parts of LaTeX instantly and offline. Not a TeX engine: no custom macros, TikZ or BibTeX.",
+    "LaTeX.js with Computer Modern and KaTeX — real article typography, offline. Not a TeX engine: no custom macros, TikZ, BibTeX or tables.",
   producesPdf: false,
   downloadBytes: 0,
-  compile: async (source: string) => ({
-    document: parseLatex(source),
-    pdf: null,
-    engineId: "lite",
-  }),
 };
 
 const engines = new Map<string, LatexEngine>([[liteEngine.id, liteEngine]]);

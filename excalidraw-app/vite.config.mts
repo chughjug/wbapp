@@ -1,3 +1,4 @@
+import { createRequire } from "module";
 import path from "path";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
@@ -157,6 +158,14 @@ export default defineConfig(({ mode }) => {
   // runtime rule below, so a student who does use equations has them
   // offline from the second time onwards.
   const mathjaxChunkFileNames = new Set<string>();
+  /**
+   * LaTeX.js is ~565 KB and only a LaTeX document ever needs it. Keeping
+   * it out of the precache, like mermaid and mathjax, means a student
+   * who writes notebooks never downloads a typesetter. Its Computer
+   * Modern fonts are emitted as ordinary hashed assets and are already
+   * outside the precache, fetched by the stylesheet on first use.
+   */
+  const latexChunkFileNames = new Set<string>();
   // https://vitejs.dev/config/
   return {
     server: {
@@ -178,6 +187,24 @@ export default defineConfig(({ mode }) => {
     envDir: "../",
     resolve: {
       alias: [
+        {
+          /**
+           * LaTeX.js exposes only its JS entry in `exports`, so its real
+           * `article.css` — the one carrying the `article` class metrics
+           * and the Computer Modern `@font-face` rules — cannot be
+           * imported by package path. Aliasing the directory lets the
+           * stylesheet be imported normally, which matters: Vite then
+           * resolves the relative `url()`s and emits the woff files as
+           * hashed, lazily-fetched assets instead of them having to be
+           * copied into `public/` and precached for every user.
+           */
+          find: /^latexjs-styles\//,
+          // `./package.json` is not exported either, so resolve the JS
+          // entry (which is) and walk up from `dist/`.
+          replacement: `${path.dirname(
+            createRequire(import.meta.url).resolve("latex.js"),
+          )}/css/`,
+        },
         {
           find: /^@excalidraw\/common$/,
           replacement: path.resolve(
@@ -312,6 +339,10 @@ export default defineConfig(({ mode }) => {
         /[\\/]node_modules[\\/]mathjax-full[\\/]/,
         mathjaxChunkFileNames,
       ),
+      lazyChunksPlugin(
+        /[\\/]node_modules[\\/]latex\.js[\\/]/,
+        latexChunkFileNames,
+      ),
       react(),
       checker({
         typescript: true,
@@ -373,7 +404,8 @@ export default defineConfig(({ mode }) => {
               manifest: entries.filter(
                 (entry) =>
                   !mermaidChunkFileNames.has(entry.url) &&
-                  !mathjaxChunkFileNames.has(entry.url),
+                  !mathjaxChunkFileNames.has(entry.url) &&
+                  !latexChunkFileNames.has(entry.url),
               ),
               warnings: [],
             }),

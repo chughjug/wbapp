@@ -18,6 +18,7 @@ import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { getEngine, listEngines } from "./engine";
 import { LatexPreview } from "./LatexPreview";
+import { SourceEditor } from "./SourceEditor";
 import {
   flushLatexSaves,
   getLatexSource,
@@ -26,8 +27,6 @@ import {
 } from "./store";
 
 import "./LatexEditor.scss";
-
-import type { CompileResult } from "./engine";
 
 export interface LatexEditorProps {
   docId: string;
@@ -49,7 +48,6 @@ export const LatexEditor: React.FC<LatexEditorProps> = ({
 }) => {
   const [source, setSource] = useState<string | null>(null);
   const [engineId, setEngineId] = useState("lite");
-  const [result, setResult] = useState<CompileResult | null>(null);
   const [showSource, setShowSource] = useState(true);
   const sourceId = useId();
   const engines = useMemo(() => listEngines(), []);
@@ -70,24 +68,22 @@ export const LatexEditor: React.FC<LatexEditorProps> = ({
     };
   }, [docId]);
 
-  /* ---- compile, debounced ------------------------------------------ */
+  /* ---- what the preview typesets ------------------------------------
+   *
+   * Debounced off the keystrokes: LaTeX.js reparses the whole document,
+   * and doing that per character makes typing stutter on a tablet.
+   */
+  const [typeset, setTypeset] = useState("");
   useEffect(() => {
     if (source === null) {
       return;
     }
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      void engine.compile(source).then((next) => {
-        if (!cancelled) {
-          setResult(next);
-        }
-      });
-    }, COMPILE_DEBOUNCE_MS);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [source, engine]);
+    const timer = window.setTimeout(
+      () => setTypeset(source),
+      COMPILE_DEBOUNCE_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [source]);
 
   /* ---- save --------------------------------------------------------- */
   useEffect(() => {
@@ -177,26 +173,18 @@ export const LatexEditor: React.FC<LatexEditorProps> = ({
       <div className="gn-tex__body">
         {showSource && (
           <div className="gn-tex__sourcepane">
-            <label className="gn-tex__srlabel" htmlFor={sourceId}>
+            <span className="gn-tex__srlabel" id={sourceId}>
               LaTeX source
-            </label>
-            <textarea
-              id={sourceId}
-              className="gn-tex__source"
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
+            </span>
+            <SourceEditor
               value={source ?? ""}
-              placeholder="Loading…"
-              onChange={(event) => setSource(event.target.value)}
+              dark={theme === "dark"}
+              onChange={setSource}
             />
           </div>
         )}
 
-        <LatexPreview
-          document={result?.document ?? null}
-          engineLabel={engine.label}
-        />
+        <LatexPreview source={typeset} engineLabel={engine.label} />
       </div>
 
       <footer className="gn-tex__footer">

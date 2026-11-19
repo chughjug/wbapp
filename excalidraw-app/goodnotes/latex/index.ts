@@ -1,8 +1,8 @@
-export { parseLatex, stripComments } from "./parse";
-export type { Block, Inline, LatexDocument } from "./parse";
+export { findUnsupported, prepareSource } from "./prepare";
+export type { PreparedSource } from "./prepare";
 
 export { getEngine, listEngines, liteEngine, registerEngine } from "./engine";
-export type { CompileResult, LatexEngine } from "./engine";
+export type { LatexEngine } from "./engine";
 
 export {
   flushLatexSaves,
@@ -17,5 +17,6 @@ export {
 export type { LatexSource } from "./store";
 
 export { LatexPreview } from "./LatexPreview";
+export { SourceEditor } from "./SourceEditor";
 export { LatexEditor } from "./LatexEditor";
 export type { LatexEditorProps } from "./LatexEditor";
