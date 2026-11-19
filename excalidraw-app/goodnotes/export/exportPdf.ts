@@ -8,13 +8,13 @@
  * correspondingly sized jsPDF page.
  */
 
-import { jsPDF } from "jspdf";
-
 import type { ExcalidrawElement } from "@excalidraw/element/types";
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types";
 
 import { pxToPt } from "./pageFrames";
 import { createPageRenderer, DEFAULT_SCALE } from "./renderPage";
+
+import type { jsPDF } from "jspdf";
 
 import type { PageRenderer } from "./renderPage";
 import type { PaperTemplateId } from "../types";
@@ -168,6 +168,21 @@ export const exportDocumentToPdf = async ({
   const selected = selectPages(pageRenderer.frames, pageRange);
 
   const total = selected.length;
+
+  // jsPDF is ~335 kB and nothing outside this function needs it, so it is
+  // fetched when someone actually exports rather than riding along in the
+  // entry chunk of an app most of whose sessions never export a PDF.
+  let JsPdf: typeof import("jspdf").jsPDF;
+  try {
+    ({ jsPDF: JsPdf } = await import("jspdf"));
+  } catch (error) {
+    throw new PdfExportError(
+      "Could not load the PDF writer. Check your connection and try again.",
+      null,
+      error,
+    );
+  }
+
   let doc: jsPDF | null = null;
 
   for (let i = 0; i < total; i++) {
@@ -191,7 +206,7 @@ export const exportDocumentToPdf = async ({
       const dataUrl = pageCanvas.toDataURL("image/png");
 
       if (doc === null) {
-        doc = new jsPDF({
+        doc = new JsPdf({
           unit: "pt",
           format,
           orientation,
