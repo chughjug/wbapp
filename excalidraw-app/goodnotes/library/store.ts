@@ -33,6 +33,7 @@ import type {
 
 import type { AppState } from "@excalidraw/excalidraw/types";
 
+import { forgetHistory, maybeSnapshot } from "../history/store";
 import { forgetDocText, indexSceneText } from "../search";
 import { PAGE_FRAME_PREFIX } from "../types";
 
@@ -456,6 +457,15 @@ export const saveScene = async (id: string, scene: DocScene): Promise<void> => {
     } catch {
       // ignored on purpose — see above
     }
+    // Keep a dated copy so an accidental erase is recoverable tomorrow, not
+    // just until the tab closes. Rate-limited inside `maybeSnapshot`, so the
+    // common save does one key listing and no write. Failing to snapshot
+    // must never fail the save that is carrying the user's actual strokes.
+    try {
+      await maybeSnapshot(id, payload, written);
+    } catch {
+      // ignored on purpose — see above
+    }
   }
   emitChange();
 };
@@ -703,6 +713,14 @@ export const deleteDoc = async (id: string): Promise<void> => {
     await forgetDocText(id);
   } catch {
     // a stale index entry is harmless; the shelf filters to live documents
+  }
+  // A document deleted for real (not trashed) must not leave its history
+  // behind: that history is a full copy of the scenes the user just asked
+  // to be rid of, and it would never be reachable again.
+  try {
+    await forgetHistory(id);
+  } catch {
+    // orphaned snapshots are purged by retention; never fail the delete
   }
   emitChange();
 };

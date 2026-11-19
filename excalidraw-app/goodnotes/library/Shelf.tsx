@@ -52,6 +52,8 @@ import React, {
 import { setPendingPageJump } from "../pages";
 import { ensureSearchIndex, searchNotes } from "../search";
 
+import { purgeExpiredHistory } from "../history/store";
+
 import { useDocuments } from "./useDocuments";
 import { useCourseStyles } from "./courses";
 import {
@@ -70,6 +72,7 @@ import {
   matchesQuery,
   visibleTags,
 } from "./filters";
+
 import { getScene, purgeExpiredTrash } from "./store";
 import {
   coursePathLabel,
@@ -473,9 +476,12 @@ export const Shelf = ({
    * consequence is that something stays recoverable slightly longer.
    */
   useEffect(() => {
-    void purgeExpiredTrash(Date.now() - TRASH_RETENTION_MS).catch(
-      () => undefined,
-    );
+    const now = Date.now();
+    void purgeExpiredTrash(now - TRASH_RETENTION_MS).catch(() => undefined);
+    // Snapshot history is enforced here too, and for the same reason: a
+    // document last edited months ago never runs the thinning pass that
+    // happens on save, so without this its versions would be kept for ever.
+    void purgeExpiredHistory(now).catch(() => undefined);
   }, []);
 
   const counts = useMemo(

@@ -78,6 +78,7 @@ import { TabBar, useOpenDocs } from "./goodnotes/tabs";
 import { ToolMenu, useActiveToolMenu } from "./goodnotes/tool-menu";
 import { ObjectMenu } from "./goodnotes/object-menu";
 import { useGraphDialog } from "./goodnotes/graph";
+import { useHistoryPanel } from "./goodnotes/history";
 import { useMathDialog } from "./goodnotes/math";
 import { useInputGestures } from "./goodnotes/input";
 import { useSettingsScreen } from "./goodnotes/settings";
@@ -481,6 +482,40 @@ const ExcalidrawWrapper = ({
     ],
     [openMathDialog],
   );
+  /**
+   * Earlier versions of this notebook.
+   *
+   * Restoring writes the old scene to the store; the editor is still showing
+   * the new one, so it has to be told. Same shape as the cross-tab merge
+   * handler above — files first, then elements with `captureUpdate: NEVER`
+   * so the restore does not become a single giant undo step that an
+   * accidental Ctrl+Z would reverse.
+   */
+  const onVersionRestored = useCallback(
+    async (restoredDocId: string) => {
+      if (!excalidrawAPI || restoredDocId !== docId) {
+        return;
+      }
+      const scene = await getScene(restoredDocId);
+      if (!scene) {
+        return;
+      }
+      excalidrawAPI.addFiles(Object.values(scene.files ?? {}));
+      excalidrawAPI.updateScene({
+        elements: scene.elements,
+        captureUpdate: CaptureUpdateAction.NEVER,
+      });
+      excalidrawAPI.setToast({
+        message: "Restored an earlier version of this notebook.",
+        closable: true,
+        duration: 6000,
+      });
+    },
+    [excalidrawAPI, docId],
+  );
+  const history = useHistoryPanel(docId ?? null, {
+    onRestored: onVersionRestored,
+  });
   // one page at a time, fitted to the workspace; swipe/arrows move between
   const paged = usePagedView(excalidrawAPI);
   // The page-jump effect must not re-run every time the paged state changes
@@ -1580,6 +1615,11 @@ const ExcalidrawWrapper = ({
                 ]
               : []),
             {
+              id: "history",
+              label: "Earlier versions…",
+              onSelect: () => history.open(),
+            },
+            {
               id: "settings",
               label: "Settings…",
               onSelect: () => settings.open(),
@@ -1886,6 +1926,7 @@ const ExcalidrawWrapper = ({
           the tool menu has no panel for and closes on. */}
       {graph.dialog}
       {math.dialog}
+      {history.panel}
       {settings.screen}
       {settings.firstRunHint}
       <PagedViewControls {...paged.controlsProps} />
