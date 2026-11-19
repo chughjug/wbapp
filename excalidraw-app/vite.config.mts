@@ -149,6 +149,14 @@ export default defineConfig(({ mode }) => {
   // so we don't precache it (the app caches it once the TTD dialog is opened,
   // see `cacheMermaidChunks`). Populated at build time by `lazyChunksPlugin`.
   const mermaidChunkFileNames = new Set<string>();
+  // MathJax is ~1.6MB of typesetting code and glyph outlines, nearly all of
+  // it the SVG font. It is loaded the first time an equation is inserted or
+  // edited, and most notebooks never hold one — precaching it would put
+  // that on every first visit, including every phone on a hotspot. It is
+  // excluded from the precache and picked up instead by the `lazy-chunks`
+  // runtime rule below, so a student who does use equations has them
+  // offline from the second time onwards.
+  const mathjaxChunkFileNames = new Set<string>();
   // https://vitejs.dev/config/
   return {
     server: {
@@ -300,6 +308,10 @@ export default defineConfig(({ mode }) => {
         mermaidChunkFileNames,
         MERMAID_CHUNKS_LIST_NAME,
       ),
+      lazyChunksPlugin(
+        /[\\/]node_modules[\\/]mathjax-full[\\/]/,
+        mathjaxChunkFileNames,
+      ),
       react(),
       checker({
         typescript: true,
@@ -354,12 +366,14 @@ export default defineConfig(({ mode }) => {
             // would only risk serving a stale one
             SHARE_SW_FILE_NAME,
           ],
-          // mermaid chunks are excluded here rather than via `globIgnores`
-          // as their file names are arbitrary
+          // mermaid and MathJax chunks are excluded here rather than via
+          // `globIgnores` as their file names are arbitrary
           manifestTransforms: [
             (entries) => ({
               manifest: entries.filter(
-                (entry) => !mermaidChunkFileNames.has(entry.url),
+                (entry) =>
+                  !mermaidChunkFileNames.has(entry.url) &&
+                  !mathjaxChunkFileNames.has(entry.url),
               ),
               warnings: [],
             }),

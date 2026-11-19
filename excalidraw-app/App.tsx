@@ -73,11 +73,12 @@ import type { ResolutionType } from "@excalidraw/common/utility-types";
 import type { ResolvablePromise } from "@excalidraw/common/utils";
 
 import { ExportDialog, getOrderedPageFrames } from "./goodnotes/export";
-import { NavBar, PagePanel } from "./goodnotes/shell";
+import { EquationIcon, NavBar, PagePanel } from "./goodnotes/shell";
 import { TabBar, useOpenDocs } from "./goodnotes/tabs";
 import { ToolMenu, useActiveToolMenu } from "./goodnotes/tool-menu";
 import { ObjectMenu } from "./goodnotes/object-menu";
 import { useGraphDialog } from "./goodnotes/graph";
+import { useMathDialog } from "./goodnotes/math";
 import { useInputGestures } from "./goodnotes/input";
 import { useSettingsScreen } from "./goodnotes/settings";
 import {
@@ -456,6 +457,20 @@ const ExcalidrawWrapper = ({
   // palm rejection, page flick and tap gestures go live from here
   const input = useInputGestures(excalidrawAPI);
   const graph = useGraphDialog(excalidrawAPI);
+  // LaTeX → a typeset SVG on the page; MathJax loads on first use only
+  const math = useMathDialog(excalidrawAPI);
+  const openMathDialog = math.open;
+  const insertMenuItems = useMemo(
+    () => [
+      {
+        id: "insert-equation",
+        label: "Insert equation…",
+        icon: <EquationIcon />,
+        onSelect: () => openMathDialog(),
+      },
+    ],
+    [openMathDialog],
+  );
   // one page at a time, fitted to the workspace; swipe/arrows move between
   const paged = usePagedView(excalidrawAPI);
   // The page-jump effect must not re-run every time the paged state changes
@@ -1414,6 +1429,9 @@ const ExcalidrawWrapper = ({
             setAppTheme(editorTheme === "dark" ? "light" : "dark")
           }
           onInsertGraph={() => graph.open()}
+          // the bar's own extension point, so an equation sits beside
+          // "Import PDF…" and "Insert graph…" under "Bring in"
+          insertItems={insertMenuItems}
           // The LIBRARY's title, not `excalidrawAPI.getName()`. The latter
           // is Excalidraw's own scene name, which for a notebook created in
           // this app is a machine-generated stamp — the bar's document
@@ -1820,6 +1838,7 @@ const ExcalidrawWrapper = ({
           because selecting an object switches to the selection tool, which
           the tool menu has no panel for and closes on. */}
       {graph.dialog}
+      {math.dialog}
       {settings.screen}
       {settings.firstRunHint}
       <PagedViewControls {...paged.controlsProps} />
@@ -1835,6 +1854,10 @@ const ExcalidrawWrapper = ({
           // the lasso overlay is modal and would swallow the dialog
           deactivateFuzzySelect();
           graph.openForElement(element);
+        }}
+        onEditMath={(element) => {
+          deactivateFuzzySelect();
+          math.openForElement(element);
         }}
       />
       <FuzzySelectOverlay excalidrawAPI={excalidrawAPI} />

@@ -195,3 +195,12 @@ export type {
   TaskbarMenuProps as ShellMenuProps,
   TaskbarMenuSection as ShellMenuSection,
 } from "../taskbar/Menu";
+
+/**
+ * Icons for `insertItems` — the bar's extension point for host-supplied
+ * entries under "Bring in". An item there sits beside "Import PDF…" and
+ * "Insert graph…", so it needs a glyph drawn to the same 24×24,
+ * `currentColor`, 1.6-stroke contract as theirs rather than something
+ * assembled at the call site.
+ */
+export { EquationIcon } from "./icons";

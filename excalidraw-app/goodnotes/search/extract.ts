@@ -31,9 +31,10 @@ import type { DocScene } from "../types";
 /** PDF import's `customData` key. Duplicated rather than imported so this
  * module stays free of the pdf.js-adjacent one. */
 const PDF_IMPORT_KEY = "goodnotesPdfImport";
-/** Graph insert's namespace and key on `customData`. */
+/** Graph and equation inserts' namespace and keys on `customData`. */
 const GOODNOTES_NAMESPACE = "goodnotes";
 const GRAPH_KEY = "graph";
+const MATH_KEY = "math";
 
 /** One page's worth of searchable text. */
 export interface PageText {
@@ -66,14 +67,25 @@ const pdfTextOf = (element: ExcalidrawElement): string | null => {
     : null;
 };
 
-const graphTextOf = (element: ExcalidrawElement): string | null => {
+/**
+ * The text alternative of a picture this app generated — a plotted graph
+ * or a typeset equation. For an equation that alternative is its LaTeX
+ * source, which is also what a student searching for `\int` would type,
+ * so the formula becomes findable without anything having to read maths.
+ */
+const generatedImageTextOf = (element: ExcalidrawElement): string | null => {
   const namespace = customDataOf(element)[GOODNOTES_NAMESPACE] as
     | Record<string, unknown>
     | undefined;
-  const graph = namespace?.[GRAPH_KEY] as { alt?: unknown } | undefined;
-  return typeof graph?.alt === "string" && graph.alt.trim() !== ""
-    ? graph.alt
-    : null;
+  if (!namespace) {
+    return null;
+  }
+  const alts = [GRAPH_KEY, MATH_KEY]
+    .map((key) => (namespace[key] as { alt?: unknown } | undefined)?.alt)
+    .filter(
+      (alt): alt is string => typeof alt === "string" && alt.trim() !== "",
+    );
+  return alts.length > 0 ? alts.join("\n") : null;
 };
 
 /** Collapses runs of whitespace; PDF text arrives full of them. */
@@ -129,7 +141,7 @@ export const extractPageTexts = (scene: DocScene): PageText[] => {
     if (element.type === "text") {
       push(page, element.text);
     } else if (element.type === "image") {
-      push(page, graphTextOf(element));
+      push(page, generatedImageTextOf(element));
     }
   }
 

@@ -47,6 +47,19 @@ export const GraphIcon = () =>
   );
 
 /**
+ * Insert equation. A radical sign over a fraction bar: the two pieces of
+ * notation that say "this is typeset maths, not a drawing" at 20px.
+ */
+export const EquationIcon = () =>
+  svg(
+    <>
+      <path d="M3 12.5l2 4 3.5-9H15" />
+      <path d="M10 17.5h10" />
+      <path d="M13 14.2h4M13 20.8h4" />
+    </>,
+  );
+
+/**
  * The hand (pan) tool. An open palm — four fingers and a thumb over a
  * rounded palm — which is the idiom every tablet note app uses for "move
  * the paper, don't mark it". Drawn with the same 1.6 stroke as the other

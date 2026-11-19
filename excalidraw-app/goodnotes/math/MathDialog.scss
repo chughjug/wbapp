@@ -1,0 +1,321 @@
+// Styles for the GoodNotes "Insert an equation" dialog.
+//
+// Same rules as the graph dialog next door: every colour comes from an
+// Excalidraw theme custom property (with a literal fallback), so the chrome
+// is correct in both themes. The typeset equation itself is NOT themed — it
+// is drawn in dark ink because it ends up as a picture on a white page and
+// in exported PDFs, so the preview stage is always a light surface too,
+// showing it the way the page will.
+
+.excalidraw.gn-math-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: var(--overlay-bg-color, rgba(0, 0, 0, 0.5));
+  animation: gn-math-fade 120ms ease-out;
+}
+
+.gn-math-dialog {
+  box-sizing: border-box;
+  width: min(52rem, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  border-radius: var(--border-radius-lg, 0.5rem);
+  border: 1px solid var(--dialog-border-color, var(--color-gray-20));
+  background-color: var(--island-bg-color, var(--color-surface-lowest));
+  color: var(--text-primary-color, var(--color-on-surface));
+  box-shadow: var(--modal-shadow, 0 20px 40px rgba(0, 0, 0, 0.25));
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  animation: gn-math-pop 140ms ease-out;
+
+  *:focus-visible {
+    outline: 2px solid var(--color-primary, #6965db);
+    outline-offset: 2px;
+    border-radius: var(--border-radius-md, 0.375rem);
+  }
+}
+
+.gn-math-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.gn-math-dialog__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary-color, var(--color-on-surface));
+}
+
+.gn-math-dialog__intro {
+  margin: 0;
+  opacity: 0.8;
+}
+
+.gn-math-dialog__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-md, 0.375rem);
+
+  &:hover {
+    background-color: var(--button-hover-bg, var(--color-surface-high));
+  }
+}
+
+.gn-math-dialog__body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.gn-math-dialog__form {
+  flex: 1 1 20rem;
+  min-width: 17rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.gn-math-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  > label {
+    font-weight: 500;
+  }
+}
+
+.gn-math-source {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  resize: vertical;
+  color: var(--text-primary-color, var(--color-on-surface));
+  background-color: var(--input-bg-color, var(--color-surface-low));
+  border: 1px solid var(--input-border-color, var(--color-gray-20));
+  border-radius: var(--border-radius-md, 0.375rem);
+
+  &[aria-invalid="true"] {
+    border-color: var(--color-danger, #c92a2a);
+  }
+}
+
+.gn-math-dialog input[type="number"] {
+  box-sizing: border-box;
+  width: 5.5rem;
+  padding: 0.375rem 0.5rem;
+  font: inherit;
+  color: var(--text-primary-color, var(--color-on-surface));
+  background-color: var(--input-bg-color, var(--color-surface-low));
+  border: 1px solid var(--input-border-color, var(--color-gray-20));
+  border-radius: var(--border-radius-md, 0.375rem);
+}
+
+.gn-math-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.gn-math-examples__label {
+  opacity: 0.75;
+}
+
+.gn-math-chip {
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  color: inherit;
+  background-color: var(--button-bg, var(--color-surface-high));
+  border: 1px solid var(--dialog-border-color, var(--color-gray-20));
+  border-radius: 999px;
+
+  &:hover {
+    background-color: var(--button-hover-bg, var(--color-surface-mid));
+  }
+}
+
+.gn-math-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.gn-math-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+
+  input {
+    margin-top: 0.2rem;
+  }
+}
+
+.gn-math-hint {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.gn-math-preview {
+  flex: 1 1 18rem;
+  min-width: 15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.gn-math-preview__heading {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.gn-math-preview__stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 9rem;
+  padding: 1rem;
+  overflow: auto;
+  // always light: this is what the page looks like
+  background-color: #ffffff;
+  border: 1px solid var(--dialog-border-color, var(--color-gray-20));
+  border-radius: var(--border-radius-md, 0.375rem);
+
+  // the last good typeset, while the current source does not parse
+  &[data-stale="true"] {
+    opacity: 0.45;
+  }
+
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+.gn-math-preview__empty {
+  font-size: 0.8125rem;
+  color: #6b6b6b;
+}
+
+.gn-math-preview__size {
+  margin: 0;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.gn-math-error {
+  margin: 0;
+  min-height: 1.15rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--color-danger, #c92a2a);
+}
+
+.gn-math-error--summary {
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--color-danger, #c92a2a);
+  border-radius: var(--border-radius-md, 0.375rem);
+  background-color: var(--color-danger-background, rgba(201, 42, 42, 0.08));
+  font-size: 0.8125rem;
+}
+
+.gn-math-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+}
+
+.gn-math-button {
+  padding: 0.4375rem 0.875rem;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-primary-color, var(--color-on-surface));
+  background-color: var(--button-bg, var(--color-surface-high));
+  border: 1px solid var(--dialog-border-color, var(--color-gray-20));
+  border-radius: var(--border-radius-md, 0.375rem);
+
+  &:hover:not(:disabled) {
+    background-color: var(--button-hover-bg, var(--color-surface-mid));
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.gn-math-button--primary {
+  color: var(--color-primary-contrast, #ffffff);
+  background-color: var(--color-primary, #6965db);
+  border-color: var(--color-primary, #6965db);
+
+  &:hover:not(:disabled) {
+    background-color: var(--color-primary-darker, #5b57d1);
+  }
+}
+
+@keyframes gn-math-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes gn-math-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .excalidraw.gn-math-backdrop,
+  .gn-math-dialog {
+    animation: none !important;
+    transition: none !important;
+  }
+}

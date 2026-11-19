@@ -59,6 +59,7 @@ import type {
 
 import { useFuzzySelectActive } from "../fuzzy-select/activation";
 import { isGraphElement } from "../graph";
+import { isMathElement } from "../math";
 
 import {
   FILL_COLOR_PICKS,
@@ -107,6 +108,13 @@ export interface ObjectMenuProps {
    * graph is to delete it and type the whole thing again.
    */
   onEditGraph?: (element: ExcalidrawImageElement) => void;
+  /**
+   * Re-opens the equation dialog for a selected equation, seeded with its
+   * LaTeX. Pass `useMathDialog(api).openForElement`. **When omitted the
+   * "Edit equation…" item is not rendered**, and a typo in a formula can
+   * only be fixed by deleting it and retyping the whole thing.
+   */
+  onEditMath?: (element: ExcalidrawImageElement) => void;
   /**
    * Force the menu out of the way (a modal tool of your own, a tour, …).
    * The lasso tool of `goodnotes/fuzzy-select` is handled automatically.
@@ -230,6 +238,7 @@ export const ObjectMenu = ({
   excalidrawAPI,
   onOpenBackdrop,
   onEditGraph,
+  onEditMath,
   hidden = false,
   onAction,
 }: ObjectMenuProps) => {
@@ -377,6 +386,15 @@ export const ObjectMenu = ({
           key="edit-graph"
           label="Edit graph…"
           onClick={() => run("edit-graph", () => onEditGraph(image))}
+        />,
+      );
+    }
+    if (onEditMath && isMathElement(image)) {
+      items.push(
+        <MenuButton
+          key="edit-math"
+          label="Edit equation…"
+          onClick={() => run("edit-math", () => onEditMath(image))}
         />,
       );
     }
