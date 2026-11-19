@@ -15,9 +15,27 @@
  * layer, the export pipeline, the outline, search — having to special-case
  * it. A separate store with the same key is simpler and keeps the
  * notebook path untouched.
+ *
+ * ## …and a copy in the scene, for everything built on scenes
+ *
+ * Writing it *only* here would have made a LaTeX document a second-class
+ * one: cross-device sync, version history and the backup export all
+ * operate on a document's scene, and none of them knows this database
+ * exists. So each save also writes the source into the scene's
+ * `appState.goodnotesLatex`.
+ *
+ * That is cheap — `sanitizeAppState` passes unknown keys through, so
+ * nothing in the library needed changing — and it buys the whole set at
+ * once: a `.tex` file now syncs between devices through the existing
+ * engine, gets a snapshot in Earlier versions on the same schedule as
+ * ink, and travels in a backup. The local database stays the fast path
+ * the editor reads on every keystroke; the scene copy is what leaves the
+ * device.
  */
 
 import { createStore, del, get, keys, set } from "idb-keyval";
+
+import { getScene, saveScene } from "../library/store";
 
 const sourceStore = createStore("goodnotes-latex", "sources");
 
@@ -64,8 +82,36 @@ Write the next answer here.
 
 export const getLatexSource = async (
   docId: string,
-): Promise<LatexSource | null> =>
-  ((await get(docId, sourceStore)) as LatexSource | undefined) ?? null;
+): Promise<LatexSource | null> => {
+  const local = (await get(docId, sourceStore)) as LatexSource | undefined;
+  if (local) {
+    return local;
+  }
+
+  /**
+   * Nothing locally: this may be a document that arrived from another
+   * device, where the source rode in on the scene. Adopt it into the
+   * local store so the next read is the fast path again.
+   */
+  try {
+    const scene = await getScene(docId);
+    const carried = (scene?.appState as Record<string, unknown> | undefined)
+      ?.goodnotesLatex;
+    if (typeof carried === "string") {
+      const adopted: LatexSource = {
+        docId,
+        text: carried,
+        engineId: "lite",
+        updatedAt: Date.now(),
+      };
+      await set(docId, adopted, sourceStore);
+      return adopted;
+    }
+  } catch {
+    // a scene we cannot read is not a reason to fail opening the editor
+  }
+  return null;
+};
 
 export const saveLatexSource = async (
   docId: string,
@@ -79,6 +125,20 @@ export const saveLatexSource = async (
     updatedAt: Date.now(),
   };
   await set(docId, record, sourceStore);
+
+  // The copy that leaves the device. Failing this must not lose the
+  // keystrokes already safely in the local store above.
+  try {
+    await saveScene(docId, {
+      elements: [],
+      appState: { goodnotesLatex: text } as never,
+      files: {},
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("goodnotes/latex: could not mirror source to scene", error);
+  }
+
   return record;
 };
 
@@ -86,9 +146,27 @@ export const forgetLatexSource = async (docId: string): Promise<void> => {
   await del(docId, sourceStore);
 };
 
-/** Is this document a LaTeX one? Used to route the shelf's open action. */
-export const isLatexDoc = async (docId: string): Promise<boolean> =>
-  (await get(docId, sourceStore)) !== undefined;
+/**
+ * Is this document a LaTeX one? Used to route the shelf's open action.
+ *
+ * Checks the scene too, so a document synced from another device opens
+ * in the LaTeX editor on its first open here rather than mounting the
+ * notebook editor over it.
+ */
+export const isLatexDoc = async (docId: string): Promise<boolean> => {
+  if ((await get(docId, sourceStore)) !== undefined) {
+    return true;
+  }
+  try {
+    const scene = await getScene(docId);
+    return (
+      typeof (scene?.appState as Record<string, unknown> | undefined)
+        ?.goodnotesLatex === "string"
+    );
+  } catch {
+    return false;
+  }
+};
 
 /** Every LaTeX document id, for the backup/export path. */
 export const listLatexDocIds = async (): Promise<string[]> =>
