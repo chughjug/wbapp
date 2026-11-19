@@ -182,13 +182,19 @@
 
   /* always one row — expand to fit every control instead of wrapping */
   width: max-content;
-  max-width: calc(100vw - 1rem);
+  /* the safe-area insets are already applied to `.gn-shell-layout`, so the
+     width available to the bar is the viewport minus them, not `100vw`;
+     on a notched phone in landscape the difference is ~94px of bar sitting
+     under the notch and the rounded corner */
+  max-width: calc(
+    100vw - 1rem - var(--gn-safe-left, 0px) - var(--gn-safe-right, 0px)
+  );
   min-height: var(--gn-bar-height);
   height: var(--gn-bar-height);
   flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
+  /* the scrolling happens in `&__scroll`; the bar itself must not clip, or
+     it would clip the tool popovers that anchor inside it */
+  overflow: visible;
   padding: 0.125rem 0.5rem;
 
   border: 1px solid var(--gn-bar-border);
@@ -210,6 +216,75 @@
     background-color: color-mix(in srgb, var(--gn-bar-bg) 78%, transparent);
     -webkit-backdrop-filter: blur(18px) saturate(1.7);
     backdrop-filter: blur(18px) saturate(1.7);
+  }
+
+  /* Everything up to the "+" — the part that is allowed to scroll out of
+     sight when the screen is too narrow for the full set of tools. */
+  &__scroll {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    /* room for the focus ring of the first and last buttons, which a
+       scroll container would otherwise cut off */
+    padding: 2px 0;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* A fade at the right edge, so an overflowing row looks like one. With
+       no scrollbar (deliberate — a visible one on a 34px-tall bar is
+       noise) there was nothing at all to say the tools continued. */
+    @supports (mask-image: linear-gradient(90deg, #000, transparent)) {
+      &[data-overflowing="true"] {
+        mask-image: linear-gradient(
+          90deg,
+          #000 calc(100% - 1.5rem),
+          transparent 100%
+        );
+      }
+
+      &[data-overflowing="start"] {
+        mask-image: linear-gradient(90deg, transparent 0, #000 1.5rem);
+      }
+
+      &[data-overflowing="both"] {
+        mask-image: linear-gradient(
+          90deg,
+          transparent 0,
+          #000 1.5rem,
+          #000 calc(100% - 1.5rem),
+          transparent 100%
+        );
+      }
+    }
+  }
+
+  /* The "+" and the pinned actions. Never scrolls: the "+" is how you get
+     at everything the bar could not fit. */
+  &__trailing {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 auto;
+  }
+
+  /* Phone widths: the row is the tools, so give them every pixel. Smaller
+     hit targets would be wrong — 30px is still above the 24px CSS-pixel
+     floor WCAG 2.2 target-size asks for, and the gap between them keeps
+     the effective target larger than the button. */
+  @media (max-width: 26.9375rem) {
+    padding: 0.125rem 0.25rem;
+
+    .gn-bar__button {
+      min-width: 1.875rem;
+      padding: 0 0.1875rem;
+    }
   }
 
   &__slot {
