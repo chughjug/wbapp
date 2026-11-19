@@ -1718,6 +1718,11 @@ const ExcalidrawWrapper = ({
       <ObjectMenu
         excalidrawAPI={excalidrawAPI}
         onOpenBackdrop={backdrops.open}
+        onEditGraph={(element) => {
+          // the lasso overlay is modal and would swallow the dialog
+          deactivateFuzzySelect();
+          graph.openForElement(element);
+        }}
       />
       <FuzzySelectOverlay excalidrawAPI={excalidrawAPI} />
       <BackdropPanel {...backdrops.panelProps} />

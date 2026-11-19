@@ -58,6 +58,7 @@ import type {
 } from "@excalidraw/element/types";
 
 import { useFuzzySelectActive } from "../fuzzy-select/activation";
+import { isGraphElement } from "../graph";
 
 import {
   FILL_COLOR_PICKS,
@@ -99,6 +100,13 @@ export interface ObjectMenuProps {
    * rendered** — the menu never shows an action it cannot perform.
    */
   onOpenBackdrop?: () => void;
+  /**
+   * Re-opens the graph dialog for a selected graph, seeded with its stored
+   * spec. Pass `useGraphDialog(api).openForElement`. **When omitted the
+   * "Edit graph…" item is not rendered**, and the only way to change a
+   * graph is to delete it and type the whole thing again.
+   */
+  onEditGraph?: (element: ExcalidrawImageElement) => void;
   /**
    * Force the menu out of the way (a modal tool of your own, a tour, …).
    * The lasso tool of `goodnotes/fuzzy-select` is handled automatically.
@@ -221,6 +229,7 @@ const Swatch = ({
 export const ObjectMenu = ({
   excalidrawAPI,
   onOpenBackdrop,
+  onEditGraph,
   hidden = false,
   onAction,
 }: ObjectMenuProps) => {
@@ -360,6 +369,17 @@ export const ObjectMenu = ({
   } else if (kind === "image" && element) {
     const image = element as ExcalidrawImageElement;
     items.push(duplicate);
+    // first, because changing the maths is the reason you selected it — the
+    // generic image actions below are the fallback, not the point
+    if (onEditGraph && isGraphElement(image)) {
+      items.push(
+        <MenuButton
+          key="edit-graph"
+          label="Edit graph…"
+          onClick={() => run("edit-graph", () => onEditGraph(image))}
+        />,
+      );
+    }
     if (onOpenBackdrop) {
       items.push(
         <MenuButton
