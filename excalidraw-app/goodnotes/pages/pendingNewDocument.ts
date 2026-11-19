@@ -16,6 +16,14 @@ export interface PendingNewDocumentSeed {
   landscape: boolean;
   imageFile?: File | null;
   imageFit?: PageImageFit;
+  /**
+   * The notebook starter chosen in the dialog, when it was anything but
+   * "Blank". Rides along here rather than in `DocMeta` because it is a
+   * one-shot instruction for the first mount, not a property of the
+   * document: once the headings are on the page they are ordinary text,
+   * and re-seeding on a later open would duplicate them.
+   */
+  starterId?: string;
 }
 
 const pendingByDocId = new Map<string, PendingNewDocumentSeed>();

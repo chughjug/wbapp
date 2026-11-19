@@ -103,6 +103,7 @@ export const useNewDocument = (
       landscape: submission.landscape,
       imageFile: submission.imageFile,
       imageFit: submission.imageFit,
+      ...(submission.starterId ? { starterId: submission.starterId } : {}),
     });
 
     pendingInitRef.current = {};
@@ -136,8 +137,9 @@ export const useNewDocument = (
             theme: opts.theme ?? "light",
             title: "New document",
             submitLabel: "Create",
+            starters: true,
             intro:
-              "Choose the first page's paper, size and orientation. You can add more pages later.",
+              "Start from a format, or set the paper, size and orientation yourself. You can add more pages later.",
             onSubmit,
             onClose: close,
           })

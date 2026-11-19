@@ -80,6 +80,11 @@ import { ObjectMenu } from "./goodnotes/object-menu";
 import { useGraphDialog } from "./goodnotes/graph";
 import { useHistoryPanel } from "./goodnotes/history";
 import { OutlinePanel } from "./goodnotes/outline";
+import {
+  buildStarterElements,
+  getStarter,
+  starterSeedsContent,
+} from "./goodnotes/starters";
 import { useMathDialog } from "./goodnotes/math";
 import { useInputGestures } from "./goodnotes/input";
 import { useSettingsScreen } from "./goodnotes/settings";
@@ -197,6 +202,8 @@ import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
 import "./index.scss";
 
 import { AppSidebar } from "./components/AppSidebar";
+
+import { PAGE_FRAME_PREFIX } from "./goodnotes/types";
 
 import type { DocMeta, DocScene } from "./goodnotes/types";
 
@@ -678,6 +685,34 @@ const ExcalidrawWrapper = ({
         landscape: choice.landscape,
         image,
       });
+
+      /**
+       * Lay down the starter's scaffolding, once, on the page that was just
+       * created.
+       *
+       * After `seedFirstPage` rather than inside it: the headings are
+       * positioned as fractions of the page frame, so the frame has to
+       * exist and have its final size first. `captureUpdate: IMMEDIATELY`
+       * so the student's first Ctrl+Z undoes their own first stroke and
+       * not the template they asked for.
+       */
+      const starter = pending?.starterId ? getStarter(pending.starterId) : null;
+      if (starter && starterSeedsContent(starter)) {
+        const elements = excalidrawAPI.getSceneElementsIncludingDeleted();
+        const frame = elements.find(
+          (element) =>
+            element.type === "frame" &&
+            !element.isDeleted &&
+            typeof element.name === "string" &&
+            element.name === `${PAGE_FRAME_PREFIX}1`,
+        );
+        if (frame) {
+          excalidrawAPI.updateScene({
+            elements: [...elements, ...buildStarterElements(starter, frame)],
+            captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+          });
+        }
+      }
       if (image) {
         syncPageImageCache(
           excalidrawAPI.getSceneElementsIncludingDeleted(),

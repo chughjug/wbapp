@@ -36,6 +36,7 @@ import { createPortal } from "react-dom";
 
 import { PAPER_TEMPLATE_LIST, PaperPicker, PaperPreview } from "../paper";
 
+import { getStarter, NOTEBOOK_STARTERS } from "../starters/starters";
 import { PAGE_SIZES } from "../types";
 
 import {
@@ -47,6 +48,7 @@ import {
 import "./NewPageDialog.scss";
 
 import type { PaperPickerOption } from "../paper";
+
 import type { PageImageFit } from "../paper/pageImages";
 import type { NewPageChoice } from "./newPageChoice";
 import type { PageSizeName, PaperTemplateId } from "../types";
@@ -69,6 +71,8 @@ export interface NewPageSubmission {
   /** The picked file, when the user chose the Image format. */
   imageFile: File | null;
   imageFit: PageImageFit;
+  /** The notebook starter chosen, when the starter row is shown. */
+  starterId?: string;
 }
 
 export interface NewPageDialogProps {
@@ -89,6 +93,15 @@ export interface NewPageDialogProps {
    * the current notebook (the add-page case).
    */
   intro?: string;
+  /**
+   * Show the notebook-starter row above the format picker.
+   *
+   * Only for the "New document" flow. A starter decides the paper, the
+   * size, the orientation *and* the scaffolding on page 1 — all of which
+   * are properties of a notebook being born, not of a page being appended
+   * to one that already has a format.
+   */
+  starters?: boolean;
   /**
    * When `false`, the Image format is hidden — useful for flows that cannot
    * attach a file yet. Default `true`.
@@ -258,6 +271,7 @@ export const NewPageDialog: React.FC<NewPageDialogProps> = ({
   submitLabel = "Add page",
   intro = DEFAULT_INTRO,
   allowImage = true,
+  starters = false,
   className,
 }) => {
   const uid = useId().replace(/:/g, "");
@@ -275,6 +289,7 @@ export const NewPageDialog: React.FC<NewPageDialogProps> = ({
   const [imageFit, setImageFit] = useState<PageImageFit>(
     initial?.imageFit ?? "cover",
   );
+  const [starterId, setStarterId] = useState<string>("blank");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -397,6 +412,7 @@ export const NewPageDialog: React.FC<NewPageDialogProps> = ({
         landscape,
         imageFile: isImage ? imageFile : null,
         imageFit,
+        ...(starters ? { starterId } : {}),
       });
       onClose();
     } catch (caught) {
@@ -417,6 +433,8 @@ export const NewPageDialog: React.FC<NewPageDialogProps> = ({
     onClose,
     onSubmit,
     size,
+    starterId,
+    starters,
   ]);
 
   const preset = PAGE_SIZES[size];
@@ -470,11 +488,54 @@ export const NewPageDialog: React.FC<NewPageDialogProps> = ({
           {intro}
         </p>
 
+        {starters && (
+          <div
+            className="gn-new-page__starters"
+            role="radiogroup"
+            aria-label="Start from"
+          >
+            {NOTEBOOK_STARTERS.map((starter) => (
+              <button
+                key={starter.id}
+                type="button"
+                role="radio"
+                aria-checked={starterId === starter.id}
+                className="gn-new-page__starter"
+                disabled={busy}
+                onClick={() => {
+                  // A starter is a shorthand for the three settings below
+                  // it, so it writes them rather than hiding them: the
+                  // picker stays visible and the student can see — and
+                  // override — exactly what "Lecture notes" chose.
+                  setStarterId(starter.id);
+                  setFormat(starter.template);
+                  setSize(starter.size);
+                  setLandscape(starter.landscape);
+                  setError(null);
+                }}
+              >
+                <span className="gn-new-page__starter-label">
+                  {starter.label}
+                </span>
+                <span className="gn-new-page__starter-desc">
+                  {starter.description}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <PaperPicker<NewPageFormatId>
           value={format}
           onChange={(next) => {
             setFormat(next);
             setError(null);
+            // The starter promised a particular paper; changing it by hand
+            // means the starter no longer describes this notebook, so its
+            // scaffolding should not be written either.
+            if (starters && next !== getStarter(starterId).template) {
+              setStarterId("blank");
+            }
           }}
           options={formatOptions}
           theme={theme}
