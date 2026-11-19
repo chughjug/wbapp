@@ -12,7 +12,8 @@ import { StoreIncrement } from "@excalidraw/element";
 
 import type { DurableIncrement, EphemeralIncrement } from "@excalidraw/element";
 
-import ExcalidrawApp from "../App";
+import { Provider, appJotaiStore } from "../app-jotai";
+import Editor from "../Editor";
 
 const { h } = window;
 
@@ -101,11 +102,32 @@ describe("collaboration", () => {
     window.history.replaceState({}, "", "/#json=sharedSceneId,sharedSceneKey");
   });
 
+  /**
+   * Render the editor directly, rather than the app shell.
+   *
+   * These tests are about the editor's collaboration behaviour, not about
+   * routing, and the shell now reaches the editor through `React.lazy`.
+   * Going through it made the test depend on a dynamic import resolving
+   * inside the mocked module graph this file sets up, which it did not —
+   * so this mounts the thing under test and skips the router entirely.
+   */
+  const renderEditor = async () =>
+    render(
+      <Provider store={appJotaiStore}>
+        <Editor
+          docId={null}
+          onCloseDocument={() => {}}
+          onNewDocument={() => {}}
+          onOpenDocument={() => {}}
+        />
+      </Provider>,
+    );
+
   it("should emit two ephemeral increments even though updates get batched", async () => {
     const durableIncrements: DurableIncrement[] = [];
     const ephemeralIncrements: EphemeralIncrement[] = [];
 
-    await render(<ExcalidrawApp />);
+    await renderEditor();
 
     h.store.onStoreIncrementEmitter.on((increment) => {
       if (StoreIncrement.isDurable(increment)) {
@@ -175,7 +197,7 @@ describe("collaboration", () => {
   });
 
   it("should allow to undo / redo even on force-deleted elements", async () => {
-    await render(<ExcalidrawApp />);
+    await renderEditor();
     const rect1Props = {
       type: "rectangle",
       id: "A",
