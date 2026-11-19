@@ -1,6 +1,5 @@
 import Trans from "@excalidraw/excalidraw/components/Trans";
 import { t } from "@excalidraw/excalidraw/i18n";
-import * as Sentry from "@sentry/browser";
 import React from "react";
 
 interface TopErrorBoundaryState {
@@ -33,15 +32,34 @@ export class TopErrorBoundary extends React.Component<
       }
     }
 
-    Sentry.withScope((scope) => {
-      scope.setExtras(errorInfo);
-      const eventId = Sentry.captureException(error);
+    this.setState((state) => ({
+      ...state,
+      hasError: true,
+      localStorage: JSON.stringify(_localStorage),
+    }));
 
-      this.setState((state) => ({
-        hasError: true,
-        sentryEventId: eventId,
-        localStorage: JSON.stringify(_localStorage),
-      }));
+    // Reporting is opt-in (see ../sentry). With no DSN there is no client,
+    // so capturing would mint an event ID that was never sent anywhere —
+    // and the splash below would tell the user their crash was "tracked on
+    // our system" when nothing left the browser. Import @sentry/browser
+    // here rather than at the top so it also stays out of the entry chunk.
+    // written against import.meta.env directly, not a flag imported from
+    // ../sentry: with VITE_APP_SENTRY_DSN declared empty the bundler folds
+    // this branch away at build time, so the dynamic import below is
+    // unreachable and @sentry/browser is never emitted or precached at all.
+    if (
+      !import.meta.env.VITE_APP_SENTRY_DSN ||
+      import.meta.env.VITE_APP_DISABLE_SENTRY === "true"
+    ) {
+      return;
+    }
+
+    void import("@sentry/browser").then((Sentry) => {
+      Sentry.withScope((scope) => {
+        scope.setExtras(errorInfo);
+        const eventId = Sentry.captureException(error);
+        this.setState((state) => ({ ...state, sentryEventId: eventId }));
+      });
     });
   }
 
@@ -114,11 +132,13 @@ export class TopErrorBoundary extends React.Component<
             </div>
           </div>
           <div>
-            <div className="ErrorSplash-paragraph">
-              {t("errorSplash.trackedToSentry", {
-                eventId: this.state.sentryEventId,
-              })}
-            </div>
+            {this.state.sentryEventId && (
+              <div className="ErrorSplash-paragraph">
+                {t("errorSplash.trackedToSentry", {
+                  eventId: this.state.sentryEventId,
+                })}
+              </div>
+            )}
             <div className="ErrorSplash-paragraph">
               <Trans
                 i18nKey="errorSplash.openIssueMessage"

@@ -22,6 +22,10 @@ interface ImportMetaEnv {
   VITE_APP_DEV_DISABLE_LIVE_RELOAD: string;
 
   VITE_APP_DISABLE_SENTRY: string;
+  /** Your own Sentry DSN. Error reporting is off unless this is set. */
+  VITE_APP_SENTRY_DSN: string;
+  /** Environment name sent with each Sentry event, e.g. "production". */
+  VITE_APP_SENTRY_ENVIRONMENT: string;
 
   // Set this flag to false if you want to open the overlay by default
   VITE_APP_COLLAPSE_OVERLAY: string;
