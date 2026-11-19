@@ -14,6 +14,7 @@ import { FixedSideContainer } from "./FixedSideContainer";
 import { Island } from "./Island";
 
 import { PenModeButton } from "./PenModeButton";
+import { Toast } from "./Toast";
 import { ViewportStatusBadge } from "./ViewportStatusFrame/ViewportStatusFrame";
 
 import type { ActionManager } from "../actions/manager";
@@ -140,6 +141,21 @@ export const MobileMenu = ({
       </button>
     ) : null;
 
+  // Upstream renders the toast only in the non-phone branch of `LayerUI`,
+  // so on a phone `setToast` was a no-op you could not see — every message
+  // the app sends that way was simply lost on the smallest screen, which is
+  // the one a student is most likely holding. It shares the status stack
+  // with the scroll-back button, and takes precedence over it, the same way
+  // it does on a desktop.
+  const toast = appState.toast ? (
+    <Toast
+      message={appState.toast.message}
+      onClose={() => setAppState({ toast: null })}
+      duration={appState.toast.duration}
+      closable={appState.toast.closable}
+    />
+  ) : null;
+
   const viewportStatusLabel = app.props.viewportStatusFrame?.label;
   const viewportStatusBadge = viewportStatusLabel ? (
     <ViewportStatusBadge
@@ -165,9 +181,9 @@ export const MobileMenu = ({
           }}
           data-viewport-ui="bottom"
         >
-          {scrollBackToContentButton && (
+          {(toast || scrollBackToContentButton) && (
             <div className="floating-status-stack">
-              {scrollBackToContentButton}
+              {toast ?? scrollBackToContentButton}
             </div>
           )}
 
@@ -186,9 +202,12 @@ export const MobileMenu = ({
         </div>
       )}
 
-      {!shouldRenderDefaultBottomBar && scrollBackToContentButton && (
-        <div className="floating-status-stack">{scrollBackToContentButton}</div>
-      )}
+      {!shouldRenderDefaultBottomBar &&
+        (toast || scrollBackToContentButton) && (
+          <div className="floating-status-stack">
+            {toast ?? scrollBackToContentButton}
+          </div>
+        )}
 
       {viewportStatusBadge && (
         <div className="viewport-status-frame__badge-row">

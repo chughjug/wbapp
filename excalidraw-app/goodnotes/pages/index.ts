@@ -116,6 +116,14 @@ export {
 } from "./pendingNewDocument";
 export type { PendingNewDocumentSeed } from "./pendingNewDocument";
 
+/** Stash / take the page a search hit was on, across the open remount. */
+export {
+  setPendingPageJump,
+  takePendingPageJump,
+  clearPendingPageJumps,
+} from "./pendingPageJump";
+export type { PendingPageJump } from "./pendingPageJump";
+
 /** The dialog itself, if you would rather drive the open state yourself. */
 export { NewPageDialog, IMAGE_FORMAT_ID } from "./NewPageDialog";
 export type {

@@ -49,6 +49,7 @@ import React, {
   useState,
 } from "react";
 
+import { setPendingPageJump } from "../pages";
 import { ensureSearchIndex, searchNotes } from "../search";
 
 import { useDocuments } from "./useDocuments";
@@ -707,9 +708,16 @@ export const Shelf = ({
   const handleOpen = useCallback(
     (doc: DocMeta) => {
       void actions.touch(doc.id);
+      // Opened from a content hit: carry the page over so the editor lands on
+      // the words that were searched for, rather than wherever the notebook
+      // was last left. Page 0 ("not on any page") is dropped by the stash.
+      const hit = contentHits.get(doc.id);
+      if (hit) {
+        setPendingPageJump(doc.id, { page: hit.page, query: query.trim() });
+      }
       onOpenDocument(doc);
     },
-    [actions, onOpenDocument],
+    [actions, onOpenDocument, contentHits, query],
   );
 
   const handleDuplicate = useCallback(

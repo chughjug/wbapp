@@ -104,6 +104,9 @@ import {
   attachPageImageFile,
   readNewPageChoice,
   takePendingNewDocumentSeed,
+  takePendingPageJump,
+  setPendingPageJump,
+  scrollToPage,
 } from "./goodnotes/pages";
 import { PaperBackgroundLayer, syncPageImageCache } from "./goodnotes/paper";
 import { PagedViewControls, usePagedView } from "./goodnotes/paged";
@@ -455,6 +458,10 @@ const ExcalidrawWrapper = ({
   const graph = useGraphDialog(excalidrawAPI);
   // one page at a time, fitted to the workspace; swipe/arrows move between
   const paged = usePagedView(excalidrawAPI);
+  // The page-jump effect must not re-run every time the paged state changes
+  // (it consumes a one-shot stash), so it reads the live hook through a ref.
+  const pagedRef = useRef(paged);
+  pagedRef.current = paged;
   // paper vs whiteboard (per document) + rotate sheet
   const surface = useSurface(excalidrawAPI, { docId: docId ?? undefined });
   const [isPagePanelOpen, setIsPagePanelOpen] = useState(false);
@@ -568,6 +575,75 @@ const ExcalidrawWrapper = ({
       cancelled = true;
     };
   }, [excalidrawAPI, docId, seedFirstPage]);
+
+  // Land on the page a search hit was found on.
+  //
+  // The shelf stashed it on the way out (see `pages/pendingPageJump`),
+  // because opening a document navigates and remounts the editor.
+  //
+  // Which call does the moving depends on the view mode, and getting that
+  // wrong is invisible in code and obvious in a browser: in paged view the
+  // paged controller owns the viewport and installs its lock on the page it
+  // considers current a few hundred ms after the document mounts, so a plain
+  // `scrollToPage` lands on the right page and is then snapped back to page
+  // 1. Routing through the controller instead makes the jump the thing it
+  // locks onto. In continuous view there is no controller, so `scrollToPage`
+  // is the only mover.
+  //
+  // Either way the scene is not there on the first frame, so both report
+  // false until a `page:<n>` frame exists; this retries for ~3s and then
+  // gives up silently. A missed jump must never block the document.
+  //
+  // StrictMode double-invokes effects and taking the stash is destructive,
+  // so an unfinished jump is put back on cleanup; one that ran out of
+  // attempts is not, or it would fire on an unrelated later open.
+  useEffect(() => {
+    if (!excalidrawAPI || !docId) {
+      return;
+    }
+    const jump = takePendingPageJump(docId);
+    if (!jump) {
+      return;
+    }
+    const index = jump.page - 1;
+    /** ~3s at 60fps: give up rather than retry into a document in use. */
+    const MAX_FRAMES = 180;
+    let frames = 0;
+    let done = false;
+    let frame = 0;
+
+    const step = () => {
+      frames++;
+      const moved = pagedRef.current.isPaged
+        ? pagedRef.current.goToPage(index, { animate: false })
+        : scrollToPage(excalidrawAPI, index);
+      if (moved) {
+        done = true;
+        // a long query would push the rest of the sentence off a phone toast
+        const shown =
+          jump.query.length > 32 ? `${jump.query.slice(0, 32)}…` : jump.query;
+        excalidrawAPI.setToast({
+          message: shown
+            ? `Page ${jump.page} — where “${shown}” appears`
+            : `Page ${jump.page}`,
+          closable: true,
+          duration: 5000,
+        });
+        return;
+      }
+      if (frames < MAX_FRAMES) {
+        frame = requestAnimationFrame(step);
+      }
+    };
+
+    frame = requestAnimationFrame(step);
+    return () => {
+      cancelAnimationFrame(frame);
+      if (!done && frames < MAX_FRAMES) {
+        setPendingPageJump(docId, jump);
+      }
+    };
+  }, [excalidrawAPI, docId]);
 
   // flush any debounced scene write before the tab goes away
   useEffect(() => {
